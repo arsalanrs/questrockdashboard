@@ -1,4 +1,4 @@
-import { generateMockLoanData, importShapeKpiCsv, mockEnrichImportedLoans } from "./actions";
+import { clearSyncData, generateMockLoanData, importShapeKpiCsv, mockEnrichImportedLoans, resetUserPassword } from "./actions";
 import { createTeam, createUserAndAssign, seedInitialOrg } from "./org-actions";
 import { ShapeApiPreview } from "./ShapeApiPreview";
 import { SyncNowButton } from "./SyncNowButton";
@@ -21,7 +21,10 @@ type Props = {
     syncPages?: string;
     syncRecords?: string;
     syncLoans?: string;
+    syncSkipped?: string;
     unmapped?: string;
+    cleared?: string;
+    passwordReset?: string;
   };
 };
 
@@ -78,6 +81,8 @@ export default async function AdminImportPage({ searchParams }: Props) {
                 ) : null}
               </>
             ) : null}
+            {searchParams.cleared ? " All synced data cleared. You can sync again." : null}
+            {searchParams.passwordReset ? " Password updated." : null}
           </div>
         ) : null}
 
@@ -105,6 +110,21 @@ export default async function AdminImportPage({ searchParams }: Props) {
           </p>
           <ShapeApiPreview />
           <SyncNowButton />
+        </div>
+
+        <div className="mt-6 border-t border-border pt-5">
+          <h4 className="text-sm font-medium">Clear data</h4>
+          <p className="mt-1 text-xs text-mutedForeground">
+            Erase all synced data (raw, loans, leads, etc.). Run sync again after to repopulate.
+          </p>
+          <form action={clearSyncData} className="mt-2">
+            <button
+              type="submit"
+              className="rounded-md border border-amber-600/50 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/20"
+            >
+              Clear all synced data
+            </button>
+          </form>
         </div>
 
         <p className="mt-4 text-xs text-mutedForeground">
@@ -188,6 +208,41 @@ export default async function AdminImportPage({ searchParams }: Props) {
         </form>
         <div className="mt-2 text-xs text-mutedForeground">
           Password: <span className="font-mono">ChangeMe!123</span>
+        </div>
+
+        <div className="mt-6 border-t border-border pt-5">
+          <h3 className="text-sm font-medium">Reset user password</h3>
+          <p className="mt-1 text-xs text-mutedForeground">
+            Set a new password for any user (e.g. <span className="font-mono">arsalan@questrock.com</span>).
+          </p>
+          <form action={resetUserPassword} className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-xs">
+              Email
+              <input
+                name="email"
+                type="email"
+                placeholder="arsalan@questrock.com"
+                className="w-56 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              New password
+              <input
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                className="w-44 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90"
+            >
+              Reset password
+            </button>
+          </form>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">

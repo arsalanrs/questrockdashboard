@@ -9,6 +9,7 @@ import { generateMockLoans, mockEnrichLoans } from "@/lib/mock/enrich";
 import { hasShapeApiConfig } from "@/lib/shape-api/config";
 import { runShapeApiPreview } from "@/lib/shape-api/preview";
 import { runShapeApiSync } from "@/lib/shape-api/sync";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const MAX_ERROR_PARAM_LENGTH = 200;
 
@@ -168,5 +169,40 @@ export async function runShapeApiSyncReturn(formData: FormData): Promise<
     const msg = e instanceof Error ? e.message : "Shape API sync failed";
     return { ok: false, error: msg.length > 300 ? `${msg.slice(0, 300)}…` : msg };
   }
+}
+
+export async function clearSyncData() {
+  const { appUser } = await requireCurrentUser();
+  if (!canAccessAdmin(appUser.role)) notFound();
+
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.rpc("truncate_sync_data");
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/lo");
+  revalidatePath("/dashboard/manager");
+  revalidatePath("/dashboard/executive");
+  revalidatePath("/admin/import");
+  redirect("/admin/import?ok=1&cleared=1");
+}
+
+export async function resetUserPassword(formData: FormData) {
+  const { appUser } = await requireCurrentUser();
+  if (!canAccessAdmin(appUser.role)) notFound();
+
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "").trim();
+  if (!email || !password) redirect("/admin/import?error=Missing%20email%20or%20password");
+
+  const admin = createSupabaseAdminClient();
+  const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 500 });
+  const user = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email.toLowerCase());
+  if (!user) redirect("/admin/import?error=User%20not%20found");
+
+  const { error } = await admin.auth.admin.updateUserById(user.id, { password });
+  if (error) redirect(`/admin/import?error=${encodeURIComponent(error.message)}`);
+
+  revalidatePath("/admin/import");
+  redirect("/admin/import?ok=1&passwordReset=1");
 }
 
