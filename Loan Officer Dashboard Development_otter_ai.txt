@@ -1,0 +1,295 @@
+Speaker 1  0:00  
+Went to fund it, and that's because humans are in there changing the statuses. And, you know, like a guy took it two days off of work this week, and so it didn't go to closed status. You
+
+Speaker 2  0:20  
+I think, I think I lost you. Oh, can you hear me? Yeah, I can hear you now.
+
+Speaker 1  0:28  
+Okay, there you go. But yeah, you see like that. There's this tracking thing and, or where was it monitoring, tracking, and there's monitoring, and it has a lot of the captures, a lot of the status times, but then it skips a few like this
+
+Speaker 2  0:42  
+one, nice. Now I can see the landing pad status as well.
+
+Unknown Speaker  0:47  
+Yeah, exactly. They're all right there.
+
+Unknown Speaker  0:50  
+Okay, great, great.
+
+Speaker 1  0:53  
+Even like, so, yeah, Portal status, landing pad status, and then, like, here's this a lot of stuff. They they upload, they can upload documents in here too. And I was trying to make this where, you know, in here, we can track all of their loan conditions. But I don't know it's, it's tough. It's tough. I want to talk to you about that on a separate, separate note from the dashboard.
+
+Speaker 2  1:20  
+I mean, this still helps a lot, because now I don't know about these statuses. I was so confused. I just wanted to get you on call so that you know I can, kind of like, build this dashboard. And now talking about the loan officers logins. I don't even know how many loan officers they are. I'll show you, because then I would then be assigning user base roles to each loan officer based on the loan officer the person is assigned to correct. Now I have a question. I have a question. Call comes in first, right? And let's say that I pick it up so Arsalan picks it up, right? So that customer is assigned to me in shape, right? But I don't close that customer, right? You close that customer when another call of the customer comes in, and then you have a talk with that customer, and then you close it. So what happens? Then? Who is it assigned to?
+
+Speaker 1  2:14  
+So what's this would be good to hear, too. Our product, our kind of, our loan life cycle, is more of like a the general, like the standard, is like a 30 day life cycle. So from first phone call to close loan and funded loan, it can be anywhere from 10 to 30 to 45 to four months sometimes. So, you know, we're working through these. We're talking to these borrowers very, very often and multiple, multiple times, three times at the at the least, if we can, like, the perfect loan officer that can run a high volume shop can do
+
+Unknown Speaker  2:52  
+but like, yeah, first phone call,
+
+Speaker 1  2:55  
+and then we get the application, and then we set up a second phone call, then we present them a loan, And then we set up a third phone call to help them e sign their application. Then there's a fourth phone call, usually when the appraisal comes in, and then a fifth one, when the final numbers come in. And we're close, we're actually, you know, present final presenting the loan we presented in the beginning, and how it turned out and why? And then in the in between, there's phone calls, like when they're collecting conditions. And hey, I need this document for the underwriter. I need this one for the underwriter. But wait, ask me. Would you ask me again? I was on to something.
+
+Speaker 2  3:34  
+So what I was asking you, essentially, is, let's say that Stephen Curry, nice name. So Stephen Curry? Yeah, Stephen Curry picked up the phone call. First come on phone call, right? And then he sent the poster link, great, but he did not close it, right? And the customer and the borrower comes in again, and let's say Kobe Bryant picks up this time, right? And Kobe Bryant is like Kobe Bryant then goes through the same process as Stephen Curry did, but this time, he actually closes the borrower right with this time the borrower comes in with application completed. So in that meantime, what will the dashboard show? Will the dashboard show the client for Kobe Bryant, or will the dashboard show the client for Stephen Curry?
+
+Speaker 1  4:19  
+So it could, it could essentially show both. But here's the thing we have, and maybe help with this too. There are rules in here about duplicate management. There we go. There are rules for duplicate management. Not very often do we have two of the same lead call in twice, but a lot of times, what happens is, is we have auto assignment. So if Stephen Curry didn't close that customer, or, you know, get that customer's app on the call, or didn't get the app, then those drip campaigns will automatically move and move and assign the lead around. So, you know, we have some automatic reconciliation.
+
+Speaker 2  5:07  
+And then I can just extract through shape if there has been a reassignment. And then in the dashboard, it won't show up for Stephen Gary anymore, it will show up for Kobe brand. He was the one who got it done exactly.
+
+Speaker 1  5:21  
+And let's see here. So where's my this is one to see. So we have a lot of drip campaigns that are set up. This one's not fully built out yet, but it has the bones. So like what happens is, is it whoever answered this is for DSCR hot campaigns that are an attempting contact status. I mean, someone hasn't got a hold of them. And then after three days, it assigns to another member of Team T Reg, after three days, it assigns to Jessica Girard. After one week, it assigns to the connoisseurs desk, which is our VAs who are calling. And then after 30 days, it goes into a one year long term nurture drip, and it stays assigned to concierge test. But I, you know, I can't figure out a way to get leads to assigned back to the original loan officer on
+
+Unknown Speaker  6:25  
+let's See if shape AI knows.
+
+Unknown Speaker  6:40  
+Honestly this is manual, yeah,
+
+Speaker 1  6:43  
+yeah, okay, so it's not that good anyway. So yeah, so yeah, we got a little bit of the reconciliation there that merges contacts and then some of that kind of just manual management right now, of reassigning and then the drip campaigns.
+
+Speaker 2  7:07  
+Great, great. So one final question, and I think that would be all for me in the dashboard, you sign in, you're a loan officer. What do you want to see over there?
+
+Unknown Speaker  7:19  
+That's a great question. So
+
+Speaker 1  7:22  
+basically, you would want to see things as a loan officer, your
+
+Unknown Speaker  7:28  
+your fire time processing? Yeah.
+
+Speaker 1  7:31  
+I would, yeah. I would say the overview of like, Hey, here's my total active loans, you know, that are in the process from, from, you know, package app, like pack application, take and package outside is all the way to, you know, closed funded, purchased, and it'd be like loans and total lack of loans, loans, and processing loans, and underwriting, you know, loans, awaiting conditions. And, you know, like, I don't know if the names are the best, you know. And then what locked loans, loans clear to close, you know, like, kind of, kind of managing the statuses. And then, you know, loans past turn, I would like it to match up with the turn time. Our quest rock, turn times. Have I sent you our process flow chart
+
+Speaker 2  8:18  
+and all that you have sent me the process for sure. I think, yeah,
+
+Speaker 1  8:22  
+awesome, great, yeah. So, you know. And then that way they know, I want to make it automatic for them to just know, like, hey, I need to go do this today. I need to focus on these, you know, loans with finance contingencies coming up, appraisal contingencies coming up. Those are in purchase purchases, when they're buying homes, there's a finance contingency or due diligence date or appraisal contingency dates, usually both, and that means, like, the appraisal has to be ordered in back before the appraisal contingency is over, because that gives the customer a chance to
+
+Unknown Speaker  8:56  
+fight for like, what? What
+
+Speaker 1  9:00  
+if they want to renegotiate or cancel the contract. And then finance contingency allows them a time period to get approved for a loan and get their money back. And then, you know, then, then, I think, also to, like, a scoreboard of their like, production metrics, like, you know, volume, volume funded this month. You know, anticipated closings this month, or volume funded year to date, average loan size. If there was a way we could track their compensation to the loan, which I don't, it's not really set up like that, because we just, we look at the closings and then go to ADP and pay them. It's like revenue per loan months to date, revenue and then speed metrics like we want, like, how fast are they doing? Stuff like average days from lead to app, from app to submission, submission to clear, to close, clear to close, to close, total average days to close, and that sort, you know, you know, that sort of thing and and something that really helped them jump in to working on their loans, and then, like, you know, they'll be we need our we need our own kind of executive view as well, where we can filter, you know, just Like that Google Dashboard filter by loan officers and states and UTM campaigns.
+
+Unknown Speaker  10:25  
+And wouldn't that be for the admins?
+
+Speaker 2  10:28  
+What's that? Wouldn't that be where they can view all the loan officers for the admins only?
+
+Speaker 1  10:36  
+Yeah, the admins only, that'd be me. Bill Ray,
+
+Speaker 2  10:39  
+yeah, got it. That was essentially what I was going for. Yeah, and
+
+Speaker 1  10:42  
+then two, I think that there would be one more layer to, like a middle management layer, where, you know, we there will be a loan officer who, he closes loans himself, but he also runs a team of, maybe, you know, up to 10 loan officers. So they would need to have a view, to view their their teams, metrics and what's important today for their team, you know, what they need to jump on, and stuff like that. So a middle management layer as well, too. And, you know? And then that, that executive view for me, Ray and Bill would be, you know, we basically can track marketing. We can track loans stuck and all kinds of stuff, and I, and, you know, so revenue drop off and etc. And it'd be really cool too, if, like, if a loan officers in their in their dashboard, and they could essentially open a lead, you know, like, hey, they it's like, Okay, here's, here's, you know, conditions or whatever I need to get. And then they can click into something, and then here's the lead that they have, and then it has the conditions that that are needed to and I can show you how. Yeah, so let me go and let me go into this so me and Ray were talking yesterday, and there's some problems that that we have that we need to solve really quickly. And give me one second we pull it up.
+
+Speaker 2  12:29  
+Also just before, I don't forget this, I tried to open the vent red form, but it just told me that you cannot connect to this. What is it? I tried to open the one the first word financial form that you sent me.
+
+Unknown Speaker  12:46  
+Oh, here we go. Oh, for the investor, it
+
+Unknown Speaker  12:51  
+wasn't opening up for me.
+
+Speaker 2  13:03  
+Okay, so we won this form as well, for for the loan officers, right? Yeah.
+
+Speaker 1  13:10  
+So, like, part of our investor hub, investor dashboard, we would need some way to, like, do an intake. You know, this one's, this one's, here's the thing I figured out. So I don't know if shape is capturing all this detail. Maybe you can help me figure this out too. But there's a tab called alternate finance that I look like unlocked, and it it looks like it might capture a lot of the information from that form, like, does it have fix and flip experience, ground up construction assets, net worth, employment information, if they have that, Was it, loan terms, and it's got, like, LTV, LTC, ARB, construction, percent finance payoffs. So I think there's a lot of good stuff here in in shape that we probably could use for that intake. But I don't know it's, it's probably not as user friendly as going through something like this. Yeah. And then, you know, that would feed into our investor hub. That would probably export into shape as well, too, but that hub would have like a dashboard for the investors to track their portfolios, and then loan officers to track their loans, and us to see what's going on there. So that's a
+
+Unknown Speaker  14:47  
+that's kind of what that would, would would look like. I would think,
+
+Unknown Speaker  14:51  
+right, you were, you were showing me something,
+
+Speaker 1  14:55  
+yeah, so I was gonna tell you. Alright, so what, what we worked on before was the automatic transcript and summary into
+
+Unknown Speaker  15:11  
+into shape. Oh, that's not a good one.
+
+Unknown Speaker  15:24  
+Answer two of these. I gotta fix that. There's three of these. I'm
+
+Speaker 1  15:46  
+okay, so we have a certain lead source called DSCR hot, and the phone system on DSCR hot called Quick Fire connect, basically you're on shape and then a little orange box pops up, and it helps us get to the customer right away, because it's a very competitive lead source with three different lenders calling, and you just accept the call, and then it calls them right away, and then we're on the phone with them.
+
+Unknown Speaker  16:12  
+And what happens is
+
+Speaker 1  16:15  
+it doesn't, it doesn't capture the call transcript and recording like, like the other ones that we set up, because those are pulling from zoom. So instead, in the contact log, it saves right here, the call recording, AI insights, and it autumn already does, like a little summary, but it doesn't do it how we want to. But then we get the call transcript here. So what we're doing is when one of these calls and I got an email that goes to one of our vas, and vas, who copies, goes in here, clicks this, he copies the transcript, puts it in chat, GBT, and then he pastes it in here.
+
+Speaker 2  16:56  
+Oh, that's an easy automation. So you said that as soon as transcript gets completed, it goes to a mailbox, correct
+
+Speaker 1  17:04  
+it goes in. I don't even know how this works, but it goes in here. Hold on. So the question we would we can ask a question to the AI, but it goes into this AI insights, and then it saves right here. So I guess the question would be, how do we Pull so
+
+Unknown Speaker  17:39  
+call logs Report reports, call logs, report
+
+Speaker 1  17:49  
+as a report, I guess that okay, this might be it. Complete call log.
+
+Unknown Speaker  18:20  
+Okay, so
+
+Speaker 1  18:28  
+it looks like it does, goes into the Call LAW provider, uu ID, I don't even know what that is.
+
+Speaker 2  18:36  
+Let me check something. Well, how are you? I cannot find AI support.
+
+Unknown Speaker  18:41  
+Oh, you down here in the bottom right, click Help.
+
+Speaker 1  18:47  
+But yeah, you should do you should use that thing up when you're when you're messing with this, because it actually knows the system pretty well. And then if it has limitations, it'll tell you to contact support, and you can hit support up anytime, just, you know, hey, this is, you know, we work with naked place rap. You can ask me first, because I might, I might have already asked him a question about something,
+
+Speaker 2  19:09  
+yeah, ask it. How will we ask it? How will we able to push the recording into Zapier? I
+
+Speaker 3  19:28  
+A great way, right? So that's good settings. Call completed.
+
+Unknown Speaker  19:38  
+I mean, I know all of that, but it didn't answer the question,
+
+Speaker 2  19:46  
+map, the recording file, URL. Let me just open shape real quick. This should be an easy fix.
+
+Unknown Speaker  19:54  
+Nice, yeah, that's awesome, man.
+
+Speaker 1  19:58  
+Because let me tell you this too. So like here, that's the first call, and then after the first call, like I mentioned, with the statuses, then the next call, essentially would be either they're going to pitch the loan or they're following up and getting additional information. And for our managers, we need like calls, like transcriptions automatically, rating coaching, you know, hey, maybe even like program suggestions, what do next, what to say next, and I would love for it to be tailored to class rocks process, which I can tell you, based on a like, what an output would look like. I can tell you how that should, should be modified. But, you know, just kind of like, walk them through that. And like, I want to put Ray's brain and training my brain and training into automation so I never have to tell anyone to do anything again. It just like it's just automatic. Hold on. And then it goes from like first call to pitch to approval, and it just like, keeps building off a transcript. So we have this profile this customer, and we know exactly what to say. I mean, we've been we've been able, this week, man, to, like, Coach some of these loan officers and tell them exactly what to say, what not to say, how to say it. Based on just listening to their transcripts, they did this wrong, that wrong, and they need to fix it by saying this now, like it's crazy.
+
+Unknown Speaker  21:33  
+Okay, so I go to shape settings,
+
+Unknown Speaker  21:42  
+and outbound web books,
+
+Unknown Speaker  21:47  
+I create a new web hook,
+
+Unknown Speaker  21:50  
+step away like 20
+
+Speaker 3  21:57  
+seconds, yeah, sure. Called transcript to
+
+Speaker 2  22:01  
+shape and this is for the DSCR or all calls.
+
+Unknown Speaker  22:06  
+Yeah, it's just DSCR hot ones.
+
+Speaker 1  22:18  
+But, you know, essentially, we we want the same kind of like effect for all leads to where it like, it builds off the first call, and it builds off the pitch, and it builds off the approval calls, and like it keeps going, and somehow it goes to the manager in a way that they have, like a one page profile and what what to do is kind of complicated. I know we can get like a zap, going to automate that piece, and then, you know, building from there gets a little intricate, because it's like, know our programs and understand
+
+Unknown Speaker  22:58  
+some our sales Principles and stuff.
+
+Unknown Speaker  23:22  
+I Sapir i You
+
+Unknown Speaker  24:05  
+give me a quest truck. Password,
+
+Unknown Speaker  24:11  
+okay, okay, okay, I see quest rock.
+
+Unknown Speaker  24:20  
+Password, password,
+
+Speaker 2  24:32  
+did he do you send me in Chad the Zapier password,
+
+Unknown Speaker  24:38  
+I think it's like quest rock, one exclamation
+
+Unknown Speaker  24:40  
+question, one exclamation. Key.
+
+Unknown Speaker  24:42  
+Be medley. This is tables
+
+Unknown Speaker  24:52  
+and
+
+Speaker 1  24:58  
+forms and stuff. Too. Like, I wonder if this is like better than air table or the same which one? What is like the forms and table? Damn, AI agents. I didn't know Zapier had
+
+Unknown Speaker  25:13  
+all this is pretty insane. It's insane, right?
+
+Unknown Speaker  25:18  
+I Okay, so this is the SCR hard calls
+
+Unknown Speaker  25:31  
+to a three A month.
+
+Unknown Speaker  25:42  
+Wow. We have agents and chatbots. Okay, you
+
+Unknown Speaker  26:09  
+transcript do,
+
+Unknown Speaker  26:25  
+call For, be something,
+
+Unknown Speaker  26:41  
+text,
+
+Unknown Speaker  26:47  
+scene,
+
+Unknown Speaker  27:07  
+transcript,
+
+Unknown Speaker  27:15  
+Lo, performance, insights, That's what it is.
+
+Speaker 1  27:20  
+Oh, it's got some, some already template ones.
+
+Speaker 2  27:25  
+I'm just looking at the field with the transcript goes, oh. So when I send to web book, I can just send the transcript to their book.
+
+Speaker 1  27:36  
+They like, wow. So we can take that transcript and put it through like a prompt, yeah,
+
+Speaker 2  27:42  
+yeah, exactly. That's, that's the idea. But I'm trying to find the transcript. They like so many fields over here, dude.
+
+Speaker 1  27:48  
+I know shapes got so many damn fields, but, I mean, it's great, but also frustrating. Like, thank you, but damn you make it hard sometimes, like, you can do anything you i
+
+Speaker 3  28:47  
+Okay, so I have now this is not yet call, let's call by last call, attempt, check call, Last inbound call, root, last called by last called score, okay, so,
+
+Unknown Speaker  29:11  
+sorry, a lot of things going on in the background.
+
+Speaker 1  29:15  
+No, you're good. I'm looking at some this new like shape AI bot, they put in the system that calls and stuff like that. Types of calls you
+
+Unknown Speaker  29:52  
+I click On site. I
+
+Transcribed by https://otter.ai

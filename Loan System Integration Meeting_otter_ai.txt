@@ -1,0 +1,151 @@
+Speaker 1  0:03  
+I particle make such a so on The shape of The Graph. Sorry.
+
+Unknown Speaker  1:40  
+In your chair. Okay, i
+
+Unknown Speaker  3:02  
+i You Hello, hello. Can you hear me? Yes, I can. How are you?
+
+Unknown Speaker  3:35  
+Man, I'm good. Man, how are you doing?
+
+Speaker 2  3:38  
+Just a little sick. I don't know. I think I caught the floor something.
+
+Unknown Speaker  3:43  
+Yeah, that sucks. Are you feeling better? A little
+
+Unknown Speaker  3:46  
+better? I would say that's good.
+
+Speaker 3  3:48  
+I know I was, we were we were, I was kind of down and out a couple days myself, just kind of feeling, feeling kind of crappy. So must be something going around the world.
+
+Unknown Speaker  3:59  
+Something is going around in the world
+
+Speaker 3  4:01  
+always, always is,
+
+Speaker 2  4:04  
+well, let me just pull up the dashboard and then I can discuss everything with you
+
+Unknown Speaker  4:10  
+to get a hold for you. A hold of you. For so long I feel
+
+Unknown Speaker  4:13  
+like I've been trying to get a hold of you, but here we are.
+
+Speaker 3  4:18  
+But no, I My schedule is pretty crazy, so when I only, when I have time to to get on is like, you know, I got some we got to be able to jump on it, if we can. But I understand we, you know, you got things going on as well too. So
+
+Speaker 2  4:36  
+I just hold on. Let me just pull the dashboard.
+
+Unknown Speaker  4:44  
+Were you able to add me to landing bed?
+
+Speaker 3  4:47  
+Yeah, I can. I need. I haven't even had time to look at that. So we can do that.
+
+Speaker 3  4:57  
+We had a lot of loans come in this week. And our sales guys are, they're doing great, and they're bringing in all kinds of business. So it's been keeping us real busy. And you know, one of the problems is, like a lot of these investor type of loans that we're just not set up really to take, take those on upfront. We just had to get that all situated. So, you know, the whole investor hub and all that's going to be amazing when it all comes together.
+
+Speaker 2  5:26  
+Okay, absolutely, man. I mean, I've been itching to complete this project.
+
+Speaker 3  5:31  
+I know I know it. I'm logging into like shape and lending pad right now to have that open in my chat. GPT here. So take your Take your time. Yeah sure you You
+
+Unknown Speaker  6:38  
+6516, I, hold
+
+Unknown Speaker  6:55  
+on one second. Let me grab this Call. I How Is The person You
+
+Unknown Speaker  8:20  
+I Hello education, all right, I'm back, sorry about
+
+Speaker 2  9:09  
+that, though, right? So we have set this up, is I have, I mean, obviously, right now I only had access to the shape KPI leads, right? So from that report. So what this does is the dashboard automatically pulls shape KPI leads into this with the statuses and the loan amounts, right? But what I need from you is the landing pad that way is when that would be how I would be able to extract some real, valuable information.
+
+Speaker 3  9:46  
+Okay, right? And then from lending pad, what? What would you be pulling from there?
+
+Unknown Speaker  9:51  
+Says the loan forms go in there. Oh, you
+
+Speaker 3  9:55  
+talking about, like, documents, yeah, so we actually can take. The documents and put them in to the dashboard, we would have to leave those in lending pad. That's the system of record for that, just because of compliance. And you know, we have a lot of NPI laws that we need to follow, like keeping like date of birth, social security, and most of the documents are belong to the customer, and so we have to keep them in there now, every now how shape and landing pad work is. And let me pull this up real quick.
+
+Speaker 2  10:35  
+You want me to start presenting so you can present?
+
+Speaker 3  10:38  
+No, you're good. I'm actually just going into shape AI support, and I'm asking so I can tell you how it says how it says it. So shape and lending pad work together through bi directional API that keeps the data synchronized between both systems. And when we create a loan in shape, like when they complete an application, it automatically creates a loan file and lending pad. Or we can create a loan and lending pad first and then shape automatically creates a borrower record, and then every 15 minutes, like any change to loan status or any critical date, or like these other 40 plot points, borrow info, property details, loan amounts, rates, milestones, dates, they all stay in sync. And, oh, I was just thinking, too, we should probably get like an otter or like a fireflies in here to record our session. Yeah.
+
+Unknown Speaker  11:32  
+Like, okay, okay, let's bring it in.
+
+Speaker 3  11:36  
+It isn't Oh, it is oh, hey, okay, you're there you go. You're already ahead of it, yeah, so great. So that's what it does. And then as far as user assignment, loan officer, loan officer, Assistant processor, we don't have an underwriter, so it's closer funder, and I think post closing are all the different users, and then we have, you know, branch managers and admins, but those guys are designated another way. And basically, documents approved from shape automatically pushed a lending pad, and then all the documentation actually is in shape, but there's more stuff in lending pad that's more loan related. So, so that's that's how they work together, critical dates and milestone from lending pad, appearance shapes, Tracking tab, and then the loan status updates flow automatically, so the CRM always has current information. So I actually think now that we have got the systems sync perfectly, and as long as the sync between shape and lending pads API is always intact, then we'll, we'll have, you know, be will have all the status, the status tracking, you know, by loan officer, by processor, and then even further, because of shape, we can track campaign lead source, you know, DSCR separately, purchase refi speed to stages, bottlenecks and things like that, and then the notes that users are using. So I think we can do this through with shape, and that's just, you know, I'm, that's how it was sold to us anyway, when, when we signed up for the system. Now, lending pad can produce different types of those, those reports, and that's one thing that can be done, is if you're, if you're exporting email reports with, you know, to track some of these KPIs, but, but the thing is, is it's supposed to be in shape. So I think that you know, if you find that it's not tracking certain fields and things that we probably should raise that to the attention of shapes. Developers say, Hey, you got an issue here. You know, support at set shape.com or help at set shape.com is, are there email addresses for support? And I always hit them up. I'm like, Hey, this isn't going the lending pad. Lending pads not updating back to this, and after about a year of back and forth, the statuses are now finally updating. The credit report pull dates or updating, but we can still create reports out of lending pad to track whatever could be missing out of shape. So I say, let's see where you know what
+
+Unknown Speaker  14:31  
+it gives us here, yeah,
+
+Speaker 3  14:33  
+and you know, and then make
+
+Speaker 2  14:36  
+our own reports exactly the same as landing pad, so we won't even need landing pad for it. If the data is completely synced to shape, we just need shapes data.
+
+Speaker 3  14:46  
+That's what that's that's what I came to the conclusion of this week. And based on, you know, everything they say about the system and what they told us two years ago, and that's why we picked them, so, which is great. So, so we can also track, you know, and we've. Built a lot of Joey has helped us build a lot of zaps in the system to track the UTM campaign that callers and people from you know Google ads are coming from. So for our executive dashboard where we're tracking marketing, we can actually have the UTM campaign. We can track state performance, refi or purchase loan, loan types, and you know, loan amounts, and all kinds of information on where the leads are coming from, whether they're coming from the website or they're calling in. And then if those are closing, and you know if we're if we're if we're getting credit pulls, if we're getting appraisal orders, if we're closing those are the three big things. And then more on the front end. You know, shape has a lot of tracking on like, application, send application completed to us. That's not really an application. That's more of a pre application, because it's like, Hey, here's your shape Account. Fill out, fill out, you know, here, borrower, fill out this link, put your information, where you work all that, and then, you know, it says application completed once that's done. But then after that, it syncs to lending pad, and then we put the loan together, and we find that's the first time we're pulling credit after they fill that out, so that we don't even know if they're then, then we actually present a loan, and then send them an A real application called a loan estimate, or 1003 it's like a 60 page document with all kinds of legal forms. And they sign that. Then we consider that an application that's signed. And then when they pay for their appraisal, which is they, someone comes out, looks at the house, puts a value on the house, and they pay for the appraisal, we consider that loan piped and, you know, we celebrate pipe, pipe loans.
+
+Speaker 2  16:52  
+Okay, Nick, question for you, yeah, right. So right now what I'm working on is just the LO login dashboard as the first step, right? Yeah, yeah. I mean, we are getting lead status assignments, custom qualification feeds from shape, right? Yes. The data is coming from landing pad. It should be file stage, outstanding conditions, milestones and days in stage. Does that also go in shape?
+
+Speaker 3  17:19  
+What would go back in shape is, yes, the status the file stage, because the processor manually throughout the throughout this file life cycle, the processor is working in the loan or we have VAs that will be in there, updating things as well, too. And once it goes to processing, you know, a button's clicked and a date is put in, and then that puts goes back to the shape. It says shapes Tracking tab. So it's like tracking date processing, or something like that. And then that's the date that it goes to processing. It counts down to the minute, hour, I think even the second. Could you show me? I mean,
+
+Speaker 2  17:59  
+if you could show me shape where this data is located. That would be, yeah, shape my entire screen here, screen two, because from then onwards it I'm going to build the dashboard view where each lo will be able to see their active pipeline, their files and processing, their outstanding conditions, aging files, all that stuff.
+
+Speaker 3  18:21  
+Let's go to funded loans. Let's go find a closed loan, because tracking, reverse engineering a closed loan should have more data than anything else in the system.
+
+Unknown Speaker  18:37  
+So let's pick this one. Christian Higgins, I it.
+
+Speaker 3  18:43  
+So this is a loan that I just closed last week, and so everything, I haven't even looked at it since, since I exported it from lending pad from shape. So we're going to see together. So this is what I get, initially, loan and property. Okay, that's where he lived. This is the house he bought. That's the loan amount.
+
+Unknown Speaker  19:06  
+You just said that you exploited it. No.
+
+Speaker 3  19:10  
+So what happens is when they so we get on the first call. This how we have a first call. First phone call, they call in and we speak to the borrower. We get we get their basic information to like, Phone and Phone, you know, where they live, what they're trying to do, their date of birth, social, all that. And if we don't get that on the first following call, we connect with them really well. And then we send them a portal application link here, and then they sign up, put all their details in there, and then, from there, we take this and we sync the Los that exports. It exports the loan to lending pad, but it keeps that bi directional sync via their API, and that's what it says here in.
+
+Unknown Speaker  20:03  
+Do it create, creates a loan and shape,
+
+Speaker 3  20:07  
+lending pad update shape every 15 minutes. So, so when I click that, it creates the file here in lending pad, and then, as I'm editing the file and lending pad every 15 minutes, this is updating. Okay, perfect. It actually did work on the status, because right now it's, it's funded in lending pad, and it shows funded here, and no one manually went in and changed it in shape. Okay.
+
+Speaker 2  20:27  
+So can you go over the statuses again? Hold on, yep, yes.
+
+Unknown Speaker  20:31  
+So go over through all of them, because I wouldn't need them for the dashboard.
+
+Speaker 3  20:42  
+I Hello, okay, I was just looking down a couple All right. So, so firstly, right, when a leads posted in the system, it's new lead, uncontacted, okay, that just all right. Then after they and then sometimes the we're texting with the customer, we're emailing with the customer. And this one's kind of just a real, really, really early status. First appointment scheduled, we might have just, hey, this is John. Hey. Can you talk? Hey, I can't talk right now. Can you talk at two Sure, I'll call you back. Boom, first appointment schedule, and it creates automation that sends an email to the manager. You they can put, they put a note of, you know, what time the appointment is, things like that missed appointment is if they missed that, they missed that call, or any appointment that was scheduled. And it sends a automatic text and email drip to try to set a new appointment with the customer attempting contacts very similar, the customer never answered, and there's an automatic drip campaign there. There's nothing here contacted, general follow up needed. Just they contacted. They need to call them for some reason,
+
+Unknown Speaker  21:59  
+pitch appointment scheduled. That's
+
+Speaker 3  22:03  
+they've done the first phone call with the customer, got the application information, and they scheduled an appointment to call them back to present loan options. Pitched in waiting. They presented loan options, and they're waiting on the customer to get back to them. Hey, I got to talk to my wife. Hey, let me think about it. Give me the weekend. Whatever they said, if it's a purchase loan and the person's house hunting, it would be pitched house hunting. They just use that kind of as a hold status. I don't know if I'm going to keep this one or not, but pitch house hunting, they're looking at homes pre qualified is a very we have three levels of approval, pre qualified, pre approved, and quest rec certified. If you're pre qualified, we had a phone conversation with you, and what you said sounds good, and it sounds like you can buy a house. Pre approved. We actually got an application. We've looked at your credit, we've looked at your income documents, and then questrock certified is, I think I got that down here. I don't think I have a status, but being questart certified means, you know, we've looked at your credit documents and we've looked at it, had an underwriter to look at it, and you're that person is very, very highly approved to go look at buy homes. No response. Ghosted another automated drip campaign status, if the customer is not talking to us and we can't get a hold of them, and this is kind of in the middle of the process or something, it just tries to get back a hold of them. Long term nurture. These are all like ending disposition statuses that that we track to see. You know, this means, like, no, basically, we didn't do anything with the customer, or it went through a drip campaign and we didn't get a hold of them, so we put them on a one year or two year drip campaign. Not interested. They're definitely not interested. Bad leads. Bad lead, bad contact info. You know, it's more another bad lead, essentially, but that one we use for to track refunds denied credit repair puts them on a credit repair drip. This means they didn't have down payment money, denied mortgage history. They they haven't made their payments on time in the last year or two. Denied no benefit. There's no reason to do anything right now, and let's kind of wait till later. We use that for managers to, you know, check and and see, like, okay, hey, how many people are putting no benefit? And then they can look at the deal and try to make a benefit, or give them a better deal or something, and then see if they can turn it into a loan, no equity. There's no equity in the home to do anything for refinance denied income. Income is not approvable, or we just can't get it to work. Other do not call us. This is a status that once they, once they're on this list, we're not allowed to call them ever again. And then these are the important ones here. Yep, here's the the portal. I. Uh, statuses, essentially, this application sent, started, completed. Those are all preliminary application. First phone call with the customer goes, Great, hey, I'll, you know, can you send me a link to to apply or to sign up? Hey, Yep, I'll send that to you. It takes you five minutes to apply. Then, you know, you go into portal tab here, and then you send it, and it automatically changes application sent. When the customer opens it and starts, it says started, and when they finish, it's completed. And it doesn't automatically change the status. I think you have to change it, but borrow docs requested, that's when the you go into the portal tab and you select certain documents, and there's custom there's like pre made lists for different loan types based on the first conversation with the customer, and it requests those documents. Then when they're all there, it changes this status. We don't use this one house sending seller or contract received necessarily, or package out or package back. They don't. They don't really work right. We need to kind of get those working right. Because there's a status called, there's a status called, application taken in lending pad, which changes this one to, I think it's supposed to be package out. So gotta, gotta take a look at that. We'll look at that when we get to the Tracking tab. And then package back would be the application is back the actual physical, like 60 page digital mortgage application, not the pre limit, not the prelim application, this one, so we call that package out and package back, and then piped is appraisal paid for. When the appraisal comes back, appraisal received registered means the loan officer has gotten all the documents from the customer. Got a signed application. The appraisal is paid for, and they're trying to send it into processing. And that means registers, means we have a loan in our system, in lending pad, and it's called a 3.4 file. And you can export that 3.4 file, it has all the borrower information, and you load it into like an investor's portal, like who we're actually selling the loan to and it just copy paste all the borrower data onto their their website, essentially like that might be Rocket Mortgage or nqm funding or the loan store or next bank or clear edge or kind lending, or all kinds, all kinds of people. We got a lot of lenders, and so they're all different workflows, too. So, you know, we have to train people to know how to handle that. So registered is when we register with that lender. Then it usually goes really quickly right to processing. Then once the processor, who's registered that loan with the lender and the loan officer is done at this point. All they're doing is they're working on the next loan now, and the processors closing the thing, working, working on closing the thing, until approval, and then it goes processing. That's them looking through documents, making sure that everything's needed for the end investor, provided by the loan officer and customer, then submission. That's when they're waiting on the underwriter to review the file. Usually takes three days. Once they're the underwriters reviewed the file, it gets approved or cleared to close. If it's approved, that means there's additional documents to get in the process. Usually, you know, like, Hey, can you all kinds of stuff? There's all kinds of things just to complete the application. And once those items are received, usually the processor will go get it, or the loan officer will go get it, or a combination of the two. Then they submit conditions back. The processor is in there, attaching conditions into that portal and writing explanations and getting letters signed by the borrower, and then, boom, sending it back to the investor. And if everything is provided, then it gets clear to close. Closings scheduled, then the loans closed, we fund it, and then that, and then there's also purchased. So if it's a loan that's non delegated that we're a lender on. We leave it as funded status, and when we sell the loan, it changes to purchase status, or we keep it as purchase status for broker loans. So funded and purchased are both, I would use them almost simultaneously as the same status, and both need to be tracked and closed. You know, closed, closed and then funded and then purchased. Are almost all the same thing, but they are different statuses in the closing, like after the loans closed. So. So there's, there's, there's a good way to track the best of those, or, you know, combine them, combine them all without like overlap. And then we don't use servicing. We usually don't use in shipping. We usually don't use post closing and then withdrawn. That would be a loan was withdrawn once it was in process. At some point not accepted. Customer didn't accept it, and usually you don't have that status, and then rescinded. Means, like the loan was actually closed, but within within a couple of days, the customer said, Hey, I'm actually canceling the loan. I want my money back, kind of thing. And then suspended. The loan was suspended in process, denied means it was denied in process, and that was a lending pad, denied status. Then new lead replied, is, we don't I mean, that was just like a shape status that was there. But I use it sometimes when I'm assigning leads that applied for like a second time. So sometimes we use it. And then obviously the other ones are, oh, crap, I changed it so do not use and then obviously the other ones are just random things. This is our visit visits, our website track, our website traffic. And then you'll see here too, like lending pad status. These are the actual track statuses in lending pad. Very similar all the ones I was showing you before. But when these, when these are changed in lending pad, it updates the status and shape right here. And then the portal, there's a certain statuses that change when these change as well too. So there's a lot of different status tracking, but they all do the same thing, essentially. So you can, kind of, you know, you grab, grab the right set of statuses to track,
+
+Transcribed by https://otter.ai
