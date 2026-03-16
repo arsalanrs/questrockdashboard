@@ -13,7 +13,7 @@ export function SignOutButton() {
     <button
       type="button"
       onClick={handleSignOut}
-      className="rounded-md px-3 py-2 text-sm text-mutedForeground hover:bg-muted hover:text-foreground"
+      className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-mutedForeground transition-all duration-150 hover:bg-muted hover:text-foreground"
     >
       Sign out
     </button>

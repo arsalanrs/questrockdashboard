@@ -1,6 +1,5 @@
 import {
   differenceInCalendarDays,
-  isWithinInterval,
   startOfDay,
   differenceInHours,
 } from "date-fns";
@@ -10,41 +9,42 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { canAccessAdmin } from "@/lib/permissions";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
-import { PrePipelineWithPanel } from "@/components/dashboard/PrePipelineWithPanel";
+import { PrePipelineDashboard } from "@/components/dashboard/PrePipelineDashboard";
+import { PitchQueue } from "@/components/dashboard/PitchQueue";
+import { MacroTracker } from "@/components/dashboard/MacroTracker";
+import { MicroPipeline, type MicroLoan } from "@/components/dashboard/MicroPipeline";
+import { AppraisalTracker } from "@/components/dashboard/AppraisalTracker";
+import { Leaderboard } from "@/components/dashboard/Leaderboard";
 import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
-import { avg, formatCurrency, monthStart, sum } from "@/lib/metrics";
+import { avg, formatCurrency, monthStart, yearStart, sum } from "@/lib/metrics";
+import {
+  isCommandCenterStatus,
+  PITCH_QUEUE_SET,
+  getMicroStage,
+  MICRO_STAGES,
+  MACRO_STAGES,
+  isExcludedFromLeaderboard,
+  type MicroStageKey,
+} from "@/lib/loan-status-groups";
 import { cn } from "@/lib/cn";
 
 /* ------------------------------------------------------------------ */
-/*  Constants                                                         */
+/*  Constants                                                          */
 /* ------------------------------------------------------------------ */
-
-const QUESTROCK_STAGES = [
-  { key: "verification", label: "Verification", turnTime: "Up to 48 hrs" },
-  { key: "esign_out", label: "eSign Out", turnTime: "3 hrs / 24 hrs" },
-  { key: "processing", label: "Processing", turnTime: "LO: 48 hrs / Proc: 24 hrs" },
-  { key: "underwriting", label: "Underwriting", turnTime: "Up to 72 hrs" },
-  { key: "approval_conditions", label: "Approval", turnTime: "LO: 48 hrs / Proc: 24 hrs" },
-  { key: "clear_to_close", label: "CTC", turnTime: "Pre-CD: 4 hrs / LO: 1 hr" },
-  { key: "closing", label: "Closing", turnTime: "24 hrs after date set" },
-] as const;
 
 const STAGE_LABELS: Record<string, string> = {
-  ...Object.fromEntries(QUESTROCK_STAGES.map((s) => [s.key, s.label])),
-  registered: "Registered",
-  submission: "Submission",
-  conditions: "Conditions",
+  verification: "Verification",
+  esign_out: "eSign Out",
+  processing: "Processing",
+  underwriting: "Underwriting",
+  approval_conditions: "Approval",
+  clear_to_close: "CTC",
+  closing: "Closing",
   funded: "Funded",
-  lead: "Lead",
-  application: "Application",
-  no_stage: "No stage",
 };
 
-const SHAPE_LEAD_BASE_URL =
-  process.env.NEXT_PUBLIC_SHAPE_LEAD_BASE_URL?.trim() || null;
-
 /* ------------------------------------------------------------------ */
-/*  Types                                                             */
+/*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 type LoanRow = {
@@ -60,6 +60,9 @@ type LoanRow = {
   loan_amount_cents: number | null;
   lead_created_at: string | null;
   application_completed_at: string | null;
+  credit_report_requested_at: string | null;
+  appraisal_ordered_at: string | null;
+  appraisal_received_at: string | null;
   loan_type: string | null;
   loan_purpose: string | null;
   track: string | null;
@@ -70,12 +73,9 @@ type LoanRow = {
   lock_expiration_date: string | null;
   finance_contingency_date: string | null;
   appraisal_contingency_date: string | null;
-  appraisal_ordered_at: string | null;
   loan_stage_events: Array<{ stage: string; entered_at: string }> | null;
   conditions: Array<{ status: "open" | "cleared" }> | null;
 };
-
-const PIPED_STAGES: Set<string> = new Set(QUESTROCK_STAGES.map((s) => s.key));
 
 type SlaRow = {
   stage: string;
@@ -85,7 +85,7 @@ type SlaRow = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                           */
+/*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
 function stageLabel(stage: string | null) {
@@ -93,28 +93,13 @@ function stageLabel(stage: string | null) {
   return STAGE_LABELS[stage] ?? stage;
 }
 
-function latestStageEntry(
-  events: LoanRow["loan_stage_events"],
-  stage: string | null,
-) {
+function latestStageEntry(events: LoanRow["loan_stage_events"], stage: string | null) {
   if (!stage) return null;
   const hit = (events ?? [])
     .filter((e) => e.stage === stage)
     .map((e) => new Date(e.entered_at))
     .filter((d) => !Number.isNaN(d.getTime()))
     .sort((a, b) => b.getTime() - a.getTime())[0];
-  return hit ?? null;
-}
-
-function firstStageEntry(
-  events: LoanRow["loan_stage_events"],
-  stage: string,
-) {
-  const hit = (events ?? [])
-    .filter((e) => e.stage === stage)
-    .map((e) => new Date(e.entered_at))
-    .filter((d) => !Number.isNaN(d.getTime()))
-    .sort((a, b) => a.getTime() - b.getTime())[0];
   return hit ?? null;
 }
 
@@ -134,7 +119,7 @@ function fmtDaysLeft(days: number): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Page                                                              */
+/*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default async function LoanOfficerDashboardPage({
@@ -158,8 +143,9 @@ export default async function LoanOfficerDashboardPage({
   let loUsersForSelector: Array<{ id: string; full_name: string | null; role: string }> = [];
   let viewAsUser: { id: string; full_name: string | null; role: string } | null = null;
 
+  const adminClient = createSupabaseAdminClient();
+
   if (isAdmin) {
-    const adminClient = createSupabaseAdminClient();
     const { data: users } = await adminClient
       .from("users")
       .select("id,full_name,role")
@@ -172,7 +158,7 @@ export default async function LoanOfficerDashboardPage({
   /* ---------- data fetch ---------- */
 
   const LOAN_SELECT =
-    "id,shape_record_id,record_type,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,loan_amount_cents,lead_created_at,application_completed_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,appraisal_ordered_at,loan_stage_events(stage,entered_at),conditions(status)";
+    "id,shape_record_id,record_type,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,loan_amount_cents,lead_created_at,application_completed_at,credit_report_requested_at,appraisal_ordered_at,appraisal_received_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,loan_stage_events(stage,entered_at),conditions(status)";
 
   let loans: LoanRow[] | null = null;
   let loansError: { message: string } | null = null;
@@ -180,8 +166,6 @@ export default async function LoanOfficerDashboardPage({
   let slaError: { message: string } | null = null;
 
   if (effectiveViewAsId) {
-    // Admin viewing another user — bypass RLS with admin client
-    const adminClient = createSupabaseAdminClient();
     const [slaRes, loansRes] = await Promise.all([
       adminClient.from("sla_thresholds").select("stage,max_hours,owner_role,sub_steps"),
       adminClient
@@ -189,14 +173,13 @@ export default async function LoanOfficerDashboardPage({
         .select(LOAN_SELECT)
         .eq("assigned_loan_officer_user_id", effectiveViewAsId)
         .order("lead_created_at", { ascending: false, nullsFirst: true })
-        .limit(1000),
+        .limit(2000),
     ]);
     slaRows = slaRes.data as SlaRow[] | null;
     slaError = slaRes.error;
     loans = loansRes.data as LoanRow[] | null;
     loansError = loansRes.error;
   } else {
-    // Regular fetch — RLS applies (LO sees only their own, admin sees all)
     const supabase = await createSupabaseServerClient();
     const [slaRes, loansRes] = await Promise.all([
       supabase.from("sla_thresholds").select("stage,max_hours,owner_role,sub_steps"),
@@ -204,7 +187,7 @@ export default async function LoanOfficerDashboardPage({
         .from("loans")
         .select(LOAN_SELECT)
         .order("lead_created_at", { ascending: false, nullsFirst: true })
-        .limit(1000),
+        .limit(2000),
     ]);
     slaRows = slaRes.data as SlaRow[] | null;
     slaError = slaRes.error;
@@ -225,118 +208,95 @@ export default async function LoanOfficerDashboardPage({
   /* ---------- computed loan data ---------- */
 
   const loanWithComputed = rows.map((l) => {
-    const openConditions = (l.conditions ?? []).filter(
-      (c) => c.status === "open",
-    ).length;
-
+    const openConditions = (l.conditions ?? []).filter((c) => c.status === "open").length;
     const stageEntered = latestStageEntry(l.loan_stage_events, l.current_stage);
-    const hoursInStage = stageEntered
-      ? differenceInHours(now, stageEntered)
-      : null;
-    const daysInStage = stageEntered
-      ? differenceInCalendarDays(now, stageEntered)
-      : null;
-
-    const slaMaxHours = l.current_stage
-      ? (slaByStage.get(l.current_stage) ?? null)
-      : null;
-    const slaExceeded =
-      hoursInStage != null &&
-      slaMaxHours != null &&
-      slaMaxHours > 0 &&
-      hoursInStage > slaMaxHours;
-
+    const hoursInStage = stageEntered ? differenceInHours(now, stageEntered) : null;
+    const daysInStage = stageEntered ? differenceInCalendarDays(now, stageEntered) : null;
+    const slaMaxHours = l.current_stage ? (slaByStage.get(l.current_stage) ?? null) : null;
+    const slaExceeded = hoursInStage != null && slaMaxHours != null && slaMaxHours > 0 && hoursInStage > slaMaxHours;
     const closingDate = l.closing_date ? new Date(l.closing_date) : null;
-    const daysToClose = closingDate
-      ? differenceInCalendarDays(closingDate, today)
-      : null;
-    const closingSoon =
-      daysToClose != null &&
-      daysToClose >= 0 &&
-      daysToClose <= 5 &&
-      l.current_stage !== "funded";
-
-    const daysToLock = l.lock_expiration_date
-      ? differenceInCalendarDays(new Date(l.lock_expiration_date), today)
-      : null;
-    const lockApproaching =
-      daysToLock != null && daysToLock >= 0 && daysToLock <= 7;
-
-    const daysToFinCont = l.finance_contingency_date
-      ? differenceInCalendarDays(new Date(l.finance_contingency_date), today)
-      : null;
-    const finContApproaching =
-      daysToFinCont != null && daysToFinCont >= 0 && daysToFinCont <= 7;
-
-    const daysToApprCont = l.appraisal_contingency_date
-      ? differenceInCalendarDays(new Date(l.appraisal_contingency_date), today)
-      : null;
-    const apprContApproaching =
-      daysToApprCont != null && daysToApprCont >= 0 && daysToApprCont <= 7;
-
-    const esignHrs = l.esign_returned_at
-      ? differenceInHours(now, new Date(l.esign_returned_at))
-      : null;
-    const restructureRisk =
-      l.is_restructure_hold || (esignHrs != null && esignHrs >= 40);
-
+    const daysToClose = closingDate ? differenceInCalendarDays(closingDate, today) : null;
+    const closingSoon = daysToClose != null && daysToClose >= 0 && daysToClose <= 5 && l.current_stage !== "funded";
+    const daysToLock = l.lock_expiration_date ? differenceInCalendarDays(new Date(l.lock_expiration_date), today) : null;
+    const lockApproaching = daysToLock != null && daysToLock >= 0 && daysToLock <= 7;
+    const daysToFinCont = l.finance_contingency_date ? differenceInCalendarDays(new Date(l.finance_contingency_date), today) : null;
+    const finContApproaching = daysToFinCont != null && daysToFinCont >= 0 && daysToFinCont <= 7;
+    const daysToApprCont = l.appraisal_contingency_date ? differenceInCalendarDays(new Date(l.appraisal_contingency_date), today) : null;
+    const apprContApproaching = daysToApprCont != null && daysToApprCont >= 0 && daysToApprCont <= 7;
+    const esignHrs = l.esign_returned_at ? differenceInHours(now, new Date(l.esign_returned_at)) : null;
+    const restructureRisk = l.is_restructure_hold || (esignHrs != null && esignHrs >= 40);
     const flag: "red" | "orange" | "yellow" | "green" | "none" = slaExceeded
       ? "red"
-      : restructureRisk
-        ? "green"
-        : closingSoon
-          ? "orange"
-          : openConditions > 0
-            ? "yellow"
-            : "none";
+      : restructureRisk ? "green"
+      : closingSoon ? "orange"
+      : openConditions > 0 ? "yellow"
+      : "none";
 
     return {
-      ...l,
-      openConditions,
-      hoursInStage,
-      daysInStage,
-      slaMaxHours,
-      slaExceeded,
-      closingDate,
-      daysToClose,
-      closingSoon,
-      lockApproaching,
-      daysToLock,
-      finContApproaching,
-      daysToFinCont,
-      apprContApproaching,
-      daysToApprCont,
-      restructureRisk,
-      esignHrs,
-      flag,
+      ...l, openConditions, hoursInStage, daysInStage, slaMaxHours, slaExceeded,
+      closingDate, daysToClose, closingSoon, lockApproaching, daysToLock,
+      finContApproaching, daysToFinCont, apprContApproaching, daysToApprCont,
+      restructureRisk, esignHrs, flag,
     };
   });
 
-  const commandCenterLoans = loanWithComputed.filter(
-    (l) => l.current_stage && PIPED_STAGES.has(l.current_stage),
-  );
+  /* ---------- categorize loans using status_raw ---------- */
 
+  const commandCenterLoans = loanWithComputed.filter((l) => isCommandCenterStatus(l.status_raw));
   const prePipelineLoans = loanWithComputed.filter(
-    (l) =>
-      l.current_stage !== "funded" &&
-      !(l.current_stage && PIPED_STAGES.has(l.current_stage)),
+    (l) => !isCommandCenterStatus(l.status_raw) && l.status_raw !== "Funded" && l.status_raw !== "Purchased" && l.status_raw !== "Closed",
+  );
+  const pitchQueueLoans = loanWithComputed.filter((l) => PITCH_QUEUE_SET.has(l.status_raw ?? ""));
+
+  /* ---------- micro stage grouping ---------- */
+
+  const loansByMicro = new Map<MicroStageKey, MicroLoan[]>();
+  for (const l of commandCenterLoans) {
+    const micro = getMicroStage(l.status_raw);
+    if (!micro) continue;
+    if (!loansByMicro.has(micro)) loansByMicro.set(micro, []);
+    loansByMicro.get(micro)!.push({
+      id: l.id,
+      shape_record_id: l.shape_record_id,
+      borrower_first_name: l.borrower_first_name,
+      borrower_last_name: l.borrower_last_name,
+      status_raw: l.status_raw,
+      loan_type: l.loan_type,
+      loan_amount_cents: l.loan_amount_cents,
+      lead_created_at: l.lead_created_at,
+      closing_date: l.closing_date,
+    });
+  }
+
+  /* ---------- macro stage data ---------- */
+
+  const macroData = MACRO_STAGES.map((m) => {
+    let count = 0;
+    let volume = 0;
+    for (const mk of m.microKeys) {
+      const staged = loansByMicro.get(mk) ?? [];
+      count += staged.length;
+      volume += staged.reduce((acc, l) => acc + (l.loan_amount_cents ?? 0), 0);
+    }
+    return { label: m.label, count, volume };
+  });
+
+  /* ---------- appraisals pending ---------- */
+
+  const appraisalsPending = loanWithComputed.filter(
+    (l) => l.appraisal_ordered_at && !l.appraisal_received_at,
   );
 
-  const activeLoans = commandCenterLoans;
-
-  /* ---------- Section 1: Goal Banner ---------- */
+  /* ---------- Goal Banner ---------- */
 
   const avgDaysToClose = avg(
     loanWithComputed.map((l) => {
       if (!l.lead_created_at || !l.closed_at) return null;
-      return differenceInCalendarDays(
-        new Date(l.closed_at),
-        new Date(l.lead_created_at),
-      );
+      return differenceInCalendarDays(new Date(l.closed_at), new Date(l.lead_created_at));
     }),
   );
 
-  /* ---------- Section 2: Action Queue ---------- */
+  /* ---------- Action Queue ---------- */
 
   type UrgencyItem = {
     loan: (typeof loanWithComputed)[number];
@@ -348,242 +308,151 @@ export default async function LoanOfficerDashboardPage({
   };
 
   const urgencyItems: UrgencyItem[] = [];
-
-  for (const l of activeLoans) {
+  for (const l of commandCenterLoans) {
     if (l.restructureRisk) {
       const hrsLeft = l.esignHrs != null ? 48 - l.esignHrs : null;
       urgencyItems.push({
-        loan: l,
-        priority: 1,
-        urgencyLabel: "Restructure Risk",
+        loan: l, priority: 1, urgencyLabel: "Restructure Risk",
         timeRemaining: hrsLeft != null ? fmtHoursLeft(hrsLeft) : "—",
         actionNeeded: "Submit to processing or restructure",
-        rowColor:
-          hrsLeft != null && hrsLeft < 0
-            ? "red"
-            : hrsLeft != null && hrsLeft < 8
-              ? "orange"
-              : "yellow",
+        rowColor: hrsLeft != null && hrsLeft < 0 ? "red" : hrsLeft != null && hrsLeft < 8 ? "orange" : "yellow",
       });
       continue;
     }
-
     if (l.slaExceeded) {
-      const over =
-        l.hoursInStage != null && l.slaMaxHours != null
-          ? l.hoursInStage - l.slaMaxHours
-          : 0;
-      urgencyItems.push({
-        loan: l,
-        priority: 2,
-        urgencyLabel: "SLA Exceeded",
-        timeRemaining: `Overdue ${Math.round(over)}h`,
-        actionNeeded: "Move loan forward",
-        rowColor: "red",
-      });
+      const over = l.hoursInStage != null && l.slaMaxHours != null ? l.hoursInStage - l.slaMaxHours : 0;
+      urgencyItems.push({ loan: l, priority: 2, urgencyLabel: "SLA Exceeded", timeRemaining: `Overdue ${Math.round(over)}h`, actionNeeded: "Move loan forward", rowColor: "red" });
       continue;
     }
-
     if (l.lockApproaching) {
-      urgencyItems.push({
-        loan: l,
-        priority: 3,
-        urgencyLabel: "Lock Expiring",
-        timeRemaining: fmtDaysLeft(l.daysToLock!),
-        actionNeeded: "Verify lock status",
-        rowColor:
-          l.daysToLock! <= 0 ? "red" : l.daysToLock! <= 2 ? "orange" : "yellow",
-      });
+      urgencyItems.push({ loan: l, priority: 3, urgencyLabel: "Lock Expiring", timeRemaining: fmtDaysLeft(l.daysToLock!), actionNeeded: "Verify lock status", rowColor: l.daysToLock! <= 0 ? "red" : l.daysToLock! <= 2 ? "orange" : "yellow" });
       continue;
     }
-
     if (l.finContApproaching || l.apprContApproaching) {
-      const minDays = Math.min(
-        l.daysToFinCont ?? 999,
-        l.daysToApprCont ?? 999,
-      );
-      const label =
-        l.finContApproaching && l.apprContApproaching
-          ? "Dual Contingency"
-          : l.finContApproaching
-            ? "Finance Contingency"
-            : "Appraisal Contingency";
-      urgencyItems.push({
-        loan: l,
-        priority: 4,
-        urgencyLabel: label,
-        timeRemaining: fmtDaysLeft(minDays),
-        actionNeeded: "Clear contingency",
-        rowColor: minDays <= 0 ? "red" : minDays <= 2 ? "orange" : "yellow",
-      });
+      const minDays = Math.min(l.daysToFinCont ?? 999, l.daysToApprCont ?? 999);
+      const label = l.finContApproaching && l.apprContApproaching ? "Dual Contingency" : l.finContApproaching ? "Finance Contingency" : "Appraisal Contingency";
+      urgencyItems.push({ loan: l, priority: 4, urgencyLabel: label, timeRemaining: fmtDaysLeft(minDays), actionNeeded: "Clear contingency", rowColor: minDays <= 0 ? "red" : minDays <= 2 ? "orange" : "yellow" });
       continue;
     }
-
     if (l.openConditions > 0) {
-      urgencyItems.push({
-        loan: l,
-        priority: 5,
-        urgencyLabel: "Open Conditions",
-        timeRemaining: `${l.openConditions} open`,
-        actionNeeded: "Clear conditions",
-        rowColor: "yellow",
-      });
+      urgencyItems.push({ loan: l, priority: 5, urgencyLabel: "Open Conditions", timeRemaining: `${l.openConditions} open`, actionNeeded: "Clear conditions", rowColor: "yellow" });
       continue;
     }
-
     if (l.closingSoon) {
-      urgencyItems.push({
-        loan: l,
-        priority: 6,
-        urgencyLabel: "Closing Soon",
-        timeRemaining: fmtDaysLeft(l.daysToClose!),
-        actionNeeded: "Prepare for closing",
-        rowColor:
-          l.daysToClose! <= 0
-            ? "red"
-            : l.daysToClose! <= 1
-              ? "orange"
-              : "yellow",
-      });
+      urgencyItems.push({ loan: l, priority: 6, urgencyLabel: "Closing Soon", timeRemaining: fmtDaysLeft(l.daysToClose!), actionNeeded: "Prepare for closing", rowColor: l.daysToClose! <= 0 ? "red" : l.daysToClose! <= 1 ? "orange" : "yellow" });
     }
   }
-
   urgencyItems.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
-    const colorRank = (c: string) =>
-      c === "red" ? 0 : c === "orange" ? 1 : c === "yellow" ? 2 : 3;
+    const colorRank = (c: string) => (c === "red" ? 0 : c === "orange" ? 1 : c === "yellow" ? 2 : 3);
     return colorRank(a.rowColor) - colorRank(b.rowColor);
   });
   const actionQueue = urgencyItems.slice(0, 15);
 
-  /* ---------- Section 3: Pipeline ---------- */
-
-  const pipelineData = QUESTROCK_STAGES.map((s) => {
-    const stageLoans = activeLoans.filter((l) => l.current_stage === s.key);
-    const count = stageLoans.length;
-    const anyExceeded = stageLoans.some((l) => l.slaExceeded);
-    const anyAtRisk = stageLoans.some((l) => {
-      if (l.hoursInStage == null || l.slaMaxHours == null || l.slaMaxHours === 0)
-        return false;
-      return l.hoursInStage > l.slaMaxHours * 0.75;
-    });
-    const health: "green" | "yellow" | "red" = anyExceeded
-      ? "red"
-      : anyAtRisk
-        ? "yellow"
-        : "green";
-    return { ...s, count, health };
-  });
-
-  /* ---------- Section 4: Active Loans Table ---------- */
-
-  const FLAG_RANK = { red: 0, green: 1, orange: 2, yellow: 3, none: 4 } as const;
-
-  const activeTable = activeLoans
-    .slice()
-    .sort((a, b) => {
-      const r = FLAG_RANK[a.flag] - FLAG_RANK[b.flag];
-      if (r !== 0) return r;
-      return (b.daysInStage ?? 0) - (a.daysInStage ?? 0);
-    })
-    .slice(0, 50);
-
-  /* ---------- Section 5: Production & Speed ---------- */
+  /* ---------- Production Scoreboard ---------- */
 
   const mStart = monthStart();
-  const fundedMtd = loanWithComputed.filter((l) => {
-    if (!l.closed_at) return false;
-    const d = new Date(l.closed_at);
-    return d >= mStart && d <= now;
-  });
+  const yStart = yearStart();
+
+  const fundedMtd = loanWithComputed.filter((l) => l.closed_at && new Date(l.closed_at) >= mStart && new Date(l.closed_at) <= now);
+  const fundedYtd = loanWithComputed.filter((l) => l.closed_at && new Date(l.closed_at) >= yStart && new Date(l.closed_at) <= now);
 
   const mtdVolumeCents = sum(fundedMtd.map((l) => l.loan_amount_cents ?? null));
+  const ytdVolumeCents = sum(fundedYtd.map((l) => l.loan_amount_cents ?? null));
   const mtdLoansClosed = fundedMtd.length;
-  const mtdAvgLoanSize = mtdLoansClosed
-    ? Math.round(mtdVolumeCents / mtdLoansClosed)
-    : null;
-  const revenueBps = 250;
-  const revenueCents = Math.round(mtdVolumeCents * (revenueBps / 10_000));
+  const mtdAvgLoanSize = mtdLoansClosed ? Math.round(mtdVolumeCents / mtdLoansClosed) : null;
+  const upcomingClosingsCount = commandCenterLoans.filter((l) => l.closingDate && l.closingDate >= today).length;
 
-  const upcomingClosingsCount = activeLoans.filter(
-    (l) => l.closingDate && l.closingDate >= today,
-  ).length;
+  /* ---------- Speed Metrics ---------- */
 
-  const leadToApp = avg(
+  const leadToCredit = avg(
     loanWithComputed.map((l) => {
-      if (!l.lead_created_at || !l.application_completed_at) return null;
-      return differenceInCalendarDays(
-        new Date(l.application_completed_at),
-        new Date(l.lead_created_at),
-      );
+      if (!l.lead_created_at || !l.credit_report_requested_at) return null;
+      return differenceInCalendarDays(new Date(l.credit_report_requested_at), new Date(l.lead_created_at));
     }),
   );
-  const appToSubmission = avg(
+  const creditToPiped = avg(
     loanWithComputed.map((l) => {
-      if (!l.application_completed_at) return null;
-      const sub = firstStageEntry(l.loan_stage_events, "processing");
-      if (!sub) return null;
-      return differenceInCalendarDays(
-        sub,
-        new Date(l.application_completed_at),
-      );
+      if (!l.credit_report_requested_at || !l.appraisal_ordered_at) return null;
+      return differenceInCalendarDays(new Date(l.appraisal_ordered_at), new Date(l.credit_report_requested_at));
     }),
   );
-  const submissionToCtc = avg(
+  const pipedToClosed = avg(
     loanWithComputed.map((l) => {
-      const sub = firstStageEntry(l.loan_stage_events, "processing");
-      const ctc = firstStageEntry(l.loan_stage_events, "clear_to_close");
-      if (!sub || !ctc) return null;
-      return differenceInCalendarDays(ctc, sub);
-    }),
-  );
-  const ctcToClose = avg(
-    loanWithComputed.map((l) => {
-      const ctc = firstStageEntry(l.loan_stage_events, "clear_to_close");
-      if (!ctc || !l.closed_at) return null;
-      return differenceInCalendarDays(new Date(l.closed_at), ctc);
+      if (!l.appraisal_ordered_at || !l.closed_at) return null;
+      return differenceInCalendarDays(new Date(l.closed_at), new Date(l.appraisal_ordered_at));
     }),
   );
   const totalDaysToClose = avg(
     loanWithComputed.map((l) => {
       if (!l.lead_created_at || !l.closed_at) return null;
-      return differenceInCalendarDays(
-        new Date(l.closed_at),
-        new Date(l.lead_created_at),
-      );
+      return differenceInCalendarDays(new Date(l.closed_at), new Date(l.lead_created_at));
     }),
   );
 
-  const colCount = SHAPE_LEAD_BASE_URL ? 11 : 10;
+  /* ---------- Leaderboard (all LOs via admin client) ---------- */
+
+  type LeaderboardEntry = { name: string; creditPulls: number; appraisalsOrdered: number; closedLoans: number; fundedVolumeCents: number };
+  let leaderboardData: LeaderboardEntry[] = [];
+
+  try {
+    const { data: allUsers } = await adminClient
+      .from("users")
+      .select("id,full_name,role")
+      .in("role", ["loan_officer"]);
+
+    const eligibleUsers = (allUsers ?? []).filter((u) => !isExcludedFromLeaderboard(u.full_name));
+
+    if (eligibleUsers.length > 0) {
+      const { data: allLoans } = await adminClient
+        .from("loans")
+        .select("assigned_loan_officer_user_id,credit_report_requested_at,appraisal_ordered_at,closed_at,loan_amount_cents")
+        .in("assigned_loan_officer_user_id", eligibleUsers.map((u) => u.id))
+        .limit(5000);
+
+      const userMap = new Map(eligibleUsers.map((u) => [u.id, u.full_name ?? "Unknown"]));
+      const stats = new Map<string, LeaderboardEntry>();
+      for (const u of eligibleUsers) {
+        stats.set(u.id, { name: u.full_name ?? "Unknown", creditPulls: 0, appraisalsOrdered: 0, closedLoans: 0, fundedVolumeCents: 0 });
+      }
+      for (const loan of allLoans ?? []) {
+        const uid = loan.assigned_loan_officer_user_id;
+        if (!uid || !stats.has(uid)) continue;
+        const s = stats.get(uid)!;
+        if (loan.credit_report_requested_at) s.creditPulls++;
+        if (loan.appraisal_ordered_at) s.appraisalsOrdered++;
+        if (loan.closed_at) {
+          s.closedLoans++;
+          s.fundedVolumeCents += loan.loan_amount_cents ?? 0;
+        }
+      }
+      leaderboardData = Array.from(stats.values());
+    }
+  } catch {
+    // leaderboard is best-effort
+  }
 
   /* ---------------------------------------------------------------- */
-  /*  Render                                                          */
+  /*  Render                                                           */
   /* ---------------------------------------------------------------- */
 
   return (
     <div className="space-y-8">
-      {/* ---- error banner ---- */}
       {dataError ? (
         <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm dark:bg-amber-950/30">
           <p className="font-medium">Database setup required</p>
           <p className="mt-1 text-mutedForeground">
-            Run the SQL in{" "}
-            <code className="rounded bg-muted px-1">supabase/migrations/</code>{" "}
-            in your Supabase project. Then refresh.
+            Run the SQL in <code className="rounded bg-muted px-1">supabase/migrations/</code> in your Supabase project. Then refresh.
           </p>
           <p className="mt-2 font-mono text-xs">{dataError.message}</p>
         </div>
       ) : null}
 
-      {/* ---- admin view-as selector ---- */}
-      {isAdmin && (
-        <ViewAsSelector users={loUsersForSelector} currentViewAs={effectiveViewAsId} />
-      )}
+      {isAdmin && <ViewAsSelector users={loUsersForSelector} currentViewAs={effectiveViewAsId} />}
 
-      {/* ---- header ---- */}
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Loan Officer Dashboard</h1>
+          <h1 className="text-xl font-bold tracking-tight">Loan Officer Dashboard</h1>
           <p className="text-sm text-mutedForeground">
             {viewAsUser ? (
               <>
@@ -591,53 +460,44 @@ export default async function LoanOfficerDashboardPage({
                 {viewAsUser.full_name} &middot; {viewAsUser.role.replace("_", " ")}
               </>
             ) : (
-              <>
-                {appUser.full_name} &middot; {appUser.role.replace("_", " ")}
-              </>
+              <>{appUser.full_name} &middot; {appUser.role.replace("_", " ")}</>
             )}
           </p>
         </div>
       </div>
 
       {/* ================================================================ */}
-      {/*  Section 1 — Goal Banner                                        */}
+      {/*  Goal Banner                                                     */}
       {/* ================================================================ */}
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section
+        className="rounded-xl p-4"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold">
-              Goal: 14–21 Days to Close
-            </span>
+            <span className="text-sm font-semibold text-foreground">Goal: 14–21 Days to Close</span>
             <span
-              className={cn(
-                "rounded-full px-3 py-1 text-sm font-medium",
+              className="rounded-full px-3 py-1 text-sm font-semibold"
+              style={
                 avgDaysToClose != null && avgDaysToClose <= 21
-                  ? "bg-green-500/10 text-green-700 dark:text-green-400"
-                  : "bg-muted text-mutedForeground",
-              )}
+                  ? { background: "rgba(232,255,0,0.12)", color: "#E8FF00" }
+                  : { background: "hsl(220 10% 18%)", color: "hsl(215 14% 52%)" }
+              }
             >
-              Your avg:{" "}
-              {avgDaysToClose != null
-                ? `${avgDaysToClose.toFixed(1)} days`
-                : "—"}
+              Your avg: {avgDaysToClose != null ? `${avgDaysToClose.toFixed(1)} days` : "—"}
             </span>
           </div>
-
           {isPast3PM ? (
-            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                />
+            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               Submissions after 3 PM will be processed next business day
             </div>
@@ -646,88 +506,56 @@ export default async function LoanOfficerDashboardPage({
       </section>
 
       {/* ================================================================ */}
-      {/*  Section 2 — Today's Action Queue                               */}
+      {/*  Today's Action Queue                                            */}
       {/* ================================================================ */}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">
-            Today&apos;s Action Queue
-          </div>
-          <div className="text-xs text-mutedForeground">
-            {actionQueue.length} urgent item
-            {actionQueue.length !== 1 ? "s" : ""}
+          <div className="text-sm font-semibold tracking-tight">Today&apos;s Action Queue</div>
+          <div className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+            style={{ background: "rgba(232,255,0,0.1)", color: "#E8FF00" }}>
+            {actionQueue.length} urgent item{actionQueue.length !== 1 ? "s" : ""}
           </div>
         </div>
-
-        <div className="overflow-hidden rounded-lg border border-border">
+        <div
+          className="overflow-hidden rounded-xl"
+          style={{
+            background: "rgba(255,255,255,0.02)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid rgba(255,255,255,0.07)",
+          }}
+        >
           <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr className="text-left text-xs text-mutedForeground">
-                <th className="px-3 py-2">Borrower</th>
-                <th className="px-3 py-2">Loan Type</th>
-                <th className="px-3 py-2">Stage</th>
-                <th className="px-3 py-2">Urgency</th>
-                <th className="px-3 py-2">Time Remaining</th>
-                <th className="px-3 py-2">Action Needed</th>
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                style={{ background: "rgba(255,255,255,0.04)" }}>
+                <th className="px-3 py-2.5">Borrower</th>
+                <th className="px-3 py-2.5">Loan Type</th>
+                <th className="px-3 py-2.5">Stage</th>
+                <th className="px-3 py-2.5">Urgency</th>
+                <th className="px-3 py-2.5">Time Remaining</th>
+                <th className="px-3 py-2.5">Action Needed</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/30">
               {actionQueue.map((item) => (
-                <tr
-                  key={item.loan.id}
-                  className={cn(
-                    "border-t border-border",
-                    item.rowColor === "red" &&
-                      "bg-red-50 dark:bg-red-950/20",
-                    item.rowColor === "orange" &&
-                      "bg-orange-50 dark:bg-orange-950/20",
-                    item.rowColor === "yellow" &&
-                      "bg-yellow-50 dark:bg-yellow-950/10",
-                  )}
-                >
-                  <td className="px-3 py-2">
-                    {item.loan.borrower_first_name ?? ""}{" "}
-                    {item.loan.borrower_last_name ?? ""}
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    {item.loan.loan_type ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">
-                    {stageLabel(item.loan.current_stage)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Badge
-                      variant={
-                        item.rowColor === "red"
-                          ? "red"
-                          : item.rowColor === "orange"
-                            ? "orange"
-                            : item.rowColor === "yellow"
-                              ? "yellow"
-                              : "muted"
-                      }
-                    >
-                      {item.urgencyLabel}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {item.timeRemaining}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-mutedForeground">
-                    {item.actionNeeded}
-                  </td>
+                <tr key={item.loan.id} className={cn(
+                  "transition-colors",
+                  item.rowColor === "red" && "bg-red-950/20",
+                  item.rowColor === "orange" && "bg-orange-950/20",
+                  item.rowColor === "yellow" && "bg-yellow-950/10",
+                )}>
+                  <td className="px-3 py-2.5">{item.loan.borrower_first_name ?? ""} {item.loan.borrower_last_name ?? ""}</td>
+                  <td className="px-3 py-2.5 text-xs text-mutedForeground">{item.loan.loan_type ?? "—"}</td>
+                  <td className="px-3 py-2.5">{stageLabel(item.loan.current_stage)}</td>
+                  <td className="px-3 py-2.5"><Badge variant={item.rowColor === "red" ? "red" : item.rowColor === "orange" ? "orange" : item.rowColor === "yellow" ? "yellow" : "muted"}>{item.urgencyLabel}</Badge></td>
+                  <td className="px-3 py-2.5 font-mono text-xs">{item.timeRemaining}</td>
+                  <td className="px-3 py-2.5 text-xs text-mutedForeground">{item.actionNeeded}</td>
                 </tr>
               ))}
               {actionQueue.length === 0 ? (
-                <tr>
-                  <td
-                    className="px-3 py-6 text-center text-sm text-mutedForeground"
-                    colSpan={6}
-                  >
-                    No urgent items — all loans on track.
-                  </td>
-                </tr>
+                <tr><td className="px-3 py-6 text-center text-sm text-mutedForeground" colSpan={6}>No urgent items — all loans on track.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -735,260 +563,105 @@ export default async function LoanOfficerDashboardPage({
       </section>
 
       {/* ================================================================ */}
-      {/*  Pre-Pipeline Summary (click stage to open list in side panel)   */}
+      {/*  Pre-Pipeline                                                    */}
       {/* ================================================================ */}
 
       {prePipelineLoans.length > 0 ? (
-        <PrePipelineWithPanel
+        <PrePipelineDashboard
           loans={prePipelineLoans.map((l) => ({
-            id: l.id,
-            shape_record_id: l.shape_record_id,
-            borrower_first_name: l.borrower_first_name,
-            borrower_last_name: l.borrower_last_name,
-            current_stage: l.current_stage,
-            status_raw: l.status_raw,
-            loan_type: l.loan_type,
-            record_type: l.record_type,
-            open_conditions_count: l.openConditions,
-            days_in_stage: l.daysInStage ?? null,
-            sla_exceeded: l.slaExceeded,
+            id: l.id, shape_record_id: l.shape_record_id, borrower_first_name: l.borrower_first_name,
+            borrower_last_name: l.borrower_last_name, status_raw: l.status_raw, loan_type: l.loan_type,
+            record_type: l.record_type, loan_amount_cents: l.loan_amount_cents, lead_created_at: l.lead_created_at,
           }))}
-          stageLabels={STAGE_LABELS}
         />
       ) : null}
 
       {/* ================================================================ */}
-      {/*  Section 3 — Questrock Pipeline View (Command Center)           */}
+      {/*  Pitch Queue                                                     */}
+      {/* ================================================================ */}
+
+      <PitchQueue
+        loans={pitchQueueLoans.map((l) => ({
+          id: l.id, shape_record_id: l.shape_record_id, borrower_first_name: l.borrower_first_name,
+          borrower_last_name: l.borrower_last_name, status_raw: l.status_raw, loan_type: l.loan_type,
+          loan_amount_cents: l.loan_amount_cents, lead_created_at: l.lead_created_at,
+        }))}
+      />
+
+      {/* ================================================================ */}
+      {/*  Command Center                                                  */}
       {/* ================================================================ */}
 
       <section className="space-y-4">
-        <div className="text-sm font-semibold">Command Center &mdash; Questrock File Flow</div>
-
-        {/* chevron row */}
-        <div className="flex items-center overflow-x-auto pb-2">
-          {pipelineData.map((s, i) => (
-            <div key={s.key} className="contents">
-              <div
-                className={cn(
-                  "flex min-w-[100px] flex-1 flex-col items-center rounded-lg border-2 px-2 py-3 text-center",
-                  s.health === "red"
-                    ? "border-red-500 bg-red-500/10"
-                    : s.health === "yellow"
-                      ? "border-yellow-500 bg-yellow-500/10"
-                      : "border-green-500/40 bg-card",
-                )}
-              >
-                <div className="text-[11px] font-semibold">{s.label}</div>
-                <div className="mt-1 text-xl font-bold">{s.count}</div>
-                <div className="mt-1 text-[10px] leading-tight text-mutedForeground">
-                  {s.turnTime}
-                </div>
-              </div>
-              {i < pipelineData.length - 1 ? (
-                <svg
-                  className="mx-1 h-5 w-5 shrink-0 text-mutedForeground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m8.25 4.5 7.5 7.5-7.5 7.5"
-                  />
-                </svg>
-              ) : null}
-            </div>
-          ))}
+        <div className="flex items-center gap-2">
+          <div className="h-1 w-4 rounded-full" style={{ background: "#E8FF00" }} />
+          <div className="text-sm font-semibold tracking-tight">Command Center &mdash; Questrock File Flow</div>
         </div>
+
+        {/* 4-step macro tracker */}
+        <MacroTracker steps={macroData} />
+
+        {/* micro pipeline */}
+        <MicroPipeline loansByMicro={loansByMicro} />
 
         {/* compact KPI row */}
         <div className="grid gap-3 md:grid-cols-4">
-          <StatCard label="Active Loans" value={activeLoans.length} />
-          <StatCard
-            label="Conditions Outstanding"
-            value={activeLoans.filter((l) => l.openConditions > 0).length}
-          />
-          <StatCard
-            label="Closing Soon"
-            value={activeLoans.filter((l) => l.closingSoon).length}
-            subtext="Within 5 days"
-          />
-          <StatCard
-            label="Past Turn Time"
-            value={activeLoans.filter((l) => l.slaExceeded).length}
-            subtext="SLA exceeded"
-          />
+          <StatCard label="Active Loans" value={commandCenterLoans.length} />
+          <StatCard label="Conditions Outstanding" value={commandCenterLoans.filter((l) => l.openConditions > 0).length} />
+          <StatCard label="Closing Soon" value={commandCenterLoans.filter((l) => l.closingSoon).length} subtext="Within 5 days" />
+          <StatCard label="Past Turn Time" value={commandCenterLoans.filter((l) => l.slaExceeded).length} subtext="SLA exceeded" />
         </div>
       </section>
 
       {/* ================================================================ */}
-      {/*  Section 4 — Active Loans Table                                 */}
+      {/*  Appraisal Tracker                                               */}
+      {/* ================================================================ */}
+
+      <AppraisalTracker
+        loans={appraisalsPending.map((l) => ({
+          id: l.id, shape_record_id: l.shape_record_id, borrower_first_name: l.borrower_first_name,
+          borrower_last_name: l.borrower_last_name, loan_type: l.loan_type,
+          loan_amount_cents: l.loan_amount_cents, appraisal_ordered_at: l.appraisal_ordered_at,
+        }))}
+      />
+
+      {/* ================================================================ */}
+      {/*  Production Scoreboard                                           */}
       {/* ================================================================ */}
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Active Loans</div>
-          <div className="flex items-center gap-2 text-xs text-mutedForeground">
-            <Badge variant="red">SLA</Badge>
-            <Badge variant="orange">Closing&nbsp;≤5d</Badge>
-            <Badge variant="yellow">Conditions</Badge>
-            <span className="inline-flex items-center rounded-full border border-transparent bg-green-500 px-2 py-0.5 text-xs font-medium text-white">
-              Restructure
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <div className="h-1 w-4 rounded-full" style={{ background: "#E8FF00" }} />
+          <div className="text-sm font-semibold tracking-tight">Production Scoreboard</div>
         </div>
-
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr className="text-left text-xs text-mutedForeground">
-                <th className="px-3 py-2">Loan&nbsp;#</th>
-                <th className="px-3 py-2">Borrower</th>
-                <th className="px-3 py-2">Loan Type</th>
-                <th className="px-3 py-2">Track</th>
-                <th className="px-3 py-2">Stage</th>
-                <th className="px-3 py-2">Days in Stage</th>
-                <th className="px-3 py-2">Owner</th>
-                <th className="px-3 py-2">Conditions</th>
-                <th className="px-3 py-2">Closing Date</th>
-                <th className="px-3 py-2">Flag</th>
-                {SHAPE_LEAD_BASE_URL ? (
-                  <th className="px-3 py-2">Open</th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {activeTable.map((l) => (
-                <tr key={l.id} className="border-t border-border">
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {l.shape_record_id ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">
-                    {l.borrower_first_name ?? ""}{" "}
-                    {l.borrower_last_name ?? ""}
-                  </td>
-                  <td className="px-3 py-2 text-xs">{l.loan_type ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    {l.track ? (
-                      <Badge
-                        variant={l.track === "Fast" ? "default" : "muted"}
-                      >
-                        {l.track}
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {stageLabel(l.current_stage)}
-                  </td>
-                  <td className="px-3 py-2">{l.daysInStage ?? "—"}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {l.current_owner_role ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">{l.openConditions}</td>
-                  <td className="px-3 py-2">{l.closing_date ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    {l.flag === "red" ? (
-                      <Badge variant="red">SLA</Badge>
-                    ) : l.flag === "green" ? (
-                      <span className="inline-flex items-center rounded-full border border-transparent bg-green-500 px-2 py-0.5 text-xs font-medium text-white">
-                        Restructure
-                      </span>
-                    ) : l.flag === "orange" ? (
-                      <Badge variant="orange">Closing</Badge>
-                    ) : l.flag === "yellow" ? (
-                      <Badge variant="yellow">Conditions</Badge>
-                    ) : (
-                      <Badge variant="muted">OK</Badge>
-                    )}
-                  </td>
-                  {SHAPE_LEAD_BASE_URL && l.shape_record_id ? (
-                    <td className="px-3 py-2">
-                      <a
-                        href={`${SHAPE_LEAD_BASE_URL}${l.shape_record_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Shape
-                      </a>
-                    </td>
-                  ) : SHAPE_LEAD_BASE_URL ? (
-                    <td className="px-3 py-2">—</td>
-                  ) : null}
-                </tr>
-              ))}
-              {activeTable.length === 0 ? (
-                <tr>
-                  <td
-                    className="px-3 py-6 text-center text-sm text-mutedForeground"
-                    colSpan={colCount}
-                  >
-                    No active loans visible yet. Import CSV or generate mock
-                    loans in Admin.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="grid gap-3 md:grid-cols-4">
+          <StatCard label="Month to Date Volume" value={formatCurrency(mtdVolumeCents)} />
+          <StatCard label="Year to Date Volume" value={formatCurrency(ytdVolumeCents)} />
+          <StatCard label="Loans Closed (MTD)" value={mtdLoansClosed} />
+          <StatCard label="Average Loan Size" value={formatCurrency(mtdAvgLoanSize)} />
         </div>
       </section>
 
       {/* ================================================================ */}
-      {/*  Section 5 — Production Scoreboard + Speed Metrics              */}
+      {/*  LO Leaderboard                                                  */}
+      {/* ================================================================ */}
+
+      {leaderboardData.length > 0 && <Leaderboard data={leaderboardData} />}
+
+      {/* ================================================================ */}
+      {/*  Speed Metrics                                                   */}
       {/* ================================================================ */}
 
       <section className="space-y-3">
-        <div className="text-sm font-semibold">Production Scoreboard</div>
-        <div className="grid gap-3 md:grid-cols-5">
-          <StatCard
-            label="Month to Date Volume"
-            value={formatCurrency(mtdVolumeCents)}
-          />
-          <StatCard label="Loans Closed" value={mtdLoansClosed} />
-          <StatCard
-            label="Average Loan Size"
-            value={formatCurrency(mtdAvgLoanSize)}
-          />
-          <StatCard
-            label="Revenue Generated"
-            value={formatCurrency(revenueCents)}
-            subtext={`${revenueBps} bps`}
-          />
-          <StatCard
-            label="Upcoming Closings"
-            value={upcomingClosingsCount}
-            subtext="Active loans"
-          />
+        <div className="flex items-center gap-2">
+          <div className="h-1 w-4 rounded-full" style={{ background: "#E8FF00" }} />
+          <div className="text-sm font-semibold tracking-tight">Speed Metrics (avg days)</div>
         </div>
-      </section>
-
-      <section className="space-y-3">
-        <div className="text-sm font-semibold">Speed Metrics (avg days)</div>
-        <div className="grid gap-3 md:grid-cols-5">
-          <StatCard
-            label="Lead → Application"
-            value={leadToApp?.toFixed(1) ?? "—"}
-          />
-          <StatCard
-            label="Application → Submission"
-            value={appToSubmission?.toFixed(1) ?? "—"}
-          />
-          <StatCard
-            label="Submission → CTC"
-            value={submissionToCtc?.toFixed(1) ?? "—"}
-          />
-          <StatCard
-            label="CTC → Close"
-            value={ctcToClose?.toFixed(1) ?? "—"}
-          />
-          <StatCard
-            label="Total Days to Close"
-            value={totalDaysToClose?.toFixed(1) ?? "—"}
-          />
+        <div className="grid gap-3 md:grid-cols-4">
+          <StatCard label="Lead → Credit" value={leadToCredit?.toFixed(1) ?? "—"} />
+          <StatCard label="Credit → Piped" value={creditToPiped?.toFixed(1) ?? "—"} />
+          <StatCard label="Piped → Closed" value={pipedToClosed?.toFixed(1) ?? "—"} />
+          <StatCard label="Total Days to Close" value={totalDaysToClose?.toFixed(1) ?? "—"} />
         </div>
       </section>
     </div>

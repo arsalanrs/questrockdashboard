@@ -2,44 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/*  Design Tokens — Questrock Dark Theme                               */
+/* ------------------------------------------------------------------ */
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --border: 214.3 31.8% 91.4%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --radius: 10px;
+  --background:       0 0% 0%;           /* pure black */
+  --foreground:       210 20% 96%;       /* #F1F3F5 */
+
+  --muted:            220 10% 13%;       /* card hover / subtle bg */
+  --muted-foreground: 215 14% 50%;       /* secondary text */
+
+  --border:           220 8% 16%;        /* very subtle border */
+
+  --card:             220 10% 10%;       /* card surface */
+  --card-foreground:  210 20% 96%;
+
+  --primary:          54 100% 53%;
+  --primary-foreground: 0 0% 0%;
+
+  --destructive:      0 72% 51%;
+  --destructive-foreground: 210 20% 96%;
+
+  --radius: 12px;
+
+  --accent-yellow:     #E8FF00;
+  --accent-yellow-dim: rgba(232, 255, 0, 0.10);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --border: 217.2 32.6% 17.5%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-  }
-}
-
-html,
-body {
-  height: 100%;
-}
+/* ---- Base ---- */
+html, body { height: 100%; }
 
 body {
-  background: hsl(var(--background));
+  background: #000;
   color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(220 8% 20%); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(220 8% 28%); }
+
+/* ---- Glassmorphism card utility ---- */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* ---- Ambient glow orbs (used in layout) ---- */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---- Yellow accent utilities ---- */
+.accent-bg     { background: var(--accent-yellow); color: #000; }
+.accent-text   { color: var(--accent-yellow); }
+.accent-border { border-color: var(--accent-yellow); }
+.accent-glow   { box-shadow: 0 0 0 1px var(--accent-yellow-dim), 0 4px 24px var(--accent-yellow-dim); }

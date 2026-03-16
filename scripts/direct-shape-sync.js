@@ -22,7 +22,7 @@ const EXCLUDED_SOURCES = new Set(["zWebLead - VISIT"]);
 const SHAPE_FIELDS = [
   "leadid", "recordtype", "createdDate", "lastActivityDate",
   "firstname", "lastname", "email", "phone",
-  "loanamount", "prState", "mailingState", "leadsource",
+  "LoanAmount", "prState", "mailingState", "leadsource",
   "channel", "depursLo", "utmCampaign", "mstrstatus1", "status",
   "purpose", "loanType",
   "trkApplicationCompleted", "trkAppraisalRequest",
@@ -39,7 +39,7 @@ const API_TO_CSV = {
   lastname: "Last Name", lastName: "Last Name", "Last Name": "Last Name",
   email: "Email", "Email": "Email",
   phone: "Phone", "Phone": "Phone", "Mobile Phone": "Phone",
-  loanamount: "Loan Amount", "Loan Amount": "Loan Amount",
+  LoanAmount: "Loan Amount", loanamount: "Loan Amount", "Loan Amount": "Loan Amount",
   prState: "Property State", "Property State": "Property State",
   mailingState: "Mailing State", "Mailing State": "Mailing State",
   leadsource: "Source", source: "Source", "Source": "Source",
@@ -141,9 +141,29 @@ function parseMaybeTimestamp(value) {
 function parseLoanAmountCents(value) {
   const raw = (value ?? "").toString().trim() || null;
   if (!raw) return { loan_amount_raw: null, loan_amount_cents: null };
+
+  // Range values like "200K-500K" or "$200k - $500k" — not a real single amount, skip
+  if (/-/.test(raw) && /[kKmM]/.test(raw)) {
+    return { loan_amount_raw: raw, loan_amount_cents: null };
+  }
+
+  // "320K" or "1.5M" shorthand
+  const kMatch = raw.match(/^\$?([\d,]+\.?\d*)\s*[kK]$/);
+  if (kMatch) {
+    const n = parseFloat(kMatch[1].replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) return { loan_amount_raw: raw, loan_amount_cents: Math.round(n * 1000 * 100) };
+  }
+  const mMatch = raw.match(/^\$?([\d,]+\.?\d*)\s*[mM]$/);
+  if (mMatch) {
+    const n = parseFloat(mMatch[1].replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) return { loan_amount_raw: raw, loan_amount_cents: Math.round(n * 1_000_000 * 100) };
+  }
+
+  // Plain number like "320000" or "$320,000.00"
   const cleaned = raw.replace(/[^0-9.]/g, "");
   const n = parseFloat(cleaned);
   if (!isNaN(n) && n > 0) return { loan_amount_raw: raw, loan_amount_cents: Math.round(n * 100) };
+
   return { loan_amount_raw: raw, loan_amount_cents: null };
 }
 
@@ -244,6 +264,18 @@ async function main() {
 
       const { loan_amount_raw, loan_amount_cents } = parseLoanAmountCents(row["Loan Amount"]);
       const loanType = (row["Loan Type"] ?? "").trim() || null;
+
+      // Shape's bulk export API does NOT return tracking date fields (trkDateClosed etc.)
+      // Only "Created Date" and "Date Loan Last Updated" are available via API.
+      // For closed/funded/purchased loans, "Date Loan Last Updated" is the best
+      // proxy for the actual close date since it's updated when the loan closes.
+      const CLOSED_STATUSES = new Set(["Closed", "Funded", "Purchased"]);
+      const lastActivityTs = parseMaybeTimestamp(row["Date Loan Last Updated"]);
+      const closedAtTs = CLOSED_STATUSES.has(statusRaw)
+        ? (parseMaybeTimestamp(row["Tracking Date Closed"]) ?? lastActivityTs)
+        : parseMaybeTimestamp(row["Tracking Date Closed"]);
+
+      // Appraisal date — use trk field if available, otherwise null
       const appraisalTs = parseMaybeTimestamp(row["Appraisal Request Date"]);
 
       allLoansPayload.push({
@@ -272,7 +304,7 @@ async function main() {
         credit_report_requested_at: parseMaybeTimestamp(row["Credit Report Request Date"]),
         appraisal_requested_at: appraisalTs,
         appraisal_ordered_at: appraisalTs,
-        closed_at: parseMaybeTimestamp(row["Tracking Date Closed"]),
+        closed_at: closedAtTs,
         assigned_loan_officer_name: loName,
         assigned_loan_officer_user_id: assignedLoUserId,
       });

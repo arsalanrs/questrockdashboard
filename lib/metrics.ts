@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, startOfMonth } from "date-fns";
+import { differenceInCalendarDays, startOfMonth, startOfYear } from "date-fns";
 
 export function daysBetween(a: string | Date | null | undefined, b: string | Date | null | undefined) {
   if (!a || !b) return null;
@@ -26,5 +26,9 @@ export function avg(values: Array<number | null | undefined>) {
 
 export function monthStart(now = new Date()) {
   return startOfMonth(now);
+}
+
+export function yearStart(now = new Date()) {
+  return startOfYear(now);
 }
 
