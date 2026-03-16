@@ -5,9 +5,13 @@ import {
   differenceInHours,
 } from "date-fns";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireCurrentUser } from "@/lib/current-user";
+import { canAccessAdmin } from "@/lib/permissions";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
+import { PrePipelineWithPanel } from "@/components/dashboard/PrePipelineWithPanel";
+import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 import { avg, formatCurrency, monthStart, sum } from "@/lib/metrics";
 import { cn } from "@/lib/cn";
 
@@ -33,6 +37,7 @@ const STAGE_LABELS: Record<string, string> = {
   funded: "Funded",
   lead: "Lead",
   application: "Application",
+  no_stage: "No stage",
 };
 
 const SHAPE_LEAD_BASE_URL =
@@ -46,6 +51,7 @@ type LoanRow = {
   id: string;
   shape_record_id: number | null;
   record_type: string | null;
+  status_raw: string | null;
   borrower_first_name: string | null;
   borrower_last_name: string | null;
   current_stage: string | null;
@@ -131,28 +137,80 @@ function fmtDaysLeft(days: number): string {
 /*  Page                                                              */
 /* ------------------------------------------------------------------ */
 
-export default async function LoanOfficerDashboardPage() {
+export default async function LoanOfficerDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ viewAs?: string }>;
+}) {
   const { appUser } = await requireCurrentUser();
-  const supabase = await createSupabaseServerClient();
   const now = new Date();
   const today = startOfDay(now);
   const isPast3PM = now.getHours() >= 15;
 
+  /* ---------- viewAs (admin/executive only) ---------- */
+
+  const isAdmin = canAccessAdmin(appUser.role);
+  const { viewAs: viewAsId } = await searchParams;
+  const effectiveViewAsId = isAdmin && viewAsId ? viewAsId : null;
+
+  /* ---------- fetch all LO users for the selector (admin only) ---------- */
+
+  let loUsersForSelector: Array<{ id: string; full_name: string | null; role: string }> = [];
+  let viewAsUser: { id: string; full_name: string | null; role: string } | null = null;
+
+  if (isAdmin) {
+    const adminClient = createSupabaseAdminClient();
+    const { data: users } = await adminClient
+      .from("users")
+      .select("id,full_name,role")
+      .in("role", ["loan_officer", "manager", "executive"])
+      .order("full_name");
+    loUsersForSelector = users ?? [];
+    viewAsUser = loUsersForSelector.find((u) => u.id === effectiveViewAsId) ?? null;
+  }
+
   /* ---------- data fetch ---------- */
 
-  const [{ data: slaRows, error: slaError }, { data: loans, error: loansError }] =
-    await Promise.all([
-      supabase
-        .from("sla_thresholds")
-        .select("stage,max_hours,owner_role,sub_steps"),
-      supabase
+  const LOAN_SELECT =
+    "id,shape_record_id,record_type,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,loan_amount_cents,lead_created_at,application_completed_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,appraisal_ordered_at,loan_stage_events(stage,entered_at),conditions(status)";
+
+  let loans: LoanRow[] | null = null;
+  let loansError: { message: string } | null = null;
+  let slaRows: SlaRow[] | null = null;
+  let slaError: { message: string } | null = null;
+
+  if (effectiveViewAsId) {
+    // Admin viewing another user — bypass RLS with admin client
+    const adminClient = createSupabaseAdminClient();
+    const [slaRes, loansRes] = await Promise.all([
+      adminClient.from("sla_thresholds").select("stage,max_hours,owner_role,sub_steps"),
+      adminClient
         .from("loans")
-        .select(
-          "id,shape_record_id,record_type,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,loan_amount_cents,lead_created_at,application_completed_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,appraisal_ordered_at,loan_stage_events(stage,entered_at),conditions(status)",
-        )
+        .select(LOAN_SELECT)
+        .eq("assigned_loan_officer_user_id", effectiveViewAsId)
         .order("lead_created_at", { ascending: false, nullsFirst: true })
         .limit(1000),
     ]);
+    slaRows = slaRes.data as SlaRow[] | null;
+    slaError = slaRes.error;
+    loans = loansRes.data as LoanRow[] | null;
+    loansError = loansRes.error;
+  } else {
+    // Regular fetch — RLS applies (LO sees only their own, admin sees all)
+    const supabase = await createSupabaseServerClient();
+    const [slaRes, loansRes] = await Promise.all([
+      supabase.from("sla_thresholds").select("stage,max_hours,owner_role,sub_steps"),
+      supabase
+        .from("loans")
+        .select(LOAN_SELECT)
+        .order("lead_created_at", { ascending: false, nullsFirst: true })
+        .limit(1000),
+    ]);
+    slaRows = slaRes.data as SlaRow[] | null;
+    slaError = slaRes.error;
+    loans = loansRes.data as LoanRow[] | null;
+    loansError = loansRes.error;
+  }
 
   const dataError = slaError || loansError;
   if (dataError) console.error("Dashboard data error:", dataError.message);
@@ -255,16 +313,13 @@ export default async function LoanOfficerDashboardPage() {
   });
 
   const commandCenterLoans = loanWithComputed.filter(
-    (l) =>
-      l.current_stage &&
-      PIPED_STAGES.has(l.current_stage) &&
-      !!l.appraisal_ordered_at,
+    (l) => l.current_stage && PIPED_STAGES.has(l.current_stage),
   );
 
   const prePipelineLoans = loanWithComputed.filter(
     (l) =>
       l.current_stage !== "funded" &&
-      !(l.current_stage && PIPED_STAGES.has(l.current_stage) && !!l.appraisal_ordered_at),
+      !(l.current_stage && PIPED_STAGES.has(l.current_stage)),
   );
 
   const activeLoans = commandCenterLoans;
@@ -520,13 +575,26 @@ export default async function LoanOfficerDashboardPage() {
         </div>
       ) : null}
 
+      {/* ---- admin view-as selector ---- */}
+      {isAdmin && (
+        <ViewAsSelector users={loUsersForSelector} currentViewAs={effectiveViewAsId} />
+      )}
+
       {/* ---- header ---- */}
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">Loan Officer Dashboard</h1>
           <p className="text-sm text-mutedForeground">
-            {appUser.full_name} &middot;{" "}
-            {appUser.role.replace("_", " ")}
+            {viewAsUser ? (
+              <>
+                <span className="text-xs uppercase tracking-wide text-mutedForeground/60 mr-1">Viewing as</span>
+                {viewAsUser.full_name} &middot; {viewAsUser.role.replace("_", " ")}
+              </>
+            ) : (
+              <>
+                {appUser.full_name} &middot; {appUser.role.replace("_", " ")}
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -667,42 +735,26 @@ export default async function LoanOfficerDashboardPage() {
       </section>
 
       {/* ================================================================ */}
-      {/*  Pre-Pipeline Summary                                           */}
+      {/*  Pre-Pipeline Summary (click stage to open list in side panel)   */}
       {/* ================================================================ */}
 
       {prePipelineLoans.length > 0 ? (
-        <section className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-semibold">Pre-Pipeline</div>
-              <p className="mt-0.5 text-xs text-mutedForeground">
-                Files not yet in Command Center &mdash; awaiting appraisal order or pipeline stage assignment
-              </p>
-            </div>
-            <div className="text-2xl font-bold">{prePipelineLoans.length}</div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(() => {
-              const byStage = new Map<string, number>();
-              for (const l of prePipelineLoans) {
-                const key = l.current_stage ?? "no_stage";
-                byStage.set(key, (byStage.get(key) ?? 0) + 1);
-              }
-              return Array.from(byStage.entries())
-                .sort((a, b) => b[1] - a[1])
-                .map(([stage, count]) => (
-                  <span
-                    key={stage}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs"
-                  >
-                    <span className="font-medium">{stageLabel(stage)}</span>
-                    <span className="text-mutedForeground">{count}</span>
-                  </span>
-                ));
-            })()}
-          </div>
-        </section>
+        <PrePipelineWithPanel
+          loans={prePipelineLoans.map((l) => ({
+            id: l.id,
+            shape_record_id: l.shape_record_id,
+            borrower_first_name: l.borrower_first_name,
+            borrower_last_name: l.borrower_last_name,
+            current_stage: l.current_stage,
+            status_raw: l.status_raw,
+            loan_type: l.loan_type,
+            record_type: l.record_type,
+            open_conditions_count: l.openConditions,
+            days_in_stage: l.daysInStage ?? null,
+            sla_exceeded: l.slaExceeded,
+          }))}
+          stageLabels={STAGE_LABELS}
+        />
       ) : null}
 
       {/* ================================================================ */}

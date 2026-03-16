@@ -31,6 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {canViewCloserDashboard(appUser.role) ? <NavLink href="/dashboard/closer">Closer</NavLink> : null}
             {canViewExecutiveDashboard(appUser.role) ? <NavLink href="/dashboard/executive">Executive</NavLink> : null}
             <NavLink href="/dashboard/advisor">AI Advisor</NavLink>
+            {canAccessAdmin(appUser.role) ? <NavLink href="/dashboard/admin-view">Team View</NavLink> : null}
             {canAccessAdmin(appUser.role) ? <NavLink href="/admin/import">Admin</NavLink> : null}
             <NotificationBell />
             <SignOutButton />

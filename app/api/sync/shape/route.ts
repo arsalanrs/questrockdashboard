@@ -42,7 +42,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runShapeApiSync({});
+    let options: { dateFrom?: string; dateTo?: string } = {};
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      try {
+        const body = await request.json();
+        if (body && typeof body === "object") {
+          if (typeof body.dateFrom === "string" && body.dateFrom.trim()) options.dateFrom = body.dateFrom.trim();
+          if (typeof body.dateTo === "string" && body.dateTo.trim()) options.dateTo = body.dateTo.trim();
+        }
+      } catch {
+        // invalid JSON
+      }
+    }
+    const result = await runShapeApiSync(options);
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Sync failed";

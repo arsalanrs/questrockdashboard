@@ -5,7 +5,9 @@ import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
 import type { ShapeBulkExportResponse } from "@/lib/shape-api/types";
 
-const EXCLUDED_RECORD_TYPES = new Set(["Referral Partner", "Contact"]);
+// Shape API returns "Referral Partners" (with 's'); CSV exports use "Referral Partner" (no 's').
+// Both are excluded. "Contact" is also excluded.
+const EXCLUDED_RECORD_TYPES = new Set(["Referral Partner", "Referral Partners", "Contact"]);
 const EXCLUDED_SOURCES = new Set(["zWebLead - VISIT"]);
 
 const PAGE_SIZE = 50;

@@ -21,6 +21,8 @@ const API_TO_CSV: Record<string, string> = {
   "Email": "Email",
   phone: "Phone",
   "Phone": "Phone",
+  // Shape returns phone as "Mobile Phone" for this account
+  "Mobile Phone": "Phone",
   loanamount: "Loan Amount",
   loan_amount: "Loan Amount",
   "Loan Amount": "Loan Amount",
@@ -38,6 +40,8 @@ const API_TO_CSV: Record<string, string> = {
   depursLo: "Loan Officer User Name",
   depurLo: "Loan Officer User Name",
   loanOfficerUserName: "Loan Officer User Name",
+  // Shape returns the LO field as "LOA User Name" (confirmed from account Preview)
+  "LOA User Name": "Loan Officer User Name",
   utmCampaign: "Custom Field - UTM Campaign",
   utm_campaign: "Custom Field - UTM Campaign",
   "Custom Field - UTM Campaign": "Custom Field - UTM Campaign",
@@ -51,7 +55,8 @@ const API_TO_CSV: Record<string, string> = {
 };
 
 /** Status field name in Shape API (account-specific; override via env or config). */
-const STATUS_FIELD_NAMES = ["mstrstatus1", "mstrStatus1", "status", "Status"];
+// "Shape File Status" is the display-name key this account uses (confirmed from Preview)
+const STATUS_FIELD_NAMES = ["Shape File Status", "mstrstatus1", "mstrStatus1", "status", "Status"];
 
 function str(value: unknown): string | undefined {
   if (value == null) return undefined;
@@ -98,6 +103,19 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
   if (recordType != null) {
     const v = str(recordType);
     if (v !== undefined) out["Record Type"] = v;
+  }
+
+  // Loan Officer: if not set by API_TO_CSV, try any key that looks like LO name (API field names vary)
+  if (out["Loan Officer User Name"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/loan\s*officer|depur|depurs|assigned\s*lo/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["Loan Officer User Name"] = v;
+          break;
+        }
+      }
+    }
   }
 
   // Tracking/milestone dates (trk*); add more as discovered
