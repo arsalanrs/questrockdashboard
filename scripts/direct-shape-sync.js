@@ -23,7 +23,10 @@ const SHAPE_FIELDS = [
   "leadid", "recordtype", "createdDate", "lastActivityDate",
   "firstname", "lastname", "email", "phone",
   "LoanAmount", "prState", "mailingState", "leadsource",
-  "channel", "depursLo", "utmCampaign", "mstrstatus1", "status",
+  "channel", "depursLo",
+  // Try both the internal api name and the exact CSV display name
+  "Loan Officer User Name", "loanOfficerUserName",
+  "utmCampaign", "mstrstatus1", "status",
   "purpose", "loanType",
   "trkApplicationCompleted", "trkAppraisalRequest",
   "trkCreditReportRequest", "trkDateClosed",
@@ -47,7 +50,8 @@ const API_TO_CSV = {
   depursLo: "Loan Officer User Name",
   depurLo: "Loan Officer User Name",
   loanOfficerUserName: "Loan Officer User Name",
-  "LOA User Name": "Loan Officer User Name",   // actual key this Shape account uses
+  "Loan Officer User Name": "Loan Officer User Name",  // exact CSV display name
+  "LOA User Name": "Loan Officer User Name",            // alternate key this Shape account uses
   utmCampaign: "Custom Field - UTM Campaign", "Custom Field - UTM Campaign": "Custom Field - UTM Campaign",
   recordtype: "Record Type", "Record Type": "Record Type",
   purpose: "Loan Purpose", "Loan Purpose": "Loan Purpose",
