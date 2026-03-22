@@ -1,41 +1,110 @@
 /**
- * LendingPad API client — stub for future integration.
- *
- * Environment variables (add to .env.local):
- *   LENDINGPAD_API_URL=https://api.lendingpad.com
- *   LENDINGPAD_API_KEY=your-api-key
+ * LendingPad Web API — read-only (GET). Uses HTTP Basic auth per Postman collection.
  */
+import { getLendingPadReadConfig, type LendingPadReadConfig } from "./config";
+import {
+  buildBasicAuthHeader,
+  parseLendingPadConditionsResponse,
+  parseLendingPadDocumentsResponse,
+  parseLendingPadListLoansResponse,
+  type NormalizedLpCondition,
+  type NormalizedLpDocument,
+  type NormalizedLpLoanListItem,
+} from "./parse-response";
 
-import type { LendingPadLoan, LendingPadDocument, LendingPadCondition } from "./types";
+const REQUEST_MS = 45_000;
 
-const BASE_URL = process.env.LENDINGPAD_API_URL ?? "https://api.lendingpad.com";
-const API_KEY = process.env.LENDINGPAD_API_KEY ?? "";
-
-function headers() {
+function authHeaders(cfg: LendingPadReadConfig): HeadersInit {
   return {
-    Authorization: `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
+    Authorization: buildBasicAuthHeader(cfg.username, cfg.password),
+    Accept: "application/json",
   };
 }
 
-// TODO: Implement when LendingPad API credentials are available
-export async function fetchLoan(_loanId: string): Promise<LendingPadLoan | null> {
-  void BASE_URL;
-  void headers;
-  console.warn("[LendingPad] fetchLoan is a stub — not yet implemented");
-  return null;
+async function lendingPadGetJson(pathWithQuery: string): Promise<unknown> {
+  const cfg = getLendingPadReadConfig();
+  const url = `${cfg.baseUrl}${pathWithQuery.startsWith("/") ? "" : "/"}${pathWithQuery}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: authHeaders(cfg),
+    signal: AbortSignal.timeout(REQUEST_MS),
+    cache: "no-store",
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`LendingPad GET ${pathWithQuery.split("?")[0]} failed: ${res.status} ${text.slice(0, 200)}`);
+  }
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("LendingPad response was not valid JSON");
+  }
 }
 
-export async function fetchDocuments(_loanId: string): Promise<LendingPadDocument[]> {
-  console.warn("[LendingPad] fetchDocuments is a stub — not yet implemented");
-  return [];
+function queryParams(params: Record<string, string | number | undefined | null>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === "") continue;
+    sp.set(k, String(v));
+  }
+  const q = sp.toString();
+  return q ? `?${q}` : "";
 }
 
-export async function fetchConditions(_loanId: string): Promise<LendingPadCondition[]> {
-  console.warn("[LendingPad] fetchConditions is a stub — not yet implemented");
-  return [];
+/** List loans (JSON). Requires LENDINGPAD_LIST_USER_ID. */
+export async function listLendingPadLoans(options?: {
+  skip?: number;
+  take?: number;
+}): Promise<NormalizedLpLoanListItem[]> {
+  const cfg = getLendingPadReadConfig();
+  if (!cfg.listUserId) {
+    throw new Error("LENDINGPAD_LIST_USER_ID is required for list/loans.");
+  }
+  const q = queryParams({
+    contact: cfg.contactId,
+    company: cfg.companyId,
+    user: cfg.listUserId,
+    skip: options?.skip,
+    take: options?.take,
+  });
+  const json = await lendingPadGetJson(`/integrations/list/loans${q}`);
+  return parseLendingPadListLoansResponse(json);
 }
 
-export async function syncLoanStatus(_loanId: string): Promise<void> {
-  console.warn("[LendingPad] syncLoanStatus is a stub — not yet implemented");
+export async function getLendingPadLoanConditions(loanUuid: string): Promise<NormalizedLpCondition[]> {
+  const cfg = getLendingPadReadConfig();
+  const q = queryParams({
+    contact: cfg.contactId,
+    company: cfg.companyId,
+    loan: loanUuid,
+  });
+  const json = await lendingPadGetJson(`/integrations/loans/conditions${q}`);
+  return parseLendingPadConditionsResponse(json);
+}
+
+function formatCreationPeriodYmdRange(from: Date, to: Date): string {
+  const ymd = (d: Date) =>
+    `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+  return `${ymd(from)}-${ymd(to)}`;
+}
+
+/** Document metadata for a loan. Optional date range defaults to last 5 years. */
+export async function getLendingPadLoanDocuments(
+  loanUuid: string,
+  creationPeriod?: string,
+): Promise<NormalizedLpDocument[]> {
+  const cfg = getLendingPadReadConfig();
+  const end = new Date();
+  const start = new Date();
+  start.setUTCFullYear(start.getUTCFullYear() - 5);
+  const period = creationPeriod ?? formatCreationPeriodYmdRange(start, end);
+  const q = queryParams({
+    contact: cfg.contactId,
+    company: cfg.companyId,
+    loan: loanUuid,
+    creationPeriod: period,
+  });
+  const json = await lendingPadGetJson(`/integrations/loans/documents${q}`);
+  return parseLendingPadDocumentsResponse(json);
 }

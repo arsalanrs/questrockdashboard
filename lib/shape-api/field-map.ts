@@ -52,6 +52,12 @@ const API_TO_CSV: Record<string, string> = {
   loanType: "Loan Type",
   loan_type: "Loan Type",
   "Loan Type": "Loan Type",
+  lendingPadLoanId: "Custom Field - LendingPad Loan ID",
+  lending_pad_loan_id: "Custom Field - LendingPad Loan ID",
+  "LendingPad Loan ID": "Custom Field - LendingPad Loan ID",
+  "Custom Field - LendingPad Loan ID": "Custom Field - LendingPad Loan ID",
+  "E-Sign Returned Date": "E-Sign Returned Date",
+  "Appraisal Payment Collected Date": "Appraisal Payment Collected Date",
 };
 
 /** Status field name in Shape API (account-specific; override via env or config). */
@@ -118,12 +124,51 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
     }
   }
 
+  if (out["E-Sign Returned Date"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/e[-\s]?sign.*return|signed.*package|package.*signed|esign.*complete/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["E-Sign Returned Date"] = v;
+          break;
+        }
+      }
+    }
+  }
+
+  if (out["Appraisal Payment Collected Date"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/appraisal.*payment|payment.*appraisal|appraisal.*fee.*paid|skin\s*in\s*the\s*game/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["Appraisal Payment Collected Date"] = v;
+          break;
+        }
+      }
+    }
+  }
+
+  // LendingPad loan UUID (custom field name varies by Shape account)
+  if (out["Custom Field - LendingPad Loan ID"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/lending\s*pad.*loan|lp\s*loan.*uuid|lendingpad.*id/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["Custom Field - LendingPad Loan ID"] = v;
+          break;
+        }
+      }
+    }
+  }
+
   // Tracking/milestone dates (trk*); add more as discovered
   const trkMap: Record<string, string> = {
     trkApplicationCompleted: "Application Completed Date",
     trkAppraisalRequest: "Appraisal Request Date",
     trkCreditReportRequest: "Credit Report Request Date",
     trkDateClosed: "Tracking Date Closed",
+    trkEsignReturned: "E-Sign Returned Date",
+    trkAppraisalPaymentCollected: "Appraisal Payment Collected Date",
   };
   for (const [apiKey, csvKey] of Object.entries(trkMap)) {
     if (apiKey in record) {

@@ -1,5 +1,6 @@
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
 import { parseLoanAmountCents, parseMaybeTimestamp } from "@/lib/import/shape-kpi";
+import { normalizeLendingPadLoanUuid } from "@/lib/lendingpad/parse-response";
 
 const SLOW_TRACK_TYPES = new Set(["Construction", "Fix & Flip", "Rehab"]);
 
@@ -29,6 +30,11 @@ export function buildLoanPayloadFromRow(
   const loanPurpose = (r["Loan Purpose"] ?? "").trim() || null;
 
   const appraisalTs = parseMaybeTimestamp(r["Appraisal Request Date"]);
+  const esignReturnedAt = parseMaybeTimestamp(r["E-Sign Returned Date"]);
+  const appraisalPaymentCollectedAt = parseMaybeTimestamp(r["Appraisal Payment Collected Date"]);
+
+  const lpLoanRaw = (r["Custom Field - LendingPad Loan ID"] ?? "").trim() || null;
+  const lendingpad_loan_uuid = normalizeLendingPadLoanUuid(lpLoanRaw);
 
   return {
     import_batch_id: importBatchId,
@@ -63,9 +69,13 @@ export function buildLoanPayloadFromRow(
     credit_report_requested_at: parseMaybeTimestamp(r["Credit Report Request Date"]),
     appraisal_requested_at: appraisalTs,
     appraisal_ordered_at: appraisalTs,
+    esign_returned_at: esignReturnedAt,
+    appraisal_payment_collected_at: appraisalPaymentCollectedAt,
     closed_at: parseMaybeTimestamp(r["Tracking Date Closed"]),
 
     assigned_loan_officer_name: loName,
     assigned_loan_officer_user_id: assignedLoUserId,
+
+    lendingpad_loan_uuid,
   };
 }

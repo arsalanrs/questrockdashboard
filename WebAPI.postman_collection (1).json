@@ -1,0 +1,640 @@
+{
+	"info": {
+		"_postman_id": "15b2a15a-3fd4-4af7-8265-d6fc6939c7a7",
+		"name": "WebAPI",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2414160",
+		"_collection_link": "https://lendingpad.postman.co/workspace/Dev-Team~bb00885a-be6e-4c95-83b6-ba65ff28a827/collection/2414160-15b2a15a-3fd4-4af7-8265-d6fc6939c7a7?action=share&source=collection_link&creator=2414160"
+	},
+	"item": [
+		{
+			"name": "Import Loan with JSON Model",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\"contact\":\"7c521588-470a-48ca-ae03-49bf2efdc610\",\r\n\"company\":\"167e115b-f299-4bc3-95b3-06f1217d5738\",\r\n\"branch\":null,\r\n\"campaign\":\"442b8714-099e-481b-b407-6dd6c1bfcafb\",\r\n\"officer\":null,\r\n\"occupancy\":1,\r\n\"purpose\":1,\r\n\"appraisalValue\":0,\r\n\"purchasePrice\":0,\r\n\"loanAmount\":0,\r\n\"creditScore\":0,\r\n\"loanType\":1,\r\n\"term\":\"\",\r\n\"noteRate\":0,\r\n\"propertyType\":7,\r\n\"units\":1,\r\n\"otherFinancing\":0,\r\n\"applicationTakenDate\":null,\r\n\"borrower\":{\"firstName\":\"Victor Hugo\",\"lastName\":\"Martinez-Soto\",\"ssn\":\"123456789\",\"birthDate\":\"04/20/1977\",\"contacts\":{\"email\":\" test@tbd.com\",\"mobilePhone\":\"6025652699\",\"homePhone\":null,\"workPhone\":null},\r\n\"currentAddress\":{\"street\":\"13422 W Keim Dr.\",\"city\":\"Litchfield Park\",\"state\":\"AZ\",\"zipCode\":\"85340\"}},\"subjectPropertyAddress\":{\"street\":\"\",\"city\":\"\",\"state\":\"\",\"zipCode\":\"\"},\r\n\"officerNmlsId\":\"1006565\",\r\n\"officerEmail\":\" arjun.elasagaram@lendingpad.com\",\r\n\"coBorrower\":{\"firstName\":\"Angelica\",\"lastName\":\"Mollinedo\",\"ssn\":\"987456321\",\"birthDate\":\"09/01/1986\",\"contacts\":{\"email\":\" test@tbd.com\",\"mobilePhone\":\"6233401285\",\"homePhone\":null,\"workPhone\":null}}}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/integrations/import/loan",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"import",
+						"loan"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Import Loan with Standard File",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 201\", function () {\r",
+							"  pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Response has the required fields - loanNumber, id, and status\", function () {\r",
+							"    const responseData = pm.response.json();\r",
+							"    \r",
+							"    pm.expect(responseData).to.be.an('object');\r",
+							"    pm.expect(responseData.loanNumber).to.exist;\r",
+							"    pm.expect(responseData.id).to.exist;\r",
+							"    pm.expect(responseData.status).to.exist.and.to.be.an('object');\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Status code is a non-negative integer\", function () {\r",
+							"    const responseData = pm.response.json();\r",
+							"    \r",
+							"    pm.expect(responseData.status.code).to.be.a('number');\r",
+							"    pm.expect(responseData.status.code).to.be.at.least(0);\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Response time is less than 10000ms\", function () {\r",
+							"  pm.expect(pm.response.responseTime).to.be.below(10000);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response has the Content-Type header\", function () {\r",
+							"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.exist;\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Content-Type header is set to application/json\", function () {\r",
+							"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r",
+							"});\r",
+							"\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "",
+							"type": "file",
+							"src": "postman-cloud:///1ef3710a-149d-46b0-97d3-67bf65834fdc"
+						},
+						{
+							"key": "contact",
+							"value": "{{contractid}}",
+							"type": "text"
+						},
+						{
+							"key": "company",
+							"value": "{{companyid}}",
+							"type": "text"
+						},
+						{
+							"key": "campaign",
+							"value": "{{campaignid}}",
+							"type": "text"
+						},
+						{
+							"key": "type",
+							"value": "2",
+							"type": "text"
+						},
+						{
+							"key": "assignments.loanOfficer.nmlsId",
+							"value": "6666",
+							"type": "text"
+						},
+						{
+							"key": "assignments.loanAssistant.email",
+							"value": "dalia@lendingpad.com",
+							"type": "text"
+						},
+						{
+							"key": "assignments.loanProcessor.id",
+							"value": "95fe5488-e1f2-4471-be03-0dfc4953c95a",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{url}}/integrations/import/loan/file",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"import",
+						"loan",
+						"file"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Import Pdf Documents into Loan",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "",
+							"type": "file",
+							"src": ""
+						},
+						{
+							"key": "contact",
+							"value": "7c521588-470a-48ca-ae03-49bf2efdc610",
+							"type": "text"
+						},
+						{
+							"key": "company",
+							"value": "{{companyid}}",
+							"type": "text"
+						},
+						{
+							"key": "loan",
+							"value": "60a5c31e-129a-41e6-8d69-c160c8eacaa9",
+							"type": "text"
+						},
+						{
+							"key": "name",
+							"value": "2021 W2 - KBG Commercial",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{url}}/integrations/import/loan/document",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"import",
+						"loan",
+						"document"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Import Notes into Loan",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Response time is within an acceptable range\", function () {\r",
+							"  pm.expect(pm.response.responseTime).to.be.below(1000);\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Id and status fields must be present in the response\", function () {\r",
+							"    const responseData = pm.response.json();\r",
+							"    \r",
+							"    pm.expect(responseData).to.be.an('object');\r",
+							"    pm.expect(responseData.id).to.exist;\r",
+							"    pm.expect(responseData.status).to.exist;\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Status code is a non-negative integer\", function () {\r",
+							"  const responseData = pm.response.json();\r",
+							"  \r",
+							"  pm.expect(responseData.status.code).to.be.a('number');\r",
+							"  pm.expect(responseData.status.code).to.be.at.least(0);\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Status name is a non-empty string\", function () {\r",
+							"    const responseData = pm.response.json();\r",
+							"    \r",
+							"    pm.expect(responseData.status.name).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Status name should not be empty\");\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"contact\" : \"7c521588-470a-48ca-ae03-49bf2efdc610\",\r\n\t\"company\" : \"167e115b-f299-4bc3-95b3-06f1217d5738\",\r\n\t\"loan\" : \"60a5c31e-129a-41e6-8d69-c160c8eacaa9\",\r\n    \"notes\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\", \"i\", \"j\", \"k\", \"l\", \"m\", \"n\", \"o\", \"p\", \"q\", \"r\", \"s\", \"t\", \"u\", \"v\", \"w\", \"x\", \"y\", \"z\"]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/integrations/import/loan/notes",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"import",
+						"loan",
+						"notes"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Loan",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"contact\": \"ac157348-c149-4281-be8f-54c008d1a95f\",\r\n\t\"company\": \"ebd3fce6-53f7-4c8a-97ff-1091cc085380\",\r\n\t\"loan\": \"1ca78f73-5219-4cf2-8fae-f6e9d0fc6145\",\r\n\t\"fields\": { \r\n\t\t\"occupancy\": \"3\",\r\n\t\t\"purpose\": \"1\",\r\n\t\t\"loanType\": 1,\r\n\t\t\"appraisalValue\":  234,\r\n\t\t\"purchasePrice\": 600000,\r\n\t\t\"loanAmount\": 450000,\r\n\t\t\"subjectPropertyAddress\": {\r\n\t\t \"City\" : \"City\",\r\n                \"State\" : \"VA\",\r\n                \"Street\" : \"Street\",\r\n                \"ZipCode\" : \"ZipCode\"\r\n\t\t}\r\n\t},\r\n\t\"customFields\": [\r\n\t\t{\r\n\t\t\t\"id\": \"a7d222c0-3192-4f2a-95ed-b016eb30474f\",\r\n\t\t\t\"values\": [\r\n\t\t\t\t\"Test A\"\r\n\t\t\t]\r\n\t\t}, {\r\n\t\t\t\"id\": \"7f2a31bb-b0bd-4c24-935b-18fd27c66932\",\r\n\t\t\t\"values\": [\r\n\t\t\t\t\"Text B\"\r\n\t\t\t]\r\n\t\t}, {\r\n\t\t\t\"id\": \"47fba5b1-1393-496b-9276-897fd7a5c506\",\r\n\t\t\t\"values\": [\r\n\t\t\t\t\"0023-11-28\"\r\n\t\t\t]\r\n\t\t}, {\r\n\t\t\t\"id\": \"e390c3d4-809d-4fb3-b693-375cb934dcbc\",\r\n\t\t\t\"values\": [\r\n\t\t\t\t2.99\r\n\t\t\t]\r\n\t\t}\r\n\t]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/integrations/update/loan",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"update",
+						"loan"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Export Loan with Standard File",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{url}}/integrations/export/loan/file?contact=7c521588-470a-48ca-ae03-49bf2efdc610&company={{companyid}}&loan=bac976d9-5d26-41a8-a736-32ef1fe1eadc&type=11",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"export",
+						"loan",
+						"file"
+					],
+					"query": [
+						{
+							"key": "contact",
+							"value": "7c521588-470a-48ca-ae03-49bf2efdc610"
+						},
+						{
+							"key": "company",
+							"value": "{{companyid}}"
+						},
+						{
+							"key": "loan",
+							"value": "bac976d9-5d26-41a8-a736-32ef1fe1eadc"
+						},
+						{
+							"key": "type",
+							"value": "11"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get List of Loans with JSON Model",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{url}}/integrations/list/loans?contact=7c521588-470a-48ca-ae03-49bf2efdc610&company=167e115b-f299-4bc3-95b3-06f1217d5738&user=ed7a312a-4a5d-4bb7-aa72-2067538e9f00&skip=null&take=null",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"list",
+						"loans"
+					],
+					"query": [
+						{
+							"key": "contact",
+							"value": "7c521588-470a-48ca-ae03-49bf2efdc610"
+						},
+						{
+							"key": "company",
+							"value": "167e115b-f299-4bc3-95b3-06f1217d5738"
+						},
+						{
+							"key": "user",
+							"value": "ed7a312a-4a5d-4bb7-aa72-2067538e9f00"
+						},
+						{
+							"key": "skip",
+							"value": "null"
+						},
+						{
+							"key": "take",
+							"value": "null"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Loan Conditions",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{url}}/integrations/loans/conditions?contact={{contact}}&company={{company}}&loan={{loan}}",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"loans",
+						"conditions"
+					],
+					"query": [
+						{
+							"key": "contact",
+							"value": "{{contact}}"
+						},
+						{
+							"key": "company",
+							"value": "{{company}}"
+						},
+						{
+							"key": "loan",
+							"value": "{{loan}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Loan Documents",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{url}}/integrations/loans/documents?contact={{contact}}&company={{company}}&loan={{loan}}&creationPeriod={{creationPeriod}}",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"loans",
+						"documents"
+					],
+					"query": [
+						{
+							"key": "contact",
+							"value": "{{contact}}"
+						},
+						{
+							"key": "company",
+							"value": "{{company}}"
+						},
+						{
+							"key": "loan",
+							"value": "{{loan}}"
+						},
+						{
+							"key": "creationPeriod",
+							"value": "{{creationPeriod}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Loan Document File",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{username}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{url}}/integrations/loans/documents/file?contact={{contact}}&company={{company}}&loan={{loan}}&document={{document}}",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"integrations",
+						"loans",
+						"documents",
+						"file"
+					],
+					"query": [
+						{
+							"key": "contact",
+							"value": "{{contact}}"
+						},
+						{
+							"key": "company",
+							"value": "{{company}}"
+						},
+						{
+							"key": "loan",
+							"value": "{{loan}}"
+						},
+						{
+							"key": "document",
+							"value": "{{document}}"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

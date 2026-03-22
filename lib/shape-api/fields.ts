@@ -28,4 +28,8 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "trkAppraisalRequest",
   "trkCreditReportRequest",
   "trkDateClosed",
+  "trkEsignReturned",
+  "trkAppraisalPaymentCollected",
+  // LendingPad link (optional; map display key in field-map when Shape exposes a custom field)
+  "lendingPadLoanId",
 ];

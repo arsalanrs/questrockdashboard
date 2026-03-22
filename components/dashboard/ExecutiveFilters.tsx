@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import { computeLifecyclePhase, LIFECYCLE_PHASE_LABEL, type LifecyclePhase } from "@/lib/lifecycle";
 
 const ClientPieChart = dynamic(
   () => import("@/components/dashboard/ClientPieChart").then((m) => m.default),
@@ -21,6 +22,7 @@ export type ExecLoan = {
   utm_campaign: string | null;
   property_state: string | null;
   status_raw: string | null;
+  current_stage: string | null;
   loan_amount_cents: number | null;
   lead_created_at: string | null;
   credit_report_requested_at: string | null;
@@ -33,6 +35,9 @@ export type ExecLoan = {
   assigned_loan_officer_name: string | null;
   loan_type: string | null;
   documentation_type: string | null;
+  esign_returned_at: string | null;
+  appraisal_payment_collected_at: string | null;
+  validation_launched_at: string | null;
 };
 
 type Props = {
@@ -114,6 +119,27 @@ export function ExecutiveFilters({ loans, loNames }: Props) {
   const denied = filtered.filter((l) => (l.status_raw ?? "").startsWith("Denied"));
   const withdrawn = filtered.filter((l) => l.status_raw === "Withdrawn");
   const deniedAfterCredit = creditPulled.filter((l) => (l.status_raw ?? "").startsWith("Denied"));
+
+  const signedPackage = filtered.filter((l) => l.esign_returned_at);
+  const appraisalPaid = filtered.filter((l) => l.appraisal_payment_collected_at);
+  const validationLaunch = filtered.filter((l) => l.validation_launched_at);
+
+  const lifecycleCounts = useMemo(() => {
+    const init: Record<LifecyclePhase, number> = {
+      verification: 0,
+      validation: 0,
+      close: 0,
+      fund: 0,
+    };
+    for (const l of filtered) {
+      const p = computeLifecyclePhase({
+        current_stage: l.current_stage,
+        validation_launched_at: l.validation_launched_at,
+      });
+      init[p] += 1;
+    }
+    return init;
+  }, [filtered]);
 
   /* ---- pie data: by source ---- */
   const bySourcePie = useMemo(() => {
@@ -233,6 +259,45 @@ export function ExecutiveFilters({ loans, loNames }: Props) {
         </div>
       </section>
 
+      {/* ── QuestRock lifecycle (PDF) ──────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="text-sm font-semibold">QuestRock lifecycle</div>
+        <p className="text-xs text-mutedForeground max-w-3xl">
+          Validation Launch (piped) requires signed package (<span className="font-medium text-foreground">e-sign returned</span>) and{" "}
+          <span className="font-medium text-foreground">appraisal payment collected</span>. Phase counts use pipeline stage after launch.
+        </p>
+        <div className="grid gap-3 md:grid-cols-4">
+          {(["verification", "validation", "close", "fund"] as const).map((phase) => (
+            <div key={phase} className="rounded-lg border border-border bg-card px-4 py-3">
+              <div className="text-xs text-mutedForeground">{LIFECYCLE_PHASE_LABEL[phase]}</div>
+              <div className="mt-1 text-xl font-bold tabular-nums">
+                {lifecycleCounts[phase]} <span className="text-sm font-normal text-mutedForeground">{pct(lifecycleCounts[phase], totalFiltered)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <div className="text-xs text-mutedForeground">Signed package (e-sign)</div>
+            <div className="mt-1 text-xl font-bold tabular-nums">
+              {signedPackage.length} <span className="text-sm font-normal text-mutedForeground">{pct(signedPackage.length, totalFiltered)}</span>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <div className="text-xs text-mutedForeground">Appraisal payment</div>
+            <div className="mt-1 text-xl font-bold tabular-nums">
+              {appraisalPaid.length} <span className="text-sm font-normal text-mutedForeground">{pct(appraisalPaid.length, totalFiltered)}</span>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-4 py-3 md:col-span-2">
+            <div className="text-xs text-mutedForeground">Validation launch (both gates)</div>
+            <div className="mt-1 text-xl font-bold tabular-nums">
+              {validationLaunch.length} <span className="text-sm font-normal text-mutedForeground">{pct(validationLaunch.length, totalFiltered)}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Pipeline Metrics ───────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="text-sm font-semibold">Pipeline Metrics</div>
@@ -243,7 +308,7 @@ export function ExecutiveFilters({ loans, loNames }: Props) {
             {deniedAfterCredit.length > 0 && <div className="mt-1 text-[10px] text-red-500">{deniedAfterCredit.length} denied after credit</div>}
           </div>
           <div className="rounded-lg border border-border bg-card px-4 py-3">
-            <div className="text-xs text-mutedForeground">Piped (Appraisals)</div>
+            <div className="text-xs text-mutedForeground">Appraisal ordered</div>
             <div className="mt-1 text-xl font-bold tabular-nums">{piped.length} <span className="text-sm font-normal text-mutedForeground">{pct(piped.length, totalFiltered)}</span></div>
           </div>
           <div className="rounded-lg border border-border bg-card px-4 py-3">

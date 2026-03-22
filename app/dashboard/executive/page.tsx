@@ -14,7 +14,7 @@ export default async function ExecutiveDashboardPage() {
     admin
       .from("loans")
       .select(
-        "id,source,utm_campaign,property_state,status_raw,loan_amount_cents,lead_created_at,credit_report_requested_at,appraisal_ordered_at,closed_at,closing_date,borrower_first_name,borrower_last_name,shape_record_id,assigned_loan_officer_name,loan_type,documentation_type",
+        "id,source,utm_campaign,property_state,status_raw,current_stage,loan_amount_cents,lead_created_at,credit_report_requested_at,appraisal_ordered_at,closed_at,closing_date,borrower_first_name,borrower_last_name,shape_record_id,assigned_loan_officer_name,loan_type,documentation_type,esign_returned_at,appraisal_payment_collected_at,validation_launched_at",
       )
       .limit(5000),
     admin

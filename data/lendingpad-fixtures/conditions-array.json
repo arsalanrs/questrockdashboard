@@ -1,0 +1,13 @@
+[
+  {
+    "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "title": "Sample underwriting condition",
+    "status": "Open"
+  },
+  {
+    "id": "ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj",
+    "description": "Cleared sample item",
+    "status": "Cleared",
+    "clearedDate": "2024-01-15T12:00:00Z"
+  }
+]

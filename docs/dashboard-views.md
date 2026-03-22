@@ -15,7 +15,7 @@ This document summarizes what each dashboard shows and which database tables/fie
 | **Speed metrics** | Lead → Application, Application → Submission, Submission → CTC, CTC → Close, total days | `loans` (lead_created_at, application_completed_at, closed_at), `loan_stage_events` (entered_at per stage) |
 
 **Tables:** `loans`, `loan_stage_events`, `conditions`, `sla_thresholds`.  
-**Note:** Shape sync fills `current_stage` (from Status + stage_mapping) and basic dates; `loan_stage_events` and `conditions` may be from mock enrichment or a future LendingPad integration until then.
+**Note:** Shape sync fills `current_stage` (from Status + stage_mapping) and basic dates. **`conditions`** rows with `source = 'lendingpad'` are filled by `GET/POST /api/sync/lendingpad` (reads LendingPad only; no LP writes). Loans must have `lendingpad_loan_uuid` set (Shape custom field **Custom Field - LendingPad Loan ID** when mapped, or manual backfill). Other `loan_stage_events` / conditions may still come from elsewhere until fully wired.
 
 ---
 
@@ -40,9 +40,10 @@ This document summarizes what each dashboard shows and which database tables/fie
 | **Marketing ROI (funnel)** | Leads, Applications Completed, Credit Pulled, Appraisals Requested (MTD); Lead→App avg days | `loans` (lead_created_at, application_completed_at, credit_report_requested_at, appraisal_requested_at) |
 | **Lead source / UTM** | Top sources and UTM campaigns (MTD leads) | `loans` (source, utm_campaign) |
 | **State performance** | Loan count by property state | `loans` (property_state) |
+| **QuestRock lifecycle** | Verification / Validation / Close / Fund counts; gate metrics (e-sign returned, appraisal payment, both = Validation Launch) | `loans` (`current_stage`, `esign_returned_at`, `appraisal_payment_collected_at`, generated `validation_launched_at`) |
 
 **Tables:** `loans`.  
-**Note:** Shape sync maps Source and Property State; add UTM to field-map if Shape returns it.
+**Note:** Shape sync maps Source and Property State; add UTM to field-map if Shape returns it. **Validation Launch** (PDF): both `esign_returned_at` and `appraisal_payment_collected_at` must be set; `validation_launched_at` is computed in the database. Shape `trkEsignReturned` / `trkAppraisalPaymentCollected` (or matching custom fields) populate those dates when present. See [environment-variables.md](./environment-variables.md) for Vercel/local env setup including LendingPad.
 
 ---
 

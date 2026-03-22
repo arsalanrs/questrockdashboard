@@ -1,13 +1,13 @@
 /**
- * GET/POST /api/sync/shape — Shape bulk export sync into Supabase.
+ * GET/POST /api/sync/lendingpad — pull conditions from LendingPad (read-only) into Supabase.
  * Auth: Vercel Cron (Authorization: Bearer CRON_SECRET), x-cron-secret, or signed-in admin.
  */
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canAccessAdmin } from "@/lib/permissions";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
-import { hasShapeApiConfig } from "@/lib/shape-api/config";
-import { runShapeApiSync } from "@/lib/shape-api/sync";
+import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
+import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
 
 async function authorize(request: Request): Promise<NextResponse | null> {
   if (isCronRequestAuthorized(request)) return null;
@@ -33,31 +33,21 @@ async function handle(request: Request) {
   const denied = await authorize(request);
   if (denied) return denied;
 
-  if (!hasShapeApiConfig()) {
+  if (!hasLendingPadReadConfig()) {
     return NextResponse.json(
-      { error: "Shape API sync is not configured. Set SHAPE_API_KEY in .env.local." },
+      {
+        error:
+          "LendingPad sync is not configured. Set LENDINGPAD_USERNAME, LENDINGPAD_PASSWORD, LENDINGPAD_CONTACT_ID, LENDINGPAD_COMPANY_ID.",
+      },
       { status: 503 },
     );
   }
 
   try {
-    let options: { dateFrom?: string; dateTo?: string } = {};
-    const contentType = request.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      try {
-        const body = await request.json();
-        if (body && typeof body === "object") {
-          if (typeof body.dateFrom === "string" && body.dateFrom.trim()) options.dateFrom = body.dateFrom.trim();
-          if (typeof body.dateTo === "string" && body.dateTo.trim()) options.dateTo = body.dateTo.trim();
-        }
-      } catch {
-        // invalid JSON
-      }
-    }
-    const result = await runShapeApiSync(options);
+    const result = await runLendingPadConditionsSync();
     return NextResponse.json(result);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Sync failed";
+    const msg = e instanceof Error ? e.message : "LendingPad sync failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

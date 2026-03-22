@@ -3,6 +3,10 @@
     {
       "path": "/api/sync/shape",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/sync/lendingpad",
+      "schedule": "30 14 * * *"
     }
   ]
 }
