@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/sync/shape",
-      "schedule": "0 14 * * *"
+      "schedule": "0 13 * * *"
     },
     {
       "path": "/api/sync/lendingpad",
-      "schedule": "30 14 * * *"
+      "schedule": "30 13 * * *"
     }
   ]
 }

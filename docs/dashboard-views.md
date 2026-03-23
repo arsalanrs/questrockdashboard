@@ -15,7 +15,7 @@ This document summarizes what each dashboard shows and which database tables/fie
 | **Speed metrics** | Lead → Application, Application → Submission, Submission → CTC, CTC → Close, total days | `loans` (lead_created_at, application_completed_at, closed_at), `loan_stage_events` (entered_at per stage) |
 
 **Tables:** `loans`, `loan_stage_events`, `conditions`, `sla_thresholds`.  
-**Note:** Shape sync fills `current_stage` (from Status + stage_mapping) and basic dates. **`conditions`** rows with `source = 'lendingpad'` are filled by `GET/POST /api/sync/lendingpad` (reads LendingPad only; no LP writes). Loans must have `lendingpad_loan_uuid` set (Shape custom field **Custom Field - LendingPad Loan ID** when mapped, or manual backfill). Other `loan_stage_events` / conditions may still come from elsewhere until fully wired.
+**Note:** Shape sync fills `current_stage` (from Status + stage_mapping) and basic dates. Scheduled cron hits **`GET /api/sync/shape`** and runs an **incremental** sync (`updatedDateRange` + DB watermark) so daily status changes upsert into existing `loans` rows; use **full** sync from admin import or **`POST /api/sync/shape`** with `{ "mode": "full" }` for a wide `createdDateRange` rebuild. **`conditions`** rows with `source = 'lendingpad'` are filled by `GET/POST /api/sync/lendingpad` (reads LendingPad only; no LP writes). Loans must have `lendingpad_loan_uuid` set (Shape custom field **Custom Field - LendingPad Loan ID** when mapped, or manual backfill). Other `loan_stage_events` / conditions may still come from elsewhere until fully wired.
 
 ---
 

@@ -1,13 +1,16 @@
 /**
  * GET/POST /api/sync/shape — Shape bulk export sync into Supabase.
  * Auth: Vercel Cron (Authorization: Bearer CRON_SECRET), x-cron-secret, or signed-in admin.
+ *
+ * GET (cron): incremental sync via updatedDateRange + DB watermark.
+ * POST: JSON { "mode": "full" | "incremental", "dateFrom"?, "dateTo"? }; default mode full (legacy).
  */
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canAccessAdmin } from "@/lib/permissions";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { hasShapeApiConfig } from "@/lib/shape-api/config";
-import { runShapeApiSync } from "@/lib/shape-api/sync";
+import { runShapeApiSync, type ShapeSyncMode } from "@/lib/shape-api/sync";
 
 async function authorize(request: Request): Promise<NextResponse | null> {
   if (isCronRequestAuthorized(request)) return null;
@@ -29,7 +32,30 @@ async function authorize(request: Request): Promise<NextResponse | null> {
   return null;
 }
 
-async function handle(request: Request) {
+function parseJsonOptions(request: Request): Promise<{
+  mode?: ShapeSyncMode;
+  dateFrom?: string;
+  dateTo?: string;
+}> {
+  const contentType = request.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return Promise.resolve({});
+  }
+  return request
+    .json()
+    .then((body: unknown) => {
+      if (!body || typeof body !== "object") return {};
+      const o = body as Record<string, unknown>;
+      const out: { mode?: ShapeSyncMode; dateFrom?: string; dateTo?: string } = {};
+      if (o.mode === "full" || o.mode === "incremental") out.mode = o.mode;
+      if (typeof o.dateFrom === "string" && o.dateFrom.trim()) out.dateFrom = o.dateFrom.trim();
+      if (typeof o.dateTo === "string" && o.dateTo.trim()) out.dateTo = o.dateTo.trim();
+      return out;
+    })
+    .catch(() => ({}));
+}
+
+export async function GET(request: Request) {
   const denied = await authorize(request);
   if (denied) return denied;
 
@@ -41,20 +67,7 @@ async function handle(request: Request) {
   }
 
   try {
-    let options: { dateFrom?: string; dateTo?: string } = {};
-    const contentType = request.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      try {
-        const body = await request.json();
-        if (body && typeof body === "object") {
-          if (typeof body.dateFrom === "string" && body.dateFrom.trim()) options.dateFrom = body.dateFrom.trim();
-          if (typeof body.dateTo === "string" && body.dateTo.trim()) options.dateTo = body.dateTo.trim();
-        }
-      } catch {
-        // invalid JSON
-      }
-    }
-    const result = await runShapeApiSync(options);
+    const result = await runShapeApiSync({ mode: "incremental" });
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Sync failed";
@@ -62,10 +75,28 @@ async function handle(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  return handle(request);
-}
-
 export async function POST(request: Request) {
-  return handle(request);
+  const denied = await authorize(request);
+  if (denied) return denied;
+
+  if (!hasShapeApiConfig()) {
+    return NextResponse.json(
+      { error: "Shape API sync is not configured. Set SHAPE_API_KEY in .env.local." },
+      { status: 503 },
+    );
+  }
+
+  try {
+    const parsed = await parseJsonOptions(request);
+    const mode: ShapeSyncMode = parsed.mode ?? "full";
+    const result = await runShapeApiSync({
+      mode,
+      dateFrom: parsed.dateFrom,
+      dateTo: parsed.dateTo,
+    });
+    return NextResponse.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Sync failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }

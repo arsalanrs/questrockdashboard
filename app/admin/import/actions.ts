@@ -118,7 +118,7 @@ export async function runShapeApiSyncAction(formData: FormData) {
   const dateTo = (formData.get("dateTo") as string)?.trim() || undefined;
 
   try {
-    const result = await runShapeApiSync({ dateFrom, dateTo });
+    const result = await runShapeApiSync({ mode: "full", dateFrom, dateTo });
     revalidatePath("/dashboard/lo");
     revalidatePath("/dashboard/manager");
     revalidatePath("/dashboard/executive");
@@ -159,7 +159,7 @@ export async function runShapeApiSyncReturn(formData: FormData): Promise<
   const dateTo = (formData.get("dateTo") as string)?.trim() || undefined;
 
   try {
-    const result = await runShapeApiSync({ dateFrom, dateTo });
+    const result = await runShapeApiSync({ mode: "full", dateFrom, dateTo });
     revalidatePath("/dashboard/lo");
     revalidatePath("/dashboard/manager");
     revalidatePath("/dashboard/executive");

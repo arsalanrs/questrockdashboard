@@ -13,19 +13,13 @@ const EXCLUDED_SOURCES = new Set(["zWebLead - VISIT"]);
 const PAGE_SIZE = 50;
 const PAGE_DELAY_MS = 1500;
 
-function twoYearsAgoIso(): string {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - 2);
-  return d.toISOString().slice(0, 10);
-}
+/** First incremental run when no watermark: pull this many days of updates. */
+const INCREMENTAL_BOOTSTRAP_DAYS = 30;
 
-function nowIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+export type ShapeSyncMode = "incremental" | "full";
 
 export type ShapeSyncOptions = {
-  incremental?: boolean;
-  lastSyncIso?: string;
+  mode?: ShapeSyncMode;
   dateFrom?: string;
   dateTo?: string;
 };
@@ -38,10 +32,84 @@ export type ShapeSyncResult = {
   importBatchId: string;
   fields_not_found?: string[];
   unmappedStatuses?: string[];
+  syncMode: ShapeSyncMode;
+  /** Which API range was used (for logs / debugging). */
+  dateRangeDescription: string;
 };
+
+function twoYearsAgoIso(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 2);
+  return d.toISOString().slice(0, 10);
+}
+
+function nowIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addCalendarDaysIso(isoDate: string, deltaDays: number): string {
+  const d = new Date(`${isoDate}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
+type DateRangeArg =
+  | { createdDateRange: { from: string; to: string } }
+  | { updatedDateRange: { from: string; to: string } };
+
+async function resolveDateRange(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  mode: ShapeSyncMode,
+  options: ShapeSyncOptions,
+  today: string,
+): Promise<{ dateRange: DateRangeArg; description: string }> {
+  if (mode === "incremental") {
+    const { data: wmRow, error: wmError } = await admin
+      .from("shape_sync_watermark")
+      .select("last_updated_sync_to")
+      .eq("id", 1)
+      .maybeSingle();
+    if (wmError) throw wmError;
+
+    const lastTo = wmRow?.last_updated_sync_to as string | undefined;
+    if (!lastTo) {
+      const from = addCalendarDaysIso(today, -INCREMENTAL_BOOTSTRAP_DAYS);
+      return {
+        dateRange: { updatedDateRange: { from, to: today } },
+        description: `updatedDateRange ${from}..${today} (bootstrap ${INCREMENTAL_BOOTSTRAP_DAYS}d, no watermark)`,
+      };
+    }
+    const from = addCalendarDaysIso(lastTo, -1);
+    return {
+      dateRange: { updatedDateRange: { from, to: today } },
+      description: `updatedDateRange ${from}..${today} (incremental, 1d overlap)`,
+    };
+  }
+
+  if (options.dateFrom && options.dateTo) {
+    return {
+      dateRange: { createdDateRange: { from: options.dateFrom, to: options.dateTo } },
+      description: `createdDateRange ${options.dateFrom}..${options.dateTo} (custom)`,
+    };
+  }
+  const from = twoYearsAgoIso();
+  return {
+    dateRange: { createdDateRange: { from, to: today } },
+    description: `createdDateRange ${from}..${today} (full default ~2y)`,
+  };
+}
 
 export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<ShapeSyncResult> {
   const admin = createSupabaseAdminClient();
+  const today = nowIso();
+
+  const mode: ShapeSyncMode = options.mode ?? "full";
+  const { dateRange, description: dateRangeDescription } = await resolveDateRange(
+    admin,
+    mode,
+    options,
+    today,
+  );
 
   const { data: batch, error: batchError } = await admin
     .from("import_batches")
@@ -54,13 +122,6 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     .single();
   if (batchError) throw batchError;
   const importBatchId = batch.id as string;
-
-  const dateRange =
-    options.incremental && options.lastSyncIso
-      ? { updatedDateRange: { from: options.lastSyncIso, to: nowIso() } }
-      : options.dateFrom && options.dateTo
-        ? { createdDateRange: { from: options.dateFrom, to: options.dateTo } }
-        : { createdDateRange: { from: twoYearsAgoIso(), to: nowIso() } };
 
   const statusToStage = new Map<string, string | null>();
   const { data: mappingRows, error: mappingError } = await admin
@@ -143,6 +204,13 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     if (error) throw error;
   }
 
+  const watermarkIso = new Date().toISOString();
+  const { error: wmUpsertError } = await admin.from("shape_sync_watermark").upsert(
+    { id: 1, last_updated_sync_to: today, updated_at: watermarkIso },
+    { onConflict: "id" },
+  );
+  if (wmUpsertError) throw wmUpsertError;
+
   return {
     pages,
     recordsProcessed,
@@ -151,5 +219,7 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     importBatchId,
     fields_not_found: fieldsNotFound,
     unmappedStatuses: unmappedStatuses.size ? Array.from(unmappedStatuses).sort() : undefined,
+    syncMode: mode,
+    dateRangeDescription: dateRangeDescription,
   };
 }
