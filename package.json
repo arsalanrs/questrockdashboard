@@ -13,7 +13,9 @@
     "shape:sync": "node scripts/sync-shape-to-supabase.js",
     "backfill:lo": "node scripts/backfill-lo-assignment-from-csv.js",
     "report:shape-by-lo": "node scripts/report-shape-by-lo.js",
-    "sync:direct": "node scripts/direct-shape-sync.js"
+    "sync:direct": "node scripts/direct-shape-sync.js",
+    "lendingpad:sync": "node scripts/lendingpad-sync-to-supabase.js",
+    "supabase:migrate": "node scripts/apply-supabase-migrations.mjs"
   },
   "keywords": [],
   "author": "",
@@ -41,6 +43,7 @@
     "autoprefixer": "^10.4.27",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
+    "pg": "^8.20.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",

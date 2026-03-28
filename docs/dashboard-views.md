@@ -1,5 +1,7 @@
 # Dashboard views by role
 
+For a **full capability checklist** (done / partial / not done), see [dashboard-capabilities-checklist.md](./dashboard-capabilities-checklist.md).
+
 This document summarizes what each dashboard shows and which database tables/fields back each section. RLS restricts data by role; loan officers see only their assigned loans (and unassigned loans); managers see their team’s loans; executives see all loans.
 
 ---

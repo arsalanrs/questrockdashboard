@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canAccessAdmin } from "@/lib/permissions";
-import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
+import { hasLendingPadListLoansConfig, hasLendingPadReadConfig } from "@/lib/lendingpad/config";
 import { listLendingPadLoans } from "@/lib/lendingpad/client";
 
 /**
  * GET — JSON list of loans from LendingPad (read-only). Admin only; for mapping / validation.
+ * Optional query: listUserId=<uuid> when using LENDINGPAD_OFFICERS_JSON (defaults to first officer in array).
  */
 export async function GET(request: Request) {
   if (!hasLendingPadReadConfig()) {
     return NextResponse.json({ error: "LendingPad is not configured" }, { status: 503 });
+  }
+  if (!hasLendingPadListLoansConfig()) {
+    return NextResponse.json(
+      {
+        error:
+          "Set LENDINGPAD_LIST_USER_ID and/or LENDINGPAD_OFFICERS_JSON (array with listUserId) for list/loans.",
+      },
+      { status: 503 },
+    );
   }
 
   const supabase = await createSupabaseServerClient();
@@ -31,6 +41,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const skip = url.searchParams.get("skip");
   const take = url.searchParams.get("take");
+  const listUserId = url.searchParams.get("listUserId")?.trim() || undefined;
   const skipN = skip != null && skip !== "" ? Number(skip) : undefined;
   const takeN = take != null && take !== "" ? Number(take) : undefined;
 
@@ -38,6 +49,7 @@ export async function GET(request: Request) {
     const loans = await listLendingPadLoans({
       skip: Number.isFinite(skipN) ? skipN : undefined,
       take: Number.isFinite(takeN) ? takeN : undefined,
+      listUserId,
     });
     return NextResponse.json({ count: loans.length, loans });
   } catch (e) {

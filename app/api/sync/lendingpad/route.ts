@@ -1,6 +1,9 @@
 /**
- * GET/POST /api/sync/lendingpad — pull conditions from LendingPad (read-only) into Supabase.
+ * GET/POST /api/sync/lendingpad — pull LendingPad loans (list) + conditions into Supabase.
  * Auth: Vercel Cron (Authorization: Bearer CRON_SECRET), x-cron-secret, or signed-in admin.
+ *
+ * Loan list: env LENDINGPAD_LIST_USER_ID, LENDINGPAD_OFFICERS_JSON, and/or lendingpad_user_credentials (per LO).
+ * Conditions: loans.lendingpad_loan_uuid + inbound API enabled for the contact in LendingPad.
  */
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -8,6 +11,7 @@ import { canAccessAdmin } from "@/lib/permissions";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
 import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
+import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 
 async function authorize(request: Request): Promise<NextResponse | null> {
   if (isCronRequestAuthorized(request)) return null;
@@ -44,8 +48,9 @@ async function handle(request: Request) {
   }
 
   try {
-    const result = await runLendingPadConditionsSync();
-    return NextResponse.json(result);
+    const loans = await runLendingPadLoansSync();
+    const conditions = await runLendingPadConditionsSync();
+    return NextResponse.json({ loans, conditions });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "LendingPad sync failed";
     return NextResponse.json({ error: msg }, { status: 500 });

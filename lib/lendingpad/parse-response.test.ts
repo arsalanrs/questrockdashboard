@@ -59,7 +59,34 @@ describe("parseLendingPadListLoansResponse", () => {
     );
     const rows = parseLendingPadListLoansResponse(raw);
     expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("11111111-2222-3333-4444-555555555555");
     expect(rows[0].loanNumber).toBe("LP-10001");
+    expect(rows[0].statusRaw).toBeNull();
+    expect(rows[0].statusAt).toBeNull();
+    expect(rows[0].borrowerFirstName).toBeNull();
+  });
+
+  it("parses list row with loanStatus object (LendingPad guide shape)", () => {
+    const raw = {
+      data: [
+        {
+          id: "4598b1f0-b115-43d7-ab65-e9ee5ada745f",
+          loanNumber: "030431",
+          loanStatus: { id: 27, name: "Prospect" },
+          loanStatusDate: "2022-12-07T00:00:00Z",
+          borrowers: [{ firstName: "Borrower", lastName: "A" }],
+          subjectPropertyAddress: { state: "NJ" },
+          totalLoanAmount: 500000,
+        },
+      ],
+    };
+    const rows = parseLendingPadListLoansResponse(raw);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].statusRaw).toBe("Prospect");
+    expect(rows[0].statusAt).toBe("2022-12-07T00:00:00.000Z");
+    expect(rows[0].borrowerFirstName).toBe("Borrower");
+    expect(rows[0].propertyState).toBe("NJ");
+    expect(rows[0].loanAmountCents).toBe(500000_00);
   });
 });
 

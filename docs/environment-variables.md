@@ -29,6 +29,8 @@ Secrets belong in **Vercel Project → Settings → Environment Variables** for 
 
 Same values can be pasted into `.env.local` for local testing of `/api/sync/lendingpad` and LendingPad routes.
 
+**`/api/sync/lendingpad` behavior:** Calls **`GET /integrations/list/loans`** (batch size 1–25 per LendingPad guide) for each credential source, then **conditions** sync. Sources: (1) rows in **`public.lendingpad_user_credentials`** (per LO: `api_username`, `api_password`, `list_user_id` — insert via SQL; **service role only**, not exposed to the browser), or (2) env **`LENDINGPAD_LIST_USER_ID`** if no credential rows exist. **Shape** continues to populate `status_raw` / `current_stage` from **`stage_mapping`**; **LendingPad** fills **`lendingpad_status_raw`**, **`lendingpad_status_at`**, and (for loans without `shape_record_id`) updates `current_stage` from the LP map. When **`lendingpad_status_raw`** changes, a **`loan_stage_events`** row may be appended for pipeline metrics. Enable **inbound API** for the integration contact in LendingPad. Local one-shot: `npm run lendingpad:sync` (requires `npm run dev` and `CRON_SECRET`). See also **[lendingpadtxt](../lendingpadtxt)** (LendingPad Web API guide in-repo).
+
 ### Cron (`/api/sync/shape`, `/api/sync/lendingpad`)
 
 Schedules in [`vercel.json`](../vercel.json) use **UTC**. Current jobs: **13:00** and **13:30 UTC** daily — that is **8:00 AM / 8:30 AM Eastern Standard Time (EST, UTC−5)**. When the US is on **daylight time (EDT, UTC−4)**, the same UTC run happens at **9:00 AM / 9:30 AM** local Eastern. Vercel cron has no timezone field; adjust the hour twice a year if you need exactly 8:00 AM local Eastern year-round (e.g. use **12:00 UTC** during EDT for 8 AM Eastern).

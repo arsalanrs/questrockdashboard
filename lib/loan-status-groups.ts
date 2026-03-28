@@ -7,27 +7,40 @@
 
 export const NOT_CONTACTED_STATUSES = [
   "New Lead",
+  "New Lead – Reapplied",
+  "New Lead - Reapplied",
   "Attempting Contact",
+  "Not Contacted",
   "Missed Appt - Rescheduling",
+  "Missed Appt – Rescheduling",
   "No Response - Ghosted",
+  "No Response – Ghosted",
 ] as const;
 
 export const CONTACTED_STATUSES = [
   "First Call Appointment Scheduled",
   "Contacted - Gathering Application",
+  "Contacted",
   "Pre-Application Sent",
   "Pre-Application Started",
   "Pre-Application Completed",
+  "App Sent",
+  "App Started",
+  "App Completed",
   "Verification Docs Requested",
   "Verification Docs Received",
   "Pitch Appointment Scheduled",
   "Pitched - Follow Up",
+  "Pitched & Waiting",
   "Pitched - Prep Package Out",
+  "Pitched - Advance",
   "Pre-Qualified",
   "Pre-Approved",
   "Contract Received",
   "Package Out",
   "Package Back",
+  "Package Signed Not Piped",
+  "Piped",
   "Appraisal Ordered",
   "Appraisal Received",
   "Registered",
@@ -42,6 +55,10 @@ export const CONTACTED_STATUSES = [
   "Purchased",
   "Long Term Nurture",
   "Not Interested",
+  "Did Not Advance",
+  "Turndown",
+  "VISIT",
+  "VISIT-Bounced",
   "Denied - Credit Repair",
   "Denied - Down Payment",
   "Denied - Mortgage History",
@@ -55,6 +72,7 @@ export const BAD_LEAD_DNC_STATUSES = [
   "Bad Lead",
   "Bad Contact Info",
   "Do Not Call List",
+  "Denied after Piped",
 ] as const;
 
 export type PrePipelineCategory = "not_contacted" | "contacted" | "bad_lead_dnc";
@@ -80,11 +98,14 @@ export const PRE_PIPELINE_CATEGORIES = [
 
 export const PITCH_QUEUE_STATUSES = [
   "Pre-Application Completed",
+  "App Completed",
   "Verification Docs Requested",
   "Verification Docs Received",
   "Pitch Appointment Scheduled",
   "Pitched - Follow Up",
+  "Pitched & Waiting",
   "Pitched - Prep Package Out",
+  "Pitched - Advance",
 ] as const;
 
 export const PITCH_QUEUE_SET = new Set<string>(PITCH_QUEUE_STATUSES);
@@ -114,10 +135,12 @@ export const MICRO_STAGES: Array<{
     turnTime: "Up to 48 hrs",
     subStatuses: [
       "Pre-Application Completed",
+      "App Completed",
       "Verification Docs Requested",
       "Verification Docs Received",
       "Pitch Appointment Scheduled",
       "Pitched - Follow Up",
+      "Pitched & Waiting",
       "Pre-Qualified",
       "Pre-Approved",
     ],
@@ -131,8 +154,10 @@ export const MICRO_STAGES: Array<{
     turnTime: "3 hrs / 24 hrs",
     subStatuses: [
       "Pitched - Prep Package Out",
+      "Pitched - Advance",
       "Contract Received",
       "Package Out",
+      "Package Signed Not Piped",
     ],
     instructions:
       "eSign package has been sent. Follow up with borrower to sign within 3 hours if during business hours, 24 hours otherwise.",
@@ -144,6 +169,7 @@ export const MICRO_STAGES: Array<{
     turnTime: "LO: 48 hrs / Proc: 24 hrs",
     subStatuses: [
       "Package Back",
+      "Piped",
       "Appraisal Ordered",
       "Appraisal Received",
       "Registered",

@@ -89,7 +89,85 @@ export function parseLendingPadConditionsResponse(json: unknown): NormalizedLpCo
   return out;
 }
 
-export type NormalizedLpLoanListItem = { id: string; loanNumber: string | null };
+export type NormalizedLpLoanListItem = {
+  id: string;
+  loanNumber: string | null;
+  /** LendingPad loanStatus.name (LOS pipeline). */
+  statusRaw: string | null;
+  /** loanStatusDate from list API, ISO when parseable. */
+  statusAt: string | null;
+  borrowerFirstName: string | null;
+  borrowerLastName: string | null;
+  loanAmountCents: number | null;
+  propertyState: string | null;
+  loanOfficerName: string | null;
+};
+
+function numToCents(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const cents = Math.round(v * 100);
+    return Number.isSafeInteger(cents) ? cents : null;
+  }
+  const s = String(v).trim().replace(/[$,]/g, "");
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  const cents = Math.round(n * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+function loanAmountCentsFromRow(o: Record<string, unknown>): number | null {
+  const cents = numToCents(o.loanAmountCents ?? o.loan_amount_cents);
+  if (cents != null) return cents;
+  return numToCents(
+    o.loanAmount ?? o.loan_amount ?? o.amount ?? o.baseLoanAmount ?? o.totalLoanAmount,
+  );
+}
+
+function borrowerFromRow(o: Record<string, unknown>): {
+  first: string | null;
+  last: string | null;
+} {
+  const tryBorrower = (b: unknown): { first: string | null; last: string | null } => {
+    if (!b || typeof b !== "object")
+      return { first: null, last: null };
+    const r = b as Record<string, unknown>;
+    return {
+      first: strField(r, "firstName", "first_name", "first") || null,
+      last: strField(r, "lastName", "last_name", "last") || null,
+    };
+  };
+
+  let { first, last } = tryBorrower(o.borrower);
+  if (!first && !last) ({ first, last } = tryBorrower(o.primaryBorrower));
+  if (!first && !last) {
+    const arr = o.borrowers;
+    if (Array.isArray(arr) && arr[0]) ({ first, last } = tryBorrower(arr[0]));
+  }
+  if (!first) first = strField(o, "borrowerFirstName", "borrower_first_name") || null;
+  if (!last) last = strField(o, "borrowerLastName", "borrower_last_name") || null;
+  return { first, last };
+}
+
+function loanOfficerNameFromRow(o: Record<string, unknown>): string | null {
+  const a = o.assignments;
+  if (a && typeof a === "object") {
+    const ao = a as Record<string, unknown>;
+    const lo = ao.loanOfficer ?? ao.loan_officer ?? ao.loanOfficerUser;
+    if (lo && typeof lo === "object") {
+      const l = lo as Record<string, unknown>;
+      const name =
+        strField(l, "fullName", "full_name", "name", "displayName") ||
+        [strField(l, "firstName"), strField(l, "lastName")].filter(Boolean).join(" ").trim();
+      if (name) return name;
+      const email = strField(l, "email");
+      if (email) return email;
+    }
+  }
+  return (
+    strField(o, "loanOfficerName", "loan_officer_name", "officerName", "assignedOfficerName") || null
+  );
+}
 
 export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanListItem | null {
   if (!raw || typeof raw !== "object") return null;
@@ -97,7 +175,47 @@ export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanLi
   const id = strField(o, "id", "loanId", "loanID", "guid");
   if (!id) return null;
   const loanNumber = strField(o, "loanNumber", "loan_number", "number", "loanNo") || null;
-  return { id, loanNumber };
+
+  let statusRaw: string | null = null;
+  const loanStatusObj = o.loanStatus;
+  if (loanStatusObj && typeof loanStatusObj === "object") {
+    statusRaw =
+      strField(loanStatusObj as Record<string, unknown>, "name", "label", "description") || null;
+  }
+  if (!statusRaw) {
+    statusRaw =
+      strField(o, "status", "loanStatus", "statusName", "pipelineStatus", "milestone") || null;
+  }
+
+  const statusDateRaw = strField(o, "loanStatusDate", "loan_status_date", "statusDate") || null;
+  let statusAt: string | null = null;
+  if (statusDateRaw) {
+    const t = Date.parse(statusDateRaw);
+    statusAt = Number.isNaN(t) ? null : new Date(t).toISOString();
+  }
+
+  const { first: borrowerFirstName, last: borrowerLastName } = borrowerFromRow(o);
+  const loanAmountCents = loanAmountCentsFromRow(o);
+  let propertyState =
+    strField(o, "propertyState", "property_state", "subjectPropertyState", "subjectState") || null;
+  const subject = o.subjectPropertyAddress ?? o.subjectProperty;
+  if (!propertyState && subject && typeof subject === "object") {
+    propertyState =
+      strField(subject as Record<string, unknown>, "state", "stateCode") || null;
+  }
+  const loanOfficerName = loanOfficerNameFromRow(o);
+
+  return {
+    id,
+    loanNumber,
+    statusRaw,
+    statusAt,
+    borrowerFirstName,
+    borrowerLastName,
+    loanAmountCents,
+    propertyState: propertyState || null,
+    loanOfficerName,
+  };
 }
 
 export function parseLendingPadListLoansResponse(json: unknown): NormalizedLpLoanListItem[] {

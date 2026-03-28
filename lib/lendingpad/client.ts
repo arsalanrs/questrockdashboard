@@ -1,9 +1,10 @@
 /**
  * LendingPad Web API — read-only (GET). Uses HTTP Basic auth per Postman collection.
+ * GET /integrations/list/loans: take must be 1–25 per LendingPad Web API guide.
  */
-import { getLendingPadReadConfig, type LendingPadReadConfig } from "./config";
+import { getLendingPadReadConfig, parseLendingPadOfficersJson } from "./config";
+import { lendingPadGetJson, type LendingPadAuthContext } from "./auth-fetch";
 import {
-  buildBasicAuthHeader,
   parseLendingPadConditionsResponse,
   parseLendingPadDocumentsResponse,
   parseLendingPadListLoansResponse,
@@ -12,34 +13,15 @@ import {
   type NormalizedLpLoanListItem,
 } from "./parse-response";
 
-const REQUEST_MS = 45_000;
-
-function authHeaders(cfg: LendingPadReadConfig): HeadersInit {
-  return {
-    Authorization: buildBasicAuthHeader(cfg.username, cfg.password),
-    Accept: "application/json",
-  };
-}
-
-async function lendingPadGetJson(pathWithQuery: string): Promise<unknown> {
+function readContext(): LendingPadAuthContext {
   const cfg = getLendingPadReadConfig();
-  const url = `${cfg.baseUrl}${pathWithQuery.startsWith("/") ? "" : "/"}${pathWithQuery}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: authHeaders(cfg),
-    signal: AbortSignal.timeout(REQUEST_MS),
-    cache: "no-store",
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`LendingPad GET ${pathWithQuery.split("?")[0]} failed: ${res.status} ${text.slice(0, 200)}`);
-  }
-  if (!text.trim()) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new Error("LendingPad response was not valid JSON");
-  }
+  return {
+    baseUrl: cfg.baseUrl,
+    contactId: cfg.contactId,
+    companyId: cfg.companyId,
+    username: cfg.username,
+    password: cfg.password,
+  };
 }
 
 function queryParams(params: Record<string, string | number | undefined | null>): string {
@@ -52,34 +34,59 @@ function queryParams(params: Record<string, string | number | undefined | null>)
   return q ? `?${q}` : "";
 }
 
-/** List loans (JSON). Requires LENDINGPAD_LIST_USER_ID. */
+/** List loans (JSON). `take` is clamped 1–25 (LendingPad API limit). */
+export async function listLendingPadLoansWithAuth(
+  ctx: LendingPadAuthContext,
+  listUserId: string,
+  options?: { skip?: number; take?: number },
+): Promise<NormalizedLpLoanListItem[]> {
+  const take = Math.min(25, Math.max(1, options?.take ?? 25));
+  const q = queryParams({
+    contact: ctx.contactId,
+    company: ctx.companyId,
+    user: listUserId,
+    skip: options?.skip,
+    take,
+  });
+  const json = await lendingPadGetJson(ctx, `/integrations/list/loans${q}`);
+  return parseLendingPadListLoansResponse(json);
+}
+
+/**
+ * List loans using env `LENDINGPAD_LIST_USER_ID`, or `options.listUserId`, or the first entry in
+ * `LENDINGPAD_OFFICERS_JSON` when no single list id is set.
+ */
 export async function listLendingPadLoans(options?: {
   skip?: number;
   take?: number;
+  /** When set, overrides env list user id (e.g. pick one officer when using LENDINGPAD_OFFICERS_JSON). */
+  listUserId?: string;
 }): Promise<NormalizedLpLoanListItem[]> {
   const cfg = getLendingPadReadConfig();
-  if (!cfg.listUserId) {
-    throw new Error("LENDINGPAD_LIST_USER_ID is required for list/loans.");
+  const officersParsed = parseLendingPadOfficersJson();
+  const officers = officersParsed.ok ? officersParsed.officers : [];
+  const resolved =
+    options?.listUserId?.trim() ||
+    cfg.listUserId ||
+    officers[0]?.listUserId ||
+    "";
+  if (!resolved) {
+    throw new Error(
+      "LENDINGPAD_LIST_USER_ID, LENDINGPAD_OFFICERS_JSON (at least one listUserId), or options.listUserId is required for list/loans.",
+    );
   }
-  const q = queryParams({
-    contact: cfg.contactId,
-    company: cfg.companyId,
-    user: cfg.listUserId,
-    skip: options?.skip,
-    take: options?.take,
-  });
-  const json = await lendingPadGetJson(`/integrations/list/loans${q}`);
-  return parseLendingPadListLoansResponse(json);
+  return listLendingPadLoansWithAuth(readContext(), resolved, options);
 }
 
 export async function getLendingPadLoanConditions(loanUuid: string): Promise<NormalizedLpCondition[]> {
   const cfg = getLendingPadReadConfig();
+  const ctx = readContext();
   const q = queryParams({
     contact: cfg.contactId,
     company: cfg.companyId,
     loan: loanUuid,
   });
-  const json = await lendingPadGetJson(`/integrations/loans/conditions${q}`);
+  const json = await lendingPadGetJson(ctx, `/integrations/loans/conditions${q}`);
   return parseLendingPadConditionsResponse(json);
 }
 
@@ -95,6 +102,7 @@ export async function getLendingPadLoanDocuments(
   creationPeriod?: string,
 ): Promise<NormalizedLpDocument[]> {
   const cfg = getLendingPadReadConfig();
+  const ctx = readContext();
   const end = new Date();
   const start = new Date();
   start.setUTCFullYear(start.getUTCFullYear() - 5);
@@ -105,6 +113,6 @@ export async function getLendingPadLoanDocuments(
     loan: loanUuid,
     creationPeriod: period,
   });
-  const json = await lendingPadGetJson(`/integrations/loans/documents${q}`);
+  const json = await lendingPadGetJson(ctx, `/integrations/loans/documents${q}`);
   return parseLendingPadDocumentsResponse(json);
 }
