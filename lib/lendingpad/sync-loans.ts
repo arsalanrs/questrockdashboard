@@ -12,10 +12,10 @@ import {
   parseLendingPadOfficersJson,
   hasLendingPadReadConfig,
 } from "./config";
-import { listLendingPadLoansWithAuth } from "./client";
+import { getLendingPadLoanDetail, listLendingPadLoansWithAuth } from "./client";
 import type { LendingPadAuthContext } from "./auth-fetch";
 import { mapLendingPadStatusToStage } from "./map-lp-status-to-stage";
-import type { NormalizedLpLoanListItem } from "./parse-response";
+import type { NormalizedLpLoanDetail, NormalizedLpLoanListItem } from "./parse-response";
 
 const PAGE_SIZE = 25;
 const MAX_PAGES = 500;
@@ -46,6 +46,124 @@ type ExistingLoan = {
   lendingpad_status_raw: string | null;
 };
 
+type AppUser = {
+  id: string;
+  full_name: string | null;
+};
+
+function normalizeName(input: string | null | undefined): string {
+  return String(input ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Canonical officer-name aliases for real-world provider drift.
+ * Example: same LO appears as "Harrison Johnson" in LP but "Tyler Johnson" in app users.
+ *
+ * Optional override/extension via env:
+ * LENDINGPAD_NAME_ALIASES_JSON='{"harrison johnson":"tyler johnson"}'
+ */
+let _cachedAliasMap: Map<string, string> | null = null;
+
+function nameAliasMap(): Map<string, string> {
+  if (_cachedAliasMap) return _cachedAliasMap;
+  const map = new Map<string, string>([
+    ["harrison johnson", "tyler johnson"],
+  ]);
+  const raw = process.env.LENDINGPAD_NAME_ALIASES_JSON?.trim();
+  if (!raw) return map;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (parsed && typeof parsed === "object") {
+      for (const [k, v] of Object.entries(parsed)) {
+        const from = normalizeName(k);
+        const to = normalizeName(String(v ?? ""));
+        if (from && to) map.set(from, to);
+      }
+    }
+  } catch {
+    // Ignore invalid alias JSON and keep built-in defaults.
+  }
+  _cachedAliasMap = map;
+  return map;
+}
+
+function canonicalizeOfficerName(input: string | null | undefined): string {
+  const n = normalizeName(input);
+  if (!n) return "";
+  return nameAliasMap().get(n) ?? n;
+}
+
+/**
+ * Optional deterministic override:
+ * LENDINGPAD_LIST_USER_MAP_JSON='[{"listUserId":"...","userId":"..."},{"listUserId":"...","fullName":"Jessica Sherard"}]'
+ */
+function parseListUserMapOverrides(users: AppUser[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const raw = process.env.LENDINGPAD_LIST_USER_MAP_JSON?.trim();
+  if (!raw) return out;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return out;
+  }
+  if (!Array.isArray(parsed)) return out;
+  const usersById = new Map(users.map((u) => [u.id, u]));
+  const usersByNorm = new Map(
+    users
+      .filter((u) => u.full_name)
+      .map((u) => [normalizeName(u.full_name), u.id]),
+  );
+  for (const row of parsed) {
+    if (!row || typeof row !== "object") continue;
+    const o = row as Record<string, unknown>;
+    const listUserId = String(o.listUserId ?? o.list_user_id ?? "").trim();
+    if (!listUserId) continue;
+    const userId = String(o.userId ?? o.user_id ?? "").trim();
+    if (userId && usersById.has(userId)) {
+      out.set(listUserId, userId);
+      continue;
+    }
+    const fullName = String(o.fullName ?? o.full_name ?? "").trim();
+    if (fullName) {
+      const mapped = usersByNorm.get(normalizeName(fullName));
+      if (mapped) out.set(listUserId, mapped);
+    }
+  }
+  return out;
+}
+
+function resolveUserIdByOfficerName(officerName: string | null | undefined, users: AppUser[]): string | null {
+  const n = canonicalizeOfficerName(officerName);
+  if (!n) return null;
+  const exact = users.find((u) => canonicalizeOfficerName(u.full_name) === n);
+  if (exact) return exact.id;
+
+  // Fallback: first+last token match with prefix tolerance.
+  const parts = n.split(" ").filter(Boolean);
+  if (parts.length < 2) return null;
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  for (const u of users) {
+    const up = canonicalizeOfficerName(u.full_name).split(" ").filter(Boolean);
+    if (up.length < 2) continue;
+    const uFirst = up[0];
+    const uLast = up[up.length - 1];
+    const lastEq = last === uLast;
+    const firstClose =
+      first === uFirst ||
+      first.startsWith(uFirst) ||
+      uFirst.startsWith(first) ||
+      (first.slice(0, 4) && uFirst.slice(0, 4) && first.slice(0, 4) === uFirst.slice(0, 4));
+    if (lastEq && firstClose) return u.id;
+  }
+  return null;
+}
+
 function envAuthContext(): LendingPadAuthContext {
   const cfg = getLendingPadReadConfig();
   return {
@@ -65,6 +183,7 @@ function buildInsertPayload(
   item: NormalizedLpLoanListItem,
   importBatchId: string,
   assignedLoUserId: string | null,
+  fixedAssignedLoName?: string | null,
 ): Record<string, unknown> {
   const stage = lpStage(item);
   return {
@@ -80,10 +199,48 @@ function buildInsertPayload(
     borrower_last_name: item.borrowerLastName,
     loan_amount_cents: item.loanAmountCents,
     property_state: item.propertyState,
-    assigned_loan_officer_name: item.loanOfficerName,
+    assigned_loan_officer_name: item.loanOfficerName ?? fixedAssignedLoName ?? null,
     assigned_loan_officer_user_id: assignedLoUserId,
+    loan_type: item.loanType,
+    loan_purpose: item.loanPurpose,
+    credit_score_mid: item.creditScoreMid,
+    property_value_cents: item.propertyValueCents,
+    ltv_bps: item.ltvBps,
+    funded_at: item.fundedAt,
     updated_at: new Date().toISOString(),
   };
+}
+
+/**
+ * Merge underwriting detail (rate / LTV / FICO / ARM / veteran) into a payload.
+ * Keys that are null in the detail are omitted so we don't clobber existing
+ * richer data (e.g. values that came from Shape).
+ */
+function mergeLoanDetail(
+  payload: Record<string, unknown>,
+  detail: NormalizedLpLoanDetail | null,
+): Record<string, unknown> {
+  if (!detail) return payload;
+  const map: Record<string, unknown> = { ...payload };
+  const setIf = (k: string, v: unknown) => {
+    if (v !== null && v !== undefined) map[k] = v;
+  };
+  setIf("note_rate_bps", detail.noteRateBps);
+  setIf("original_rate_bps", detail.originalRateBps);
+  setIf("property_value_cents", detail.propertyValueCents);
+  setIf("current_loan_balance_cents", detail.currentLoanBalanceCents);
+  setIf("ltv_bps", detail.ltvBps);
+  setIf("cltv_bps", detail.cltvBps);
+  setIf("credit_score_mid", detail.creditScoreMid);
+  setIf("dti_bps", detail.dtiBps);
+  setIf("is_veteran", detail.isVeteran);
+  setIf("arm_first_reset_date", detail.armFirstResetDate);
+  setIf("arm_index", detail.armIndex);
+  setIf("arm_margin_bps", detail.armMarginBps);
+  setIf("loan_type", detail.loanType);
+  setIf("loan_purpose", detail.loanPurpose);
+  setIf("funded_at", detail.fundedAt);
+  return map;
 }
 
 function buildUpdatePayload(
@@ -91,6 +248,7 @@ function buildUpdatePayload(
   importBatchId: string,
   assignedLoUserId: string | null,
   existing: ExistingLoan,
+  fixedAssignedLoName?: string | null,
 ): Record<string, unknown> {
   const stage = lpStage(item);
   const p: Record<string, unknown> = {
@@ -106,7 +264,14 @@ function buildUpdatePayload(
   if (item.loanAmountCents != null) p.loan_amount_cents = item.loanAmountCents;
   if (item.propertyState) p.property_state = item.propertyState;
   if (item.loanOfficerName) p.assigned_loan_officer_name = item.loanOfficerName;
+  else if (fixedAssignedLoName) p.assigned_loan_officer_name = fixedAssignedLoName;
   if (assignedLoUserId) p.assigned_loan_officer_user_id = assignedLoUserId;
+  if (item.loanType) p.loan_type = item.loanType;
+  if (item.loanPurpose) p.loan_purpose = item.loanPurpose;
+  if (item.creditScoreMid != null) p.credit_score_mid = item.creditScoreMid;
+  if (item.propertyValueCents != null) p.property_value_cents = item.propertyValueCents;
+  if (item.ltvBps != null) p.ltv_bps = item.ltvBps;
+  if (item.fundedAt) p.funded_at = item.fundedAt;
 
   if (existing.shape_record_id == null) {
     if (item.statusRaw) p.status_raw = item.statusRaw;
@@ -157,7 +322,17 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
   const nameToUserId = new Map<string, string>();
   const { data: users, error: usersError } = await admin.from("users").select("id,full_name");
   if (usersError) throw usersError;
-  (users ?? []).forEach((u) => nameToUserId.set(String(u.full_name).trim().toLowerCase(), u.id));
+  const appUsers: AppUser[] = (users ?? []) as AppUser[];
+  appUsers.forEach((u) => {
+    const raw = String(u.full_name ?? "").trim();
+    if (raw) nameToUserId.set(raw.toLowerCase(), u.id);
+  });
+  const listUserOverrides = parseListUserMapOverrides(appUsers);
+  const userNameById = new Map(
+    appUsers
+      .filter((u) => u.full_name)
+      .map((u) => [u.id, String(u.full_name)]),
+  );
 
   const baseCtx = envAuthContext();
   const cfg = getLendingPadReadConfig();
@@ -167,6 +342,7 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
     ctx: LendingPadAuthContext,
     listUserId: string,
     fixedAssignedLoUserId: string | null,
+    fixedAssignedLoName: string | null,
   ) {
     let pages = 0;
     let upserted = 0;
@@ -207,8 +383,28 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
         const stage = lpStage(item);
         const enteredAt = item.statusAt ?? new Date().toISOString();
 
+        // Phase 2: optionally enrich with rate/LTV/FICO/ARM from loan-detail.
+        // Gated by env flag to avoid N+1 calls on every sync — opt in by setting
+        // LENDINGPAD_FETCH_LOAN_DETAIL=1.
+        let detail: NormalizedLpLoanDetail | null = null;
+        if (process.env.LENDINGPAD_FETCH_LOAN_DETAIL === "1") {
+          try {
+            detail = await getLendingPadLoanDetail(item.id);
+          } catch (e) {
+            const m = e instanceof Error ? e.message : String(e);
+            result.errors.push(`detail ${item.id}: ${m}`);
+          }
+        }
+
         if (ex?.id) {
-          const payload = buildUpdatePayload(item, result.importBatchId, assignedLoUserId, ex);
+          const basePayload = buildUpdatePayload(
+            item,
+            result.importBatchId,
+            assignedLoUserId,
+            ex,
+            fixedAssignedLoName,
+          );
+          const payload = mergeLoanDetail(basePayload, detail);
           const { error: upErr } = await admin.from("loans").update(payload).eq("id", ex.id);
           if (upErr) {
             result.errors.push(`update ${item.id}: ${upErr.message}`);
@@ -224,7 +420,13 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
             }
           }
         } else {
-          const payload = buildInsertPayload(item, result.importBatchId, assignedLoUserId);
+          const basePayload = buildInsertPayload(
+            item,
+            result.importBatchId,
+            assignedLoUserId,
+            fixedAssignedLoName,
+          );
+          const payload = mergeLoanDetail(basePayload, detail);
           const { data: ins, error: insErr } = await admin.from("loans").insert(payload).select("id").single();
           if (insErr) {
             result.errors.push(`insert ${item.id}: ${insErr.message}`);
@@ -262,16 +464,19 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
         username: c.api_username,
         password: c.api_password,
       };
-      await runSource("user", ctx, c.list_user_id.trim(), c.user_id);
+      const fixedName = userNameById.get(c.user_id) ?? null;
+      await runSource("user", ctx, c.list_user_id.trim(), c.user_id, fixedName);
     }
   } else if (cfg.listUserId) {
-    await runSource("env", baseCtx, cfg.listUserId, null);
+    await runSource("env", baseCtx, cfg.listUserId, null, null);
   } else if (envOfficers.length > 0) {
     for (const o of envOfficers) {
-      const fixedId = o.officerName
-        ? nameToUserId.get(o.officerName.trim().toLowerCase()) ?? null
-        : null;
-      await runSource("officers_env", baseCtx, o.listUserId.trim(), fixedId);
+      const listId = o.listUserId.trim();
+      const overrideId = listUserOverrides.get(listId) ?? null;
+      const byNameId = resolveUserIdByOfficerName(o.officerName, appUsers);
+      const fixedId = overrideId ?? byNameId ?? null;
+      const fixedName = fixedId ? (userNameById.get(fixedId) ?? o.officerName ?? null) : null;
+      await runSource("officers_env", baseCtx, listId, fixedId, fixedName);
     }
   } else {
     result.errors.push(

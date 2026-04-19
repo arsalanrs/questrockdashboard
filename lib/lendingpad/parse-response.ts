@@ -101,6 +101,12 @@ export type NormalizedLpLoanListItem = {
   loanAmountCents: number | null;
   propertyState: string | null;
   loanOfficerName: string | null;
+  loanType: string | null;
+  loanPurpose: string | null;
+  creditScoreMid: number | null;
+  propertyValueCents: number | null;
+  ltvBps: number | null;
+  fundedAt: string | null;
 };
 
 function numToCents(v: unknown): number | null {
@@ -169,6 +175,27 @@ function loanOfficerNameFromRow(o: Record<string, unknown>): string | null {
   );
 }
 
+function objectNameField(v: unknown): string | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  return strField(o, "name", "label", "description") || null;
+}
+
+function pctToBps(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(String(v).replace(/[%,\s]/g, ""));
+  if (!Number.isFinite(n)) return null;
+  return n < 2 ? Math.round(n * 10000) : Math.round(n * 100);
+}
+
+function timestampFromStatus(statusRaw: string | null, statusAt: string | null): string | null {
+  if (!statusRaw || !statusAt) return null;
+  const s = statusRaw.toLowerCase();
+  if (s.includes("fund")) return statusAt;
+  if (s.includes("closed")) return statusAt;
+  return null;
+}
+
 export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanListItem | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -204,6 +231,26 @@ export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanLi
       strField(subject as Record<string, unknown>, "state", "stateCode") || null;
   }
   const loanOfficerName = loanOfficerNameFromRow(o);
+  const loanType =
+    objectNameField(o.loanType) ??
+    (strField(o, "loanType", "loan_type", "productName", "product") || null);
+  const loanPurpose =
+    objectNameField(o.purpose) ??
+    objectNameField(o.loanPurpose) ??
+    (strField(o, "purpose", "loanPurpose", "loan_purpose") || null);
+  const creditScoreRaw = o.creditScore ?? o.ficoScore ?? o.midFico;
+  const creditScoreMid =
+    creditScoreRaw == null || creditScoreRaw === ""
+      ? null
+      : Number.isFinite(Number(creditScoreRaw))
+        ? Math.round(Number(creditScoreRaw))
+        : null;
+  const propertyValueCents = numToCents(o.appraisalValue ?? o.propertyValue ?? o.appraisedValue);
+  let ltvBps: number | null = pctToBps(o.ltv ?? o.loanToValue ?? o.LTV);
+  if (ltvBps == null && loanAmountCents != null && propertyValueCents != null && propertyValueCents > 0) {
+    ltvBps = Math.round((loanAmountCents / propertyValueCents) * 10000);
+  }
+  const fundedAt = timestampFromStatus(statusRaw, statusAt);
 
   return {
     id,
@@ -215,6 +262,12 @@ export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanLi
     loanAmountCents,
     propertyState: propertyState || null,
     loanOfficerName,
+    loanType,
+    loanPurpose,
+    creditScoreMid,
+    propertyValueCents,
+    ltvBps,
+    fundedAt,
   };
 }
 
@@ -259,6 +312,176 @@ export function parseLendingPadDocumentsResponse(json: unknown): NormalizedLpDoc
     if (n) out.push(n);
   }
   return out;
+}
+
+/**
+ * Underwriting detail extracted from the LendingPad loan-detail endpoint.
+ * LendingPad field shapes vary by account + integration tier, so every
+ * mapping uses the defensive `strField` helper with multiple fallbacks.
+ */
+export type NormalizedLpLoanDetail = {
+  id: string;
+  noteRateBps: number | null;
+  originalRateBps: number | null;
+  propertyValueCents: number | null;
+  currentLoanBalanceCents: number | null;
+  ltvBps: number | null;
+  cltvBps: number | null;
+  creditScoreMid: number | null;
+  dtiBps: number | null;
+  isVeteran: boolean | null;
+  armFirstResetDate: string | null;
+  armIndex: string | null;
+  armMarginBps: number | null;
+  loanType: string | null;
+  loanPurpose: string | null;
+  fundedAt: string | null;
+};
+
+function pickNumber(o: Record<string, unknown>, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = o[k];
+    if (v == null || v === "") continue;
+    const n = Number(String(v).replace(/[%,\s$]/g, ""));
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function pickRateBps(o: Record<string, unknown>, keys: string[]): number | null {
+  const n = pickNumber(o, keys);
+  if (n == null) return null;
+  return n < 20 ? Math.round(n * 100) : Math.round(n);
+}
+
+function pickPctBps(o: Record<string, unknown>, keys: string[]): number | null {
+  const n = pickNumber(o, keys);
+  if (n == null) return null;
+  return n < 2 ? Math.round(n * 10000) : Math.round(n * 100);
+}
+
+function pickCents(o: Record<string, unknown>, keys: string[]): number | null {
+  const n = pickNumber(o, keys);
+  if (n == null) return null;
+  return Math.round(n * 100);
+}
+
+function pickDate(o: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = o[k];
+    if (v == null || v === "") continue;
+    const d = new Date(String(v));
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+function pickTimestamp(o: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = o[k];
+    if (v == null || v === "") continue;
+    const t = Date.parse(String(v));
+    if (!Number.isNaN(t)) return new Date(t).toISOString();
+  }
+  return null;
+}
+
+function pickBool(o: Record<string, unknown>, keys: string[]): boolean | null {
+  for (const k of keys) {
+    const v = o[k];
+    if (v == null) continue;
+    if (typeof v === "boolean") return v;
+    const s = String(v).trim().toLowerCase();
+    if (["true", "yes", "y", "1"].includes(s)) return true;
+    if (["false", "no", "n", "0"].includes(s)) return false;
+  }
+  return null;
+}
+
+export function normalizeLendingPadLoanDetailRow(
+  raw: unknown,
+): NormalizedLpLoanDetail | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = strField(o, "id", "loanId", "loanID", "guid");
+  if (!id) return null;
+
+  // Rates
+  const noteRateBps = pickRateBps(o, [
+    "noteRate",
+    "note_rate",
+    "interestRate",
+    "interest_rate",
+    "currentNoteRate",
+    "rate",
+  ]);
+  const originalRateBps = pickRateBps(o, ["originalRate", "original_rate", "initialRate"]);
+
+  // Value / balance / LTV
+  const propertyValueCents = pickCents(o, ["propertyValue", "appraisedValue", "estimatedValue"]);
+  const currentLoanBalanceCents = pickCents(o, [
+    "currentLoanBalance",
+    "loanBalance",
+    "outstandingBalance",
+    "upb",
+  ]);
+  const ltvBps = pickPctBps(o, ["ltv", "loanToValue", "LTV"]);
+  const cltvBps = pickPctBps(o, ["cltv", "combinedLoanToValue", "CLTV"]);
+
+  // Credit + DTI
+  const creditScoreMid = pickNumber(o, ["creditScore", "ficoScore", "midFico", "representativeFico"]);
+  const dtiBps = pickPctBps(o, ["dti", "debtToIncome", "totalDti"]);
+
+  // Veteran
+  const isVeteran = pickBool(o, ["isVeteran", "veteran", "vaEligible"]);
+
+  // ARM
+  const armFirstResetDate = pickDate(o, [
+    "armFirstResetDate",
+    "firstRateAdjustmentDate",
+    "firstResetDate",
+  ]);
+  const armIndex = strField(o, "armIndex", "index") || null;
+  const armMarginBps = pickRateBps(o, ["armMargin", "margin"]);
+
+  // Loan meta
+  const loanType =
+    strField(o, "loanType", "loan_type", "productName", "product") || null;
+  const loanPurpose =
+    strField(o, "loanPurpose", "loan_purpose", "purpose") || null;
+  const fundedAt = pickTimestamp(o, ["fundedDate", "fundDate", "fundedAt", "disbursementDate"]);
+
+  return {
+    id,
+    noteRateBps,
+    originalRateBps,
+    propertyValueCents,
+    currentLoanBalanceCents,
+    ltvBps,
+    cltvBps,
+    creditScoreMid: creditScoreMid != null ? Math.round(creditScoreMid) : null,
+    dtiBps,
+    isVeteran,
+    armFirstResetDate,
+    armIndex,
+    armMarginBps,
+    loanType,
+    loanPurpose,
+    fundedAt,
+  };
+}
+
+export function parseLendingPadLoanDetailResponse(json: unknown): NormalizedLpLoanDetail | null {
+  if (Array.isArray(json)) {
+    return json.length > 0 ? normalizeLendingPadLoanDetailRow(json[0]) : null;
+  }
+  if (json && typeof json === "object") {
+    const o = json as Record<string, unknown>;
+    if ("loan" in o) return normalizeLendingPadLoanDetailRow(o.loan);
+    if ("data" in o) return normalizeLendingPadLoanDetailRow(o.data);
+    return normalizeLendingPadLoanDetailRow(o);
+  }
+  return null;
 }
 
 export function normalizeLendingPadLoanUuid(raw: string | null | undefined): string | null {

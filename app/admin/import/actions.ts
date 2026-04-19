@@ -4,11 +4,15 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canAccessAdmin } from "@/lib/permissions";
+import { runInsellerateImport } from "@/lib/import/run-insellerate-import";
 import { runShapeKpiImport } from "@/lib/import/run-shape-kpi-import";
 import { generateMockLoans, mockEnrichLoans } from "@/lib/mock/enrich";
 import { hasShapeApiConfig } from "@/lib/shape-api/config";
 import { runShapeApiPreview } from "@/lib/shape-api/preview";
 import { runShapeApiSync } from "@/lib/shape-api/sync";
+import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
+import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
+import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const MAX_ERROR_PARAM_LENGTH = 200;
@@ -16,6 +20,31 @@ const MAX_ERROR_PARAM_LENGTH = 200;
 function errorParam(msg: string): string {
   const safe = msg.replace(/\s+/g, " ").replace(/<[^>]*>/g, "").trim();
   return encodeURIComponent(safe.length > MAX_ERROR_PARAM_LENGTH ? `${safe.slice(0, MAX_ERROR_PARAM_LENGTH)}…` : safe);
+}
+
+/**
+ * Extract a readable message from anything thrown. Supabase throws plain
+ * objects like { code, details, hint, message } that are not instanceof Error,
+ * so generic fallbacks would otherwise swallow the real cause.
+ */
+function messageFrom(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    const parts = [
+      typeof o.message === "string" ? o.message : null,
+      typeof o.hint === "string" ? o.hint : null,
+      typeof o.details === "string" ? o.details : null,
+      typeof o.code === "string" ? `(${o.code})` : null,
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return fallback;
+    }
+  }
+  return typeof err === "string" && err.trim() ? err : fallback;
 }
 
 async function runImportShapeKpiCsv(formData: FormData) {
@@ -44,6 +73,48 @@ export async function importShapeKpiCsv(formData: FormData) {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Import failed";
+    redirect(`/admin/import?error=${errorParam(msg)}`);
+  }
+}
+
+export async function importInsellerateXlsx(formData: FormData) {
+  const { appUser } = await requireCurrentUser();
+  if (!canAccessAdmin(appUser.role)) notFound();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    redirect(`/admin/import?error=${errorParam("Missing .xlsx file.")}`);
+  }
+  const noMerge = String(formData.get("noMerge") ?? "") === "1";
+
+  try {
+    const arrayBuffer = await (file as File).arrayBuffer();
+    const result = await runInsellerateImport({
+      buffer: arrayBuffer,
+      filename: (file as File).name,
+      importedByUserId: appUser.id,
+      mergeActiveToLoans: !noMerge,
+    });
+    revalidatePath("/dashboard/executive");
+    revalidatePath("/admin/import");
+    const params = new URLSearchParams({
+      ok: "1",
+      insellerate: "1",
+      batch: result.importBatchId,
+      insRows: String(result.totalRows),
+      insHistorical: String(result.historicalUpserted),
+      insLoans: String(result.loansUpserted),
+      insActive: String(result.activeCandidates),
+    });
+    if (result.unmatchedLoanOfficers.length) {
+      params.set("insUnmatchedLOs", result.unmatchedLoanOfficers.slice(0, 10).join(","));
+    }
+    redirect(`/admin/import?${params.toString()}`);
+  } catch (e) {
+    // next/navigation `redirect()` throws a NEXT_REDIRECT internally — let it bubble.
+    if (e instanceof Error && e.message === "NEXT_REDIRECT") throw e;
+    console.error("Insellerate import failed:", e);
+    const msg = messageFrom(e, "Insellerate import failed");
     redirect(`/admin/import?error=${errorParam(msg)}`);
   }
 }
@@ -167,6 +238,43 @@ export async function runShapeApiSyncReturn(formData: FormData): Promise<
     return { ok: true, result };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Shape API sync failed";
+    return { ok: false, error: msg.length > 300 ? `${msg.slice(0, 300)}…` : msg };
+  }
+}
+
+/** LendingPad loans list + conditions sync; returns JSON for admin UI (no redirect). */
+export async function runLendingPadSyncReturn(): Promise<
+  | {
+      ok: true;
+      loans: Awaited<ReturnType<typeof runLendingPadLoansSync>>;
+      conditions: Awaited<ReturnType<typeof runLendingPadConditionsSync>>;
+    }
+  | { ok: false; error: string }
+> {
+  const { appUser } = await requireCurrentUser();
+  if (!canAccessAdmin(appUser.role)) {
+    return { ok: false, error: "Forbidden" };
+  }
+
+  if (!hasLendingPadReadConfig()) {
+    return {
+      ok: false,
+      error:
+        "LendingPad is not configured. Set LENDINGPAD_USERNAME, LENDINGPAD_PASSWORD, LENDINGPAD_CONTACT_ID, LENDINGPAD_COMPANY_ID.",
+    };
+  }
+
+  try {
+    const loans = await runLendingPadLoansSync();
+    const conditions = await runLendingPadConditionsSync();
+    revalidatePath("/dashboard/lo");
+    revalidatePath("/dashboard/manager");
+    revalidatePath("/dashboard/executive");
+    revalidatePath("/dashboard/processor");
+    revalidatePath("/admin/import");
+    return { ok: true, loans, conditions };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "LendingPad sync failed";
     return { ok: false, error: msg.length > 300 ? `${msg.slice(0, 300)}…` : msg };
   }
 }

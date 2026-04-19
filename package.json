@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,6 +16,9 @@
     "report:shape-by-lo": "node scripts/report-shape-by-lo.js",
     "sync:direct": "node scripts/direct-shape-sync.js",
     "lendingpad:sync": "node scripts/lendingpad-sync-to-supabase.js",
+    "signals:dry-run": "node scripts/signals-dry-run.js",
+    "signals:run": "node scripts/signals-dry-run.js --persist",
+    "insellerate:import": "node scripts/import-insellerate-xlsx.js",
     "supabase:migrate": "node scripts/apply-supabase-migrations.mjs"
   },
   "keywords": [],
@@ -33,6 +37,7 @@
     "react-dom": "^18.3.1",
     "recharts": "^3.8.0",
     "tailwind-merge": "^3.5.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

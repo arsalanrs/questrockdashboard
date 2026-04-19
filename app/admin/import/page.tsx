@@ -1,5 +1,13 @@
-import { clearSyncData, generateMockLoanData, importShapeKpiCsv, mockEnrichImportedLoans, resetUserPassword } from "./actions";
+import {
+  clearSyncData,
+  generateMockLoanData,
+  importInsellerateXlsx,
+  importShapeKpiCsv,
+  mockEnrichImportedLoans,
+  resetUserPassword,
+} from "./actions";
 import { createTeam, createUserAndAssign, seedInitialOrg } from "./org-actions";
+import { LendingPadSyncButton } from "./LendingPadSyncButton";
 import { ShapeApiPreview } from "./ShapeApiPreview";
 import { SyncNowButton } from "./SyncNowButton";
 import { requireCurrentUser } from "@/lib/current-user";
@@ -25,6 +33,12 @@ type Props = {
     unmapped?: string;
     cleared?: string;
     passwordReset?: string;
+    insellerate?: string;
+    insRows?: string;
+    insHistorical?: string;
+    insLoans?: string;
+    insActive?: string;
+    insUnmatchedLOs?: string;
   };
 };
 
@@ -83,6 +97,18 @@ export default async function AdminImportPage({ searchParams }: Props) {
             ) : null}
             {searchParams.cleared ? " All synced data cleared. You can sync again." : null}
             {searchParams.passwordReset ? " Password updated." : null}
+            {searchParams.insellerate ? (
+              <>
+                Insellerate import: {searchParams.insRows} rows parsed, {searchParams.insHistorical} stored in
+                historical_leads, {searchParams.insLoans} active rows merged into loans ({searchParams.insActive}{" "}
+                active candidates).
+                {searchParams.insUnmatchedLOs ? (
+                  <span className="block mt-2">
+                    Unmatched LO names (add users or alias): {searchParams.insUnmatchedLOs}
+                  </span>
+                ) : null}
+              </>
+            ) : null}
           </div>
         ) : null}
 
@@ -110,6 +136,49 @@ export default async function AdminImportPage({ searchParams }: Props) {
           </p>
           <ShapeApiPreview />
           <SyncNowButton />
+        </div>
+
+        <div className="mt-6 border-t border-border pt-5">
+          <h3 className="text-sm font-semibold">Import: Insellerate export (.xlsx)</h3>
+          <p className="mt-1 text-sm text-mutedForeground">
+            One-time upload of the legacy Insellerate export. Every row lands in{" "}
+            <span className="font-mono">historical_leads</span> (exec-only). Rows with an active pipeline status
+            (Application / Piped / Processing / Underwriting / Approved / CTC) are also merged into{" "}
+            <span className="font-mono">loans</span> so they appear on the Executive dashboard and Deal Detection
+            signals. Re-running the same file is safe — dedupe is by a stable hash of email + app-create date +
+            last name.
+          </p>
+          <form action={importInsellerateXlsx} className="mt-3 flex flex-col gap-3">
+            <input
+              name="file"
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              required
+              className="block w-full text-sm file:mr-4 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-muted"
+            />
+            <label className="flex items-center gap-2 text-xs text-mutedForeground">
+              <input type="checkbox" name="noMerge" value="1" className="h-4 w-4" />
+              Write to historical_leads only (skip merging active rows into loans)
+            </label>
+            <button
+              type="submit"
+              className="inline-flex w-fit items-center rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90"
+            >
+              Import Insellerate XLSX
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-6 border-t border-border pt-5">
+          <h3 className="text-sm font-semibold">LendingPad sync</h3>
+          <p className="mt-1 text-sm text-mutedForeground">
+            Pull loan lists and conditions from the LendingPad Web API into Supabase (merges with existing loans by{" "}
+            <span className="font-mono">lendingpad_loan_uuid</span>). Configure{" "}
+            <span className="font-mono">LENDINGPAD_*</span> and either{" "}
+            <span className="font-mono">LENDINGPAD_OFFICERS_JSON</span> or{" "}
+            <span className="font-mono">LENDINGPAD_LIST_USER_ID</span> / credential rows.
+          </p>
+          <LendingPadSyncButton />
         </div>
 
         <div className="mt-6 border-t border-border pt-5">

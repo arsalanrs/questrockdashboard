@@ -11,6 +11,7 @@ import { canAccessAdmin } from "@/lib/permissions";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
 import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
+import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 
 async function authorize(request: Request): Promise<NextResponse | null> {
@@ -50,7 +51,8 @@ async function handle(request: Request) {
   try {
     const loans = await runLendingPadLoansSync();
     const conditions = await runLendingPadConditionsSync();
-    return NextResponse.json({ loans, conditions });
+    const documents = await runLendingPadDocumentsSync();
+    return NextResponse.json({ loans, conditions, documents });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "LendingPad sync failed";
     return NextResponse.json({ error: msg }, { status: 500 });

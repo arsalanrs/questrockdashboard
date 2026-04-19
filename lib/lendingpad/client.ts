@@ -8,8 +8,10 @@ import {
   parseLendingPadConditionsResponse,
   parseLendingPadDocumentsResponse,
   parseLendingPadListLoansResponse,
+  parseLendingPadLoanDetailResponse,
   type NormalizedLpCondition,
   type NormalizedLpDocument,
+  type NormalizedLpLoanDetail,
   type NormalizedLpLoanListItem,
 } from "./parse-response";
 
@@ -76,6 +78,49 @@ export async function listLendingPadLoans(options?: {
     );
   }
   return listLendingPadLoansWithAuth(readContext(), resolved, options);
+}
+
+/**
+ * Fetch loan detail (note rate, LTV, FICO, ARM, etc.) for a single loan.
+ *
+ * LendingPad's detail endpoint path varies by account — we try the common
+ * patterns and return null if the server doesn't expose one. Override with
+ * LENDINGPAD_LOAN_DETAIL_PATH (e.g. "/integrations/loans/detail") when known.
+ */
+export async function getLendingPadLoanDetail(
+  loanUuid: string,
+): Promise<NormalizedLpLoanDetail | null> {
+  const cfg = getLendingPadReadConfig();
+  const ctx = readContext();
+  const q = queryParams({
+    contact: cfg.contactId,
+    company: cfg.companyId,
+    loan: loanUuid,
+  });
+  const overridePath = process.env.LENDINGPAD_LOAN_DETAIL_PATH?.trim();
+  const paths = overridePath
+    ? [overridePath]
+    : [
+        "/integrations/loans/detail",
+        "/integrations/loans", // some accounts use GET /integrations/loans?loan=<uuid>
+        `/integrations/loans/${loanUuid}`,
+      ];
+
+  for (const p of paths) {
+    try {
+      const path = p.includes(":uuid") ? p.replace(":uuid", loanUuid) : `${p}${q}`;
+      const json = await lendingPadGetJson(ctx, path);
+      const detail = parseLendingPadLoanDetailResponse(json);
+      if (detail) return detail;
+    } catch (err) {
+      // 404 on this attempted path is fine — try the next one.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/\b(404|not\s*found)\b/i.test(msg)) {
+        throw err;
+      }
+    }
+  }
+  return null;
 }
 
 export async function getLendingPadLoanConditions(loanUuid: string): Promise<NormalizedLpCondition[]> {

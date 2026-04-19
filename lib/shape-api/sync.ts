@@ -12,6 +12,7 @@ const EXCLUDED_SOURCES = new Set(["zWebLead - VISIT"]);
 
 const PAGE_SIZE = 50;
 const PAGE_DELAY_MS = 1500;
+const MAX_PAGES = 1000;
 
 /** First incremental run when no watermark: pull this many days of updates. */
 const INCREMENTAL_BOOTSTRAP_DAYS = 30;
@@ -35,6 +36,8 @@ export type ShapeSyncResult = {
   syncMode: ShapeSyncMode;
   /** Which API range was used (for logs / debugging). */
   dateRangeDescription: string;
+  /** Non-empty when sync loop stops early due a safety guard. */
+  stoppedEarlyReason?: string;
 };
 
 function twoYearsAgoIso(): string {
@@ -144,8 +147,10 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
   const allLoansPayload: Record<string, unknown>[] = [];
   let fieldsNotFound: string[] | undefined;
   const unmappedStatuses = new Set<string>();
+  const seenPageFingerprints = new Set<string>();
+  let stoppedEarlyReason: string | undefined;
 
-  for (let pageNumber = 1; ; pageNumber++) {
+  for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber++) {
     const res: ShapeBulkExportResponse = await shapeBulkExport({
       ...dateRange,
       fields: SHAPE_BULK_EXPORT_FIELDS,
@@ -159,12 +164,14 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     const data = res.data ?? {};
     const records = Object.values(data) as Record<string, unknown>[];
     pages += 1;
+    const pageRecordIds: number[] = [];
 
     for (const record of records) {
       const row = mapApiRecordToCsvLike(record);
       const recordIdRaw = row["recordId"];
       const recordId = Number(String(recordIdRaw ?? "").trim());
       if (!Number.isFinite(recordId)) continue;
+      pageRecordIds.push(recordId);
 
       recordsProcessed += 1;
       allRawPayload.push({ import_batch_id: importBatchId, record_id: recordId, row });
@@ -186,8 +193,22 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
       if (loan) allLoansPayload.push(loan);
     }
 
+    // Safety guard: some Shape accounts keep returning 50 rows even after the
+    // end of the range (repeating page-1 forever). Fingerprint each page and
+    // break if we see the same page content again.
+    const fp = `${records.length}|${pageRecordIds.slice(0, 5).join(",")}|${pageRecordIds.slice(-5).join(",")}`;
+    if (seenPageFingerprints.has(fp)) {
+      stoppedEarlyReason = `Detected repeated page payload at page ${pageNumber}; stopping to avoid infinite loop.`;
+      break;
+    }
+    seenPageFingerprints.add(fp);
+
     if (records.length < PAGE_SIZE) break;
     await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+  }
+
+  if (pages >= MAX_PAGES && !stoppedEarlyReason) {
+    stoppedEarlyReason = `Reached MAX_PAGES (${MAX_PAGES}); stopping to avoid infinite loop.`;
   }
 
   // Persist raw
@@ -221,5 +242,6 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     unmappedStatuses: unmappedStatuses.size ? Array.from(unmappedStatuses).sort() : undefined,
     syncMode: mode,
     dateRangeDescription: dateRangeDescription,
+    stoppedEarlyReason,
   };
 }

@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/sync/shape",
+      "path": "/api/cron/nightly",
       "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/sync/lendingpad",
-      "schedule": "30 13 * * *"
     }
   ]
 }
