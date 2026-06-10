@@ -111,7 +111,7 @@ export default async function ExecutiveDashboardPage() {
 
   // ── Tier breakdown from the loans we already fetched ──────────────────────
   const tierStatsMap = new Map<string | null, { count: number; volumeCents: number }>();
-  for (const r of (loans as ExecLoan[] | null) ?? []) {
+  for (const r of ((loans as unknown) as ExecLoan[] | null) ?? []) {
     const t = r.lead_tier ?? null;
     const b = tierStatsMap.get(t) ?? { count: 0, volumeCents: 0 };
     b.count += 1;
@@ -190,18 +190,16 @@ export default async function ExecutiveDashboardPage() {
 
       {/* Document health and ML readiness stream in after the above renders */}
       <Suspense fallback={null}>
-        {/* @ts-expect-error async server component */}
         <DocumentHealthSection />
       </Suspense>
 
       <Suspense fallback={null}>
-        {/* @ts-expect-error async server component */}
         <MlReadinessSection />
       </Suspense>
 
       <ExecChat />
 
-      <ExecutiveFilters loans={(loans ?? []) as ExecLoan[]} loNames={loNames} />
+      <ExecutiveFilters loans={((loans ?? []) as unknown) as ExecLoan[]} loNames={loNames} />
     </div>
   );
 }
