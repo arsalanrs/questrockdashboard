@@ -1,4 +1,5 @@
-const DEFAULT_BASE_URL = "https://secure-api.setshape.com/api";
+// Bulk export MUST use secure.setshape.com — secure-api.setshape.com returns 404 for bulk.
+const DEFAULT_BASE_URL = "https://secure.setshape.com/api";
 const DEFAULT_CRM_ID = "20931";
 
 export function getShapeApiConfig(): { baseUrl: string; apiKey: string; crmId: string } {

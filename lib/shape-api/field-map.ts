@@ -39,9 +39,23 @@ const API_TO_CSV: Record<string, string> = {
   "Co Borrower Phone": "Co Borrower Phone",
   coBorrowerPhone: "Co Borrower Phone",
 
+  // Loan amount — every casing variant Shape might use as a response key.
+  // NOTE: Shape's actual field ID is "LoanAmount" (camelCase). The all-lowercase
+  // "loanamount" appears in fields_not_found and returns no data.
+  LoanAmount: "Loan Amount",
+  loanAmount: "Loan Amount",
   loanamount: "Loan Amount",
   loan_amount: "Loan Amount",
+  borLoanAmount: "Loan Amount",
   "Loan Amount": "Loan Amount",
+
+  // Purchase price (purchase loans) — fall back to this if Loan Amount is absent
+  borpurchasePrice: "Purchase Price",
+  "Purchase Price": "Purchase Price",
+  downpmtamount2: "Down Payment Amount",
+  "Down Payment Amount": "Down Payment Amount",
+  loan_estAppraisalVal: "Estimated Appraisal Value",
+  "Estimated Appraisal Value": "Estimated Appraisal Value",
   prState: "Property State",
   property_state: "Property State",
   "Property State": "Property State",
@@ -115,6 +129,7 @@ const API_TO_CSV: Record<string, string> = {
   cltv: "CLTV",
   "Credit Score": "Credit Score",
   creditScore: "Credit Score",
+  borcreditscore: "Credit Score",
   "FICO": "Credit Score",
   fico: "Credit Score",
   "DTI": "DTI",
@@ -142,6 +157,14 @@ const API_TO_CSV: Record<string, string> = {
   trkFunded: "Funded Date",
   "Closing Scheduled Date": "Closing Scheduled Date",
   "Lock Expiration Date": "Lock Expiration Date",
+
+  // Notes fields
+  "notes_sidebar": "Notes Sidebar",
+  "Notes Sidebar": "Notes Sidebar",
+  "notes_sidebar_ai_note": "Notes Sidebar AI Note",
+  "Notes Sidebar AI Note": "Notes Sidebar AI Note",
+  "recent_notes": "Recent Note",
+  "Recent Note": "Recent Note",
 };
 
 /** Status field name in Shape API (account-specific; override via env or config). */
@@ -200,6 +223,33 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
   if (recordType != null) {
     const v = str(recordType);
     if (v !== undefined) out["Record Type"] = v;
+  }
+
+  // Loan Amount: robust fallback scan — Shape may return this under many key variants.
+  // If the explicit API_TO_CSV map already captured it, skip. Otherwise scan all keys.
+  if (out["Loan Amount"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/^(loan\s*amount|LoanAmount|loanAmount|borLoanAmount|bor.*loan.*amount|loan.*amount)$/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["Loan Amount"] = v;
+          break;
+        }
+      }
+    }
+  }
+
+  // Purchase Price: fallback for purchase loans where loan amount may come from borpurchasePrice
+  if (out["Purchase Price"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/purchase\s*price|borpurchase|bor.*purchase/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["Purchase Price"] = v;
+          break;
+        }
+      }
+    }
   }
 
   // Loan Officer: if not set by API_TO_CSV, try any key that looks like LO name (API field names vary)

@@ -368,6 +368,104 @@ Credit rescoring is a free way to see if you've moved into a better rate tier si
   };
 }
 
+function leadTierPlaybook(title: string, input: PlaybookInput): Playbook {
+  const first = borrowerFirstName(input.loan);
+  return {
+    headline: title,
+    callScript: `Hi ${first}, ${loName(input.loan)} from Quest Rock. ${input.reason} I wanted to reach out personally and see how we can help move things forward — or confirm if timing has changed on your side.`,
+    email: {
+      subject: `Quest Rock — ${title}`,
+      body: `Hi ${first},\n\n${input.reason}\n\nReply with a good time to talk, or let me know if we should check back later.\n\n— ${loName(input.loan)}, Quest Rock`,
+    },
+    nextSteps: ["Review loan file for blockers.", "Log contact outcome in CRM.", "Dismiss signal when resolved."],
+    source: "template",
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function postCloseSkipPaymentPlaybook(input: PlaybookInput): Playbook {
+  const first = borrowerFirstName(input.loan);
+  return {
+    headline: `${first} — first payment month / skip-payment check-in`,
+    callScript: `Hi ${first}, it's ${loName(input.loan)} with Quest Rock. I'm checking in right after your close to confirm your first payment timing — whether you're using the skip-payment month, how to log into the servicer, and autopay if you want it. If you know anyone buying or refi'ing, I'm happy to help them too.`,
+    email: {
+      subject: `Quest Rock — quick first-payment check-in`,
+      body: `Hi ${first},\n\nFollowing up on your close: want to confirm your first payment date and the best way to pay (portal / mail). Reply with any questions — or a good time for a two-minute call.\n\n— ${loName(input.loan)}, Quest Rock`,
+    },
+    nextSteps: [
+      "Confirm first due date and servicer contact.",
+      "Send portal link or payment instructions by text/email.",
+      "Log outcome and dismiss when borrower confirms they're set.",
+    ],
+    source: "template",
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function firstPaymentTouchPlaybook(input: PlaybookInput): Playbook {
+  const first = borrowerFirstName(input.loan);
+  return {
+    headline: `${first} — first payment date touchpoint`,
+    callScript: `Hi ${first}, ${loName(input.loan)} from Quest Rock. Your first payment date is coming up — I want to double-check you know where to pay, the amount, and that autopay or reminders are set so nothing slips.`,
+    email: {
+      subject: `Quest Rock — first payment reminder`,
+      body: `Hi ${first},\n\nQuick note before your first payment: if anything on the servicer portal looks off, reply here and I'll help sort it.\n\n— ${loName(input.loan)}, Quest Rock`,
+    },
+    nextSteps: ["Verify amount and due date on servicer letter.", "Confirm borrower logged in successfully.", "Dismiss after successful first payment or resolution."],
+    source: "template",
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function fhaSeasoningPrepPlaybook(input: PlaybookInput): Playbook {
+  const first = borrowerFirstName(input.loan);
+  return {
+    headline: `${first} — FHA seasoning prep (~180 days)`,
+    callScript: `Hi ${first}, ${loName(input.loan)} from Quest Rock. On FHA loans we're usually looking at about 210 days from the note before a refi can close, but around now is a good time to talk goals so we're ready when you're eligible — no pressure, just planning.`,
+    email: {
+      subject: `Quest Rock — FHA timeline check-in`,
+      body: `Hi ${first},\n\nWanted to sync on your FHA timeline and options once seasoning is met. Reply if you'd like a quick call to map next steps.\n\n— ${loName(input.loan)}, Quest Rock`,
+    },
+    nextSteps: [
+      "Confirm anchor date in file (note vs close per compliance).",
+      "Set expectation: prep now, refi closing after seasoning.",
+      "Schedule follow-up before 210-day eligibility if appropriate.",
+    ],
+    source: "template",
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function armBookCheckinPlaybook(input: PlaybookInput): Playbook {
+  const first = borrowerFirstName(input.loan);
+  return {
+    headline: `${first} — ARM fixed-period book check-in`,
+    callScript: `Hi ${first}, ${loName(input.loan)} from Quest Rock. You're in the fixed period of your ARM and we're near the point where it makes sense to reconnect on the plan before the first adjustment — I can walk through what the reset means and whether staying put or restructuring is smarter.`,
+    email: {
+      subject: `Quest Rock — ARM check-in`,
+      body: `Hi ${first},\n\nTouching base as your ARM's fixed period advances — happy to review your reset timeline and options on a quick call.\n\n— ${loName(input.loan)}, Quest Rock`,
+    },
+    nextSteps: ["Pull current index/margin snapshot for talking points.", "Book 15-minute education call.", "Dismiss or set next review before reset window."],
+    source: "template",
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function orangePipelineHotPlaybook(input: PlaybookInput): Playbook {
+  const first = borrowerFirstName(input.loan);
+  return {
+    headline: `${first} — active pipeline (closing window)`,
+    callScript: `Hi ${first}, ${loName(input.loan)} from Quest Rock. We're in the final stretch on your file — I want to clear any last conditions and lock timing so we close clean. What's the biggest thing on your mind this week?`,
+    email: {
+      subject: `Quest Rock — closing in sight`,
+      body: `Hi ${first},\n\nWe're pushing to the finish line on your loan. Reply with any open questions or docs and I'll prioritize.\n\n— ${loName(input.loan)}, Quest Rock`,
+    },
+    nextSteps: ["Review open conditions and title/CTC checklist.", "Daily touch until funded.", "Dismiss after funding or handoff."],
+    source: "template",
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 const TEMPLATE_PLAYBOOKS: Record<SignalType, (input: PlaybookInput) => Playbook> = {
   piped_never_closed: pipedNeverClosedPlaybook,
   app_no_movement: appNoMovementPlaybook,
@@ -380,6 +478,20 @@ const TEMPLATE_PLAYBOOKS: Record<SignalType, (input: PlaybookInput) => Playbook>
   va_irrrl: vaIrrrlPlaybook,
   arm_reset_window: armResetPlaybook,
   credit_score_improved: creditScoreImprovedPlaybook,
+  never_contacted: (i) => leadTierPlaybook("New lead — no contact logged", i),
+  pre_signature: (i) => leadTierPlaybook("Pre-signature — keep momentum", i),
+  packaged_not_closed: (i) => leadTierPlaybook("Package out — close the loop", i),
+  ctc_expired: (i) => leadTierPlaybook("CTC aging — rescue the file", i),
+  appraisal_ordered_stalled: (i) => leadTierPlaybook("Appraisal stalled", i),
+  closing_8month_due: (i) => leadTierPlaybook("8-month homeowner check-in", i),
+  book_checkin_6m: (i) => leadTierPlaybook("6-month book check-in", i),
+  book_checkin_12m: (i) => leadTierPlaybook("12-month book check-in", i),
+  post_close_skip_payment_due: postCloseSkipPaymentPlaybook,
+  first_payment_touch: firstPaymentTouchPlaybook,
+  fha_seasoning_prep: fhaSeasoningPrepPlaybook,
+  arm_book_checkin_due: armBookCheckinPlaybook,
+  orange_pipeline_hot: orangePipelineHotPlaybook,
+  epo_window_opening: (i) => leadTierPlaybook("EPO window — outreach", i),
 };
 
 /** Generate a deterministic playbook from a template. Never fails, no network. */

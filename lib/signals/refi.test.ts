@@ -7,9 +7,10 @@ const NOW = new Date("2026-04-15T12:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
 
 function makeFundedLoan(overrides: Partial<SignalLoanRow> = {}): SignalLoanRow {
+  const { first_payment_date, note_date, ...rest } = overrides;
   const fundedAt = new Date(NOW.getTime() - 24 * 30 * DAY).toISOString(); // 24 months ago
   return {
-    id: overrides.id ?? "loan-funded",
+    id: "loan-funded",
     current_stage: "funded",
     status_raw: "Funded",
     loan_amount_cents: 400_000_00,
@@ -48,7 +49,14 @@ function makeFundedLoan(overrides: Partial<SignalLoanRow> = {}): SignalLoanRow {
     last_contacted_at: null,
     funded_at: fundedAt,
     loan_age_months: 24,
-    ...overrides,
+    lead_tier: "GREEN",
+    epo_date: null,
+    epo_window_activated: false,
+    reengagement_8month_completed_at: null,
+    appraisal_received_at: null,
+    first_payment_date: first_payment_date ?? null,
+    note_date: note_date ?? null,
+    ...rest,
   };
 }
 

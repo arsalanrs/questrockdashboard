@@ -16,6 +16,7 @@
 
 import { differenceInCalendarDays, differenceInCalendarMonths } from "date-fns";
 
+import { shouldSuppressRefiForFhaSeasoning } from "./book-outreach-policy";
 import type {
   DealSignal,
   MarketRate,
@@ -107,6 +108,7 @@ function loanAgeMonths(loan: SignalLoanRow, now: Date): number | null {
 /** Note rate is ≥ threshold above the latest market rate for this loan type. */
 export function detectRateAboveMarket(loan: SignalLoanRow, ctx: RefiContext): DealSignal | null {
   if (!isFundedBackBookLoan(loan)) return null;
+  if (shouldSuppressRefiForFhaSeasoning(loan, ctx.now)) return null;
   if (loan.note_rate_bps == null) return null;
   const lt = canonicalLoanType(loan);
   if (!lt) return null;
@@ -138,6 +140,7 @@ export function detectRateAboveMarket(loan: SignalLoanRow, ctx: RefiContext): De
 /** Meaningful equity (≥ $75k) on a Conv/FHA/VA funded loan → cash-out pitch. */
 export function detectCashOutCandidate(loan: SignalLoanRow, ctx: RefiContext): DealSignal | null {
   if (!isFundedBackBookLoan(loan)) return null;
+  if (shouldSuppressRefiForFhaSeasoning(loan, ctx.now)) return null;
   if (loan.do_not_contact) return null;
   if (loan.property_value_cents == null || loan.current_loan_balance_cents == null) return null;
 
@@ -175,6 +178,7 @@ export function detectCashOutCandidate(loan: SignalLoanRow, ctx: RefiContext): D
  */
 export function detectFhaToConventional(loan: SignalLoanRow, ctx: RefiContext): DealSignal | null {
   if (!isFundedBackBookLoan(loan)) return null;
+  if (shouldSuppressRefiForFhaSeasoning(loan, ctx.now)) return null;
   if (loan.do_not_contact) return null;
   const lt = canonicalLoanType(loan);
   if (lt !== "FHA") return null;

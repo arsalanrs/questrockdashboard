@@ -1,40 +1,50 @@
 /**
  * Shape API field names to request in bulk export.
  *
- * This account returns fields using their display-name keys (e.g. "LOA User Name",
- * "Shape File Status") rather than internal field IDs (e.g. depursLo, mstrstatus1).
- * We request both the API-style lowercase ids AND the likely display-name keys — Shape
- * ignores unknown fields and the field-map (API_TO_CSV) tolerates either shape.
+ * KEY RULE: Shape ignores unknown field names silently — if a field comes back
+ * in `fields_not_found`, volume/amount/etc will be null. We therefore request
+ * BOTH the camelCase API field IDs (e.g. "LoanAmount", "loanType") AND the
+ * likely display-name labels Shape uses in responses (e.g. "Loan Amount").
  *
- * Verified from Preview Shape API; extended 2026-04-18 to pull every underwriting,
- * milestone, and contact detail the signal + doc-health engines need.
+ * Loan amount specifically: Shape's field ID is "LoanAmount" (capital L, A).
+ * The all-lowercase "loanamount" is NOT recognised and returns fields_not_found.
+ * We also pull "borpurchasePrice" (purchase price for purchase loans).
  */
 export const SHAPE_BULK_EXPORT_FIELDS = [
-  // Identity
+  // ── Identity ─────────────────────────────────────────────────────────────
   "leadid",
+  "leadId",
   "recordtype",
+  "Record Type",
   "createdDate",
+  "Created Date",
   "lastActivityDate",
+  "Last Activity Date",
 
-  // Borrower contact
+  // ── Borrower contact ─────────────────────────────────────────────────────
   "firstname",
+  "First Name",
   "lastname",
+  "Last Name",
   "email",
+  "Email",
   "phone",
+  "Phone",
   "Mobile Phone",
   "Home Phone",
   "Work Phone",
   "Birth Date",
   "Marital Status",
 
-  // Co-borrower
+  // ── Co-borrower ───────────────────────────────────────────────────────────
   "Co Borrower First Name",
   "Co Borrower Last Name",
   "Co Borrower Email",
   "Co Borrower Phone",
 
-  // Address
+  // ── Address ───────────────────────────────────────────────────────────────
   "mailingState",
+  "Mailing State",
   "Mailing City",
   "Mailing Zip",
   "Mailing Address",
@@ -46,38 +56,60 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "Subject Property Type",
   "Occupancy Type",
 
-  // Lead source / attribution
+  // ── Lead source / attribution ─────────────────────────────────────────────
   "leadsource",
+  "Source",
   "channel",
+  "Channel",
   "utmCampaign",
 
-  // Loan officer
+  // ── Loan officer ──────────────────────────────────────────────────────────
   "depursLo",
   "LOA User Name",
   "Loan Officer Email",
 
-  // Status / pipeline
+  // ── Status / pipeline ─────────────────────────────────────────────────────
   "mstrstatus1",
   "status",
+  "Status",
   "Shape File Status",
   "Lead Status",
   "LendingPad Status",
 
-  // Loan terms
-  "loanamount",
+  // ── Loan terms ────────────────────────────────────────────────────────────
+  // Loan amount — request both the correct camelCase ID and display label variants.
+  // "loanamount" (all-lowercase) is NOT a valid Shape field — use "LoanAmount".
+  "LoanAmount",
+  "loanAmount",
+  "Loan Amount",
+  "borLoanAmount",
+
+  // Purchase price / down payment (for purchase loans)
+  "borpurchasePrice",
+  "Purchase Price",
+  "downpmtamount2",
+  "Down Payment Amount",
+
+  // Estimated appraised value
+  "loan_estAppraisalVal",
+  "Estimated Appraisal Value",
+
+  // Loan type / purpose
   "loanType",
+  "Loan Type",
   "purpose",
+  "Loan Purpose",
   "Documentation Type",
   "Is Self Employed",
 
-  // Underwriting — rates
+  // ── Underwriting — rates ──────────────────────────────────────────────────
   "Note Rate",
   "noteRate",
   "Original Rate",
   "originalRate",
   "APR",
 
-  // Underwriting — value / balance / LTV
+  // ── Underwriting — value / balance / LTV ──────────────────────────────────
   "Property Value",
   "propertyValue",
   "Appraised Value",
@@ -88,19 +120,20 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "CLTV",
   "cltv",
 
-  // Underwriting — credit / DTI
+  // ── Underwriting — credit / DTI ───────────────────────────────────────────
   "Credit Score",
   "creditScore",
+  "borcreditscore",
   "FICO",
   "fico",
   "DTI",
   "dti",
 
-  // Veteran / VA
+  // ── Veteran / VA ──────────────────────────────────────────────────────────
   "Is Veteran",
   "isVeteran",
 
-  // ARM
+  // ── ARM ───────────────────────────────────────────────────────────────────
   "ARM First Reset Date",
   "armFirstResetDate",
   "ARM Margin",
@@ -108,7 +141,7 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "ARM Index",
   "armIndex",
 
-  // Compliance / exceptions
+  // ── Compliance / exceptions ───────────────────────────────────────────────
   "HMDA Denial Reason",
   "hmdaDenialReason",
   "Do Not Contact",
@@ -116,15 +149,15 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "Last Contacted",
   "Last Contact Date",
 
-  // Historical linkage
+  // ── Historical linkage ────────────────────────────────────────────────────
   "Insellerate Ref ID",
   "insellerateRefId",
 
-  // LendingPad link
+  // ── LendingPad link ───────────────────────────────────────────────────────
   "lendingPadLoanId",
   "Custom Field - LendingPad Loan ID",
 
-  // Milestone / tracker dates — every pipeline stage
+  // ── Milestone / tracker dates — every pipeline stage ─────────────────────
   "trkApplicationCompleted",
   "trkCreditReportRequest",
   "trkAppraisalRequest",
@@ -150,4 +183,12 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "Funded Date",
   "Closing Scheduled Date",
   "Lock Expiration Date",
+
+  // ── Notes (three sources) ────────────────────────────────────────────────
+  "notes_sidebar",
+  "Notes Sidebar",
+  "notes_sidebar_ai_note",
+  "Notes Sidebar AI Note",
+  "recent_notes",
+  "Recent Note",
 ];

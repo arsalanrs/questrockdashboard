@@ -6,14 +6,74 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PanelSignal, LoRollup } from "@/components/executive/OpportunitiesPanel";
+import type { CachedPlaybook, PanelSignal, LoRollup } from "@/components/executive/OpportunitiesPanel";
 import type { SignalType } from "@/lib/signals/types";
+
+function parseCachedPlaybook(raw: unknown): CachedPlaybook | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.headline !== "string" || typeof o.callScript !== "string") return null;
+  const email = o.email;
+  if (!email || typeof email !== "object") return null;
+  const em = email as Record<string, unknown>;
+  if (typeof em.subject !== "string" || typeof em.body !== "string") return null;
+  if (!Array.isArray(o.nextSteps)) return null;
+  return {
+    headline: o.headline,
+    callScript: o.callScript,
+    email: { subject: em.subject, body: em.body },
+    nextSteps: o.nextSteps.map((x) => String(x)),
+    source: o.source === "llm" ? "llm" : "template",
+    generatedAt: typeof o.generatedAt === "string" ? o.generatedAt : new Date().toISOString(),
+  };
+}
+
+function normalizeBorrowerKey(name: string | null): string {
+  return String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function pickBetterPanelSignal(prev: PanelSignal, s: PanelSignal): PanelSignal {
+  if (s.priority > prev.priority) return s;
+  if (s.priority < prev.priority) return prev;
+  const ts = s.computedAt ? new Date(s.computedAt).getTime() : 0;
+  const pt = prev.computedAt ? new Date(prev.computedAt).getTime() : 0;
+  if (ts > pt) return s;
+  if (ts < pt) return prev;
+  const sb = s.cachedPlaybook != null;
+  const pb = prev.cachedPlaybook != null;
+  if (sb && !pb) return s;
+  if (!sb && pb) return prev;
+  return s;
+}
+
+/** One row per borrower + signal type (highest priority; tie-break by newest computed_at, then saved playbook). */
+function dedupePanelSignals(signals: PanelSignal[]): PanelSignal[] {
+  const best = new Map<string, PanelSignal>();
+  for (const s of signals) {
+    const key = `${normalizeBorrowerKey(s.borrowerName)}|${s.signalType}`;
+    const prev = best.get(key);
+    if (!prev) {
+      best.set(key, s);
+      continue;
+    }
+    best.set(key, pickBetterPanelSignal(prev, s));
+  }
+  return Array.from(best.values()).sort((a, b) => {
+    if (b.priority !== a.priority) return b.priority - a.priority;
+    const ta = a.computedAt ? new Date(a.computedAt).getTime() : 0;
+    const tb = b.computedAt ? new Date(b.computedAt).getTime() : 0;
+    return tb - ta;
+  });
+}
 
 export async function loadOpportunitiesPanelData(admin: SupabaseClient) {
   const [{ data: signals, error: sErr }, { data: runs, error: rErr }] = await Promise.all([
     admin
       .from("deal_signals")
-      .select("id,loan_id,signal_type,category,priority,reason,lo_user_id,lo_name,meta,computed_at")
+      .select("id,loan_id,signal_type,category,priority,reason,lo_user_id,lo_name,meta,computed_at,playbook_json")
       .is("dismissed_at", null)
       .order("priority", { ascending: false })
       .order("computed_at", { ascending: false })
@@ -46,7 +106,7 @@ export async function loadOpportunitiesPanelData(admin: SupabaseClient) {
     loanById = new Map((loans ?? []).map((l) => [l.id as string, l as any]));
   }
 
-  const panelSignals: PanelSignal[] = (signals ?? []).map((s) => {
+  let panelSignals: PanelSignal[] = (signals ?? []).map((s) => {
     const l = loanById.get(s.loan_id as string);
     const bn =
       [l?.borrower_first_name, l?.borrower_last_name].filter(Boolean).join(" ").trim() || null;
@@ -63,8 +123,12 @@ export async function loadOpportunitiesPanelData(admin: SupabaseClient) {
       borrowerName: bn,
       loanAmountCents: (l?.loan_amount_cents as number | null) ?? null,
       shapeRecordId: (l?.shape_record_id as number | null) ?? null,
+      computedAt: (s.computed_at as string | null) ?? null,
+      cachedPlaybook: parseCachedPlaybook(s.playbook_json),
     };
   });
+
+  panelSignals = dedupePanelSignals(panelSignals);
 
   const rollupMap = new Map<string, LoRollup>();
   for (const s of panelSignals) {

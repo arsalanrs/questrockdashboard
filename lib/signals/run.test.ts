@@ -6,8 +6,9 @@ const NOW = new Date("2026-04-15T12:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
 
 function makeLoan(overrides: Partial<SignalLoanRow> = {}): SignalLoanRow {
+  const { first_payment_date, note_date, ...rest } = overrides;
   return {
-    id: overrides.id ?? "loan-1",
+    id: "loan-1",
     current_stage: null,
     status_raw: null,
     loan_amount_cents: 500_000_00,
@@ -46,7 +47,14 @@ function makeLoan(overrides: Partial<SignalLoanRow> = {}): SignalLoanRow {
     last_contacted_at: null,
     funded_at: null,
     loan_age_months: null,
-    ...overrides,
+    lead_tier: null,
+    epo_date: null,
+    epo_window_activated: null,
+    reengagement_8month_completed_at: null,
+    appraisal_received_at: null,
+    first_payment_date: first_payment_date ?? null,
+    note_date: note_date ?? null,
+    ...rest,
   };
 }
 

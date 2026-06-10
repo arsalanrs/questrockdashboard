@@ -1,21 +1,25 @@
 /**
  * Morning digest builder.
  *
- * For each executive user, summarize the pipeline:
- *   • Top 5 hot signals across all LOs
+ * Executives (Bill, Ray, Nikk) receive the full-pipeline digest:
+ *   • Top 5 hot signals across ALL loan officers
  *   • New signals in the last 24 hours
- *   • Per-LO signal counts, highlighting anyone with > 5 hot signals
+ *   • Per-LO signal counts
  *
- * Produces one executive_notifications row per executive (kind='morning_digest').
- * The body is plain markdown so it renders the same in-app and in future
- * email / slack delivery channels.
+ * Managers (Bastian, Tashawna, Jason) receive a team-scoped digest:
+ *   • Same format, but filtered to loans owned by their team members
+ *     (+ the manager's own loans).
+ *
+ * Produces one executive_notifications row per recipient (kind='morning_digest').
+ * The body is plain markdown so it renders in-app and in future
+ * email / Slack delivery channels.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { SIGNAL_LABEL, type SignalType } from "@/lib/signals/types";
 
-type ExecUser = { id: string; full_name: string | null };
+type DigestRecipient = { id: string; full_name: string | null; role: string };
 
 type DigestSignal = {
   id: string;
@@ -23,6 +27,7 @@ type DigestSignal = {
   priority: number;
   reason: string;
   lo_name: string | null;
+  lo_user_id?: string | null;
   computed_at: string;
   loan_id: string;
 };
@@ -45,9 +50,15 @@ function formatCurrency(cents: number | null | undefined): string {
   }).format(cents / 100);
 }
 
-function renderDigestBody(summary: DigestSummary): string {
+function renderDigestBody(summary: DigestSummary, scopeLabel?: string): string {
   const lines: string[] = [];
-  lines.push(`**${summary.hotCount} hot signals · ${summary.totalActive} active · ${summary.newLast24h} new in the last 24h**`);
+  if (scopeLabel) {
+    lines.push(`**${scopeLabel}**`);
+    lines.push("");
+  }
+  lines.push(
+    `**${summary.hotCount} hot signals · ${summary.totalActive} active · ${summary.newLast24h} new in the last 24h**`
+  );
   lines.push("");
   if (summary.topSignals.length > 0) {
     lines.push("**Top priorities**");
@@ -66,17 +77,8 @@ function renderDigestBody(summary: DigestSummary): string {
   return lines.join("\n");
 }
 
-export async function buildDigestSummary(admin: SupabaseClient): Promise<DigestSummary> {
+function buildSummaryFromSignals(signals: DigestSignal[]): DigestSummary {
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data: activeSignals, error: sigErr } = await admin
-    .from("deal_signals")
-    .select("id,signal_type,priority,reason,lo_name,computed_at,loan_id")
-    .is("dismissed_at", null);
-  if (sigErr) throw sigErr;
-
-  const signals = (activeSignals ?? []) as DigestSignal[];
-
   const hot = signals.filter((s) => s.priority >= 4);
   const newLast24h = signals.filter((s) => s.computed_at >= twentyFourHoursAgo).length;
 
@@ -107,45 +109,148 @@ export async function buildDigestSummary(admin: SupabaseClient): Promise<DigestS
   };
 }
 
-export async function deliverMorningDigest(
-  admin: SupabaseClient
-): Promise<{ execsNotified: number; summary: DigestSummary }> {
-  const summary = await buildDigestSummary(admin);
-  const body = renderDigestBody(summary);
+export async function buildDigestSummary(admin: SupabaseClient): Promise<DigestSummary> {
+  const { data: activeSignals, error: sigErr } = await admin
+    .from("deal_signals")
+    .select("id,signal_type,priority,reason,lo_name,lo_user_id,computed_at,loan_id")
+    .is("dismissed_at", null);
+  if (sigErr) throw sigErr;
 
-  const { data: execs, error: execErr } = await admin
-    .from("users")
-    .select("id,full_name")
-    .in("role", ["executive", "admin"]);
-  if (execErr) throw execErr;
-
-  const rows = (execs ?? [])
-    .map((u: ExecUser) => ({
-      user_id: u.id,
-      kind: "morning_digest",
-      title: `Morning digest — ${summary.hotCount} hot signals`,
-      body,
-      payload: {
-        totalActive: summary.totalActive,
-        hotCount: summary.hotCount,
-        newLast24h: summary.newLast24h,
-        topSignalIds: summary.topSignals.map((s) => s.id),
-        generatedAt: summary.generatedAt,
-      },
-    }));
-
-  if (rows.length === 0) {
-    return { execsNotified: 0, summary };
-  }
-
-  const { error: insErr } = await admin.from("executive_notifications").insert(rows);
-  if (insErr) throw insErr;
-
-  return { execsNotified: rows.length, summary };
+  return buildSummaryFromSignals((activeSignals ?? []) as DigestSignal[]);
 }
 
-export { renderDigestBody };
-// expose types for route handlers
+export async function deliverMorningDigest(
+  admin: SupabaseClient
+): Promise<{ recipientsNotified: number; execsNotified: number; managersNotified: number; summary: DigestSummary }> {
+  // ── 1. Fetch all active signals once ────────────────────────────────────────
+  const { data: activeSignals, error: sigErr } = await admin
+    .from("deal_signals")
+    .select("id,signal_type,priority,reason,lo_name,lo_user_id,computed_at,loan_id")
+    .is("dismissed_at", null);
+  if (sigErr) throw sigErr;
+
+  const allSignals = (activeSignals ?? []) as DigestSignal[];
+  const fullSummary = buildSummaryFromSignals(allSignals);
+
+  // ── 2. Fetch recipients: executives + managers (active only) ─────────────────
+  const { data: recipients, error: userErr } = await admin
+    .from("users")
+    .select("id,full_name,role")
+    .in("role", ["executive", "admin", "manager"])
+    .eq("is_active", true);
+  if (userErr) throw userErr;
+
+  const allRecipients = (recipients ?? []) as DigestRecipient[];
+  const executives = allRecipients.filter((u) => u.role === "executive" || u.role === "admin");
+  const managers = allRecipients.filter((u) => u.role === "manager");
+
+  // ── 3. Fetch team memberships for managers ────────────────────────────────────
+  // team_members rows: { team_id, user_id } — we need manager → [member user ids]
+  const managerIds = managers.map((m) => m.id);
+  const memberIdsByManager = new Map<string, Set<string>>();
+
+  if (managerIds.length > 0) {
+    // Get teams each manager leads
+    const { data: managedTeams } = await admin
+      .from("teams")
+      .select("id,manager_user_id")
+      .in("manager_user_id", managerIds);
+
+    const teamIds = (managedTeams ?? []).map((t) => t.id);
+
+    if (teamIds.length > 0) {
+      const { data: members } = await admin
+        .from("team_members")
+        .select("team_id,user_id")
+        .in("team_id", teamIds);
+
+      // Map each manager to the set of member user IDs (including themselves)
+      for (const team of managedTeams ?? []) {
+        const mgr = team.manager_user_id as string;
+        const memberSet = memberIdsByManager.get(mgr) ?? new Set<string>();
+        memberSet.add(mgr); // manager sees their own loans too
+        for (const m of members ?? []) {
+          if (m.team_id === team.id) memberSet.add(m.user_id);
+        }
+        memberIdsByManager.set(mgr, memberSet);
+      }
+    }
+    // Managers with no team still see their own loans
+    for (const mgr of managers) {
+      if (!memberIdsByManager.has(mgr.id)) {
+        memberIdsByManager.set(mgr.id, new Set([mgr.id]));
+      }
+    }
+  }
+
+  // ── 4. Build notification rows ────────────────────────────────────────────────
+  const notificationRows: Record<string, unknown>[] = [];
+
+  // Executives → full-pipeline digest
+  const fullBody = renderDigestBody(fullSummary);
+  for (const exec of executives) {
+    notificationRows.push({
+      user_id: exec.id,
+      kind: "morning_digest",
+      title: `Morning digest — ${fullSummary.hotCount} hot signals`,
+      body: fullBody,
+      payload: {
+        totalActive: fullSummary.totalActive,
+        hotCount: fullSummary.hotCount,
+        newLast24h: fullSummary.newLast24h,
+        topSignalIds: fullSummary.topSignals.map((s) => s.id),
+        generatedAt: fullSummary.generatedAt,
+        scope: "all",
+      },
+    });
+  }
+
+  // Managers → team-scoped digest
+  for (const mgr of managers) {
+    const teamMemberIds = memberIdsByManager.get(mgr.id) ?? new Set([mgr.id]);
+    const teamSignals = allSignals.filter(
+      (s) => s.lo_user_id != null && teamMemberIds.has(s.lo_user_id)
+    );
+    const teamSummary = buildSummaryFromSignals(teamSignals);
+
+    // Determine team name for context
+    const teamLabel =
+      teamSignals.length === 0
+        ? "No active signals for your team"
+        : `${[...teamMemberIds].length} team member${[...teamMemberIds].length === 1 ? "" : "s"}`;
+
+    const teamBody = renderDigestBody(teamSummary, `Team digest — ${teamLabel}`);
+    notificationRows.push({
+      user_id: mgr.id,
+      kind: "morning_digest",
+      title: `Morning digest — ${teamSummary.hotCount} hot · ${teamSummary.totalActive} active on your team`,
+      body: teamBody,
+      payload: {
+        totalActive: teamSummary.totalActive,
+        hotCount: teamSummary.hotCount,
+        newLast24h: teamSummary.newLast24h,
+        topSignalIds: teamSummary.topSignals.map((s) => s.id),
+        generatedAt: teamSummary.generatedAt,
+        scope: "team",
+        teamMemberIds: [...teamMemberIds],
+      },
+    });
+  }
+
+  if (notificationRows.length === 0) {
+    return { recipientsNotified: 0, execsNotified: 0, managersNotified: 0, summary: fullSummary };
+  }
+
+  const { error: insErr } = await admin.from("executive_notifications").insert(notificationRows);
+  if (insErr) throw insErr;
+
+  return {
+    recipientsNotified: notificationRows.length,
+    execsNotified: executives.length,
+    managersNotified: managers.length,
+    summary: fullSummary,
+  };
+}
+
+export { renderDigestBody, formatCurrency };
 export type { DigestSignal };
-// expose to currency formatter outside (e.g. tests)
-export { formatCurrency };

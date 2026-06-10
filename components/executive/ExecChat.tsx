@@ -116,7 +116,8 @@ export function ExecChat() {
                 <div className="max-w-md text-center">
                   <p className="text-sm text-mutedForeground">Try asking:</p>
                   <div className="mt-3 space-y-2">
-                    {["What should Brenden focus on closing this week?",
+                    {[
+                      "What are the top deals we should go after today? Call findDealCandidates and listSignals with no LO filter. Lead every bullet with borrower name and LO, then loan_id.",
                       "Which LO has the most stalled deals right now?",
                       "Show me deals that were Clear to Close but didn't fund this quarter.",
                     ].map((t) => (

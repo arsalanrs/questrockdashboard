@@ -36,6 +36,20 @@ const ALL_TYPES: SignalType[] = [
   "va_irrrl",
   "arm_reset_window",
   "credit_score_improved",
+  "never_contacted",
+  "pre_signature",
+  "packaged_not_closed",
+  "ctc_expired",
+  "appraisal_ordered_stalled",
+  "closing_8month_due",
+  "book_checkin_6m",
+  "book_checkin_12m",
+  "post_close_skip_payment_due",
+  "first_payment_touch",
+  "fha_seasoning_prep",
+  "arm_book_checkin_due",
+  "orange_pipeline_hot",
+  "epo_window_opening",
 ];
 
 describe("generatePlaybookFromTemplate", () => {

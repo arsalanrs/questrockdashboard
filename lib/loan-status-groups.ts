@@ -221,15 +221,47 @@ export const MICRO_STAGES: Array<{
 ];
 
 const statusToMicro = new Map<string, MicroStageKey>();
+const statusToMicroLower = new Map<string, MicroStageKey>();
 for (const stage of MICRO_STAGES) {
   for (const s of stage.subStatuses) {
     statusToMicro.set(s, stage.key);
+    statusToMicroLower.set(s.trim().toLowerCase(), stage.key);
   }
 }
 
 export function getMicroStage(statusRaw: string | null): MicroStageKey | null {
   if (!statusRaw) return null;
-  return statusToMicro.get(statusRaw) ?? null;
+  const t = statusRaw.trim();
+  return statusToMicro.get(t) ?? statusToMicroLower.get(t.toLowerCase()) ?? null;
+}
+
+/**
+ * Maps DB `current_stage` (loan_pipeline_stage) → Command Center micro bucket.
+ * Used when `status_raw` is from LendingPad (or missing) and does not match Shape strings.
+ */
+const PIPELINE_STAGE_TO_MICRO: Partial<Record<string, MicroStageKey>> = {
+  application: "verification",
+  verification: "verification",
+  esign_out: "esign_out",
+  registered: "processing",
+  processing: "processing",
+  submission: "underwriting",
+  underwriting: "underwriting",
+  conditions: "approval",
+  approval_conditions: "approval",
+  clear_to_close: "ctc",
+  closing: "closed",
+  funded: "closed",
+};
+
+export function getPipelineMicroStage(
+  statusRaw: string | null,
+  currentStage: string | null,
+): MicroStageKey | null {
+  const fromShape = getMicroStage(statusRaw);
+  if (fromShape) return fromShape;
+  if (!currentStage) return null;
+  return PIPELINE_STAGE_TO_MICRO[currentStage] ?? null;
 }
 
 /* ── Command Center: Macro Stages ────────────────────────────────── */
@@ -250,15 +282,35 @@ export const MACRO_STAGES: Array<{
 /* ── All pipeline statuses (used to determine CC vs Pre-Pipeline) ── */
 
 const ALL_CC_STATUSES = new Set<string>();
+const ALL_CC_STATUSES_LOWER = new Set<string>();
 for (const stage of MICRO_STAGES) {
   for (const s of stage.subStatuses) {
     ALL_CC_STATUSES.add(s);
+    ALL_CC_STATUSES_LOWER.add(s.trim().toLowerCase());
   }
 }
 
+/** Shape-only: true when status_raw is a known Questrock Command Center status string. */
 export function isCommandCenterStatus(statusRaw: string | null): boolean {
   if (!statusRaw) return false;
-  return ALL_CC_STATUSES.has(statusRaw);
+  const t = statusRaw.trim();
+  return ALL_CC_STATUSES.has(t) || ALL_CC_STATUSES_LOWER.has(t.toLowerCase());
+}
+
+/** Includes LP (and other) loans whose `current_stage` maps into the Command Center micro pipeline. */
+export function isCommandCenterPipelineStatus(
+  statusRaw: string | null,
+  currentStage: string | null,
+): boolean {
+  return getPipelineMicroStage(statusRaw, currentStage) != null;
+}
+
+/** Loans that are closed/funded for pre-pipeline exclusion (LP often uses different casing). */
+export function isTerminalRetailStatus(statusRaw: string | null, currentStage: string | null): boolean {
+  if (currentStage === "funded") return true;
+  const s = (statusRaw ?? "").trim().toLowerCase();
+  if (!s) return false;
+  return s === "funded" || s === "purchased" || s === "closed";
 }
 
 /* ── Document Checklists ─────────────────────────────────────────── */
@@ -301,6 +353,9 @@ export const DOC_CHECKLISTS: Record<string, { title: string; items: string[] }> 
 
 /* ── Leaderboard exclusions ──────────────────────────────────────── */
 
+// Owners/executives are excluded from the LO leaderboard since they don't
+// work a standard pipeline. Branch Builders (Bastian, Tashawna) and
+// managers (Jason) ARE included since they originate loans.
 export const LEADERBOARD_EXCLUDED_NAMES = ["nikk", "ray", "bill"];
 
 export function isExcludedFromLeaderboard(fullName: string | null): boolean {

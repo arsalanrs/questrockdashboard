@@ -18,9 +18,10 @@ import { Leaderboard } from "@/components/dashboard/Leaderboard";
 import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 import { avg, formatCurrency, monthStart, yearStart, sum } from "@/lib/metrics";
 import {
-  isCommandCenterStatus,
+  isCommandCenterPipelineStatus,
+  isTerminalRetailStatus,
   PITCH_QUEUE_SET,
-  getMicroStage,
+  getPipelineMicroStage,
   MICRO_STAGES,
   MACRO_STAGES,
   isExcludedFromLeaderboard,
@@ -33,10 +34,15 @@ import { cn } from "@/lib/cn";
 /* ------------------------------------------------------------------ */
 
 const STAGE_LABELS: Record<string, string> = {
+  lead: "Lead",
+  application: "Application",
   verification: "Verification",
   esign_out: "eSign Out",
+  registered: "Registered",
   processing: "Processing",
+  submission: "Submission",
   underwriting: "Underwriting",
+  conditions: "Conditions",
   approval_conditions: "Approval",
   clear_to_close: "CTC",
   closing: "Closing",
@@ -57,6 +63,7 @@ type LoanRow = {
   current_stage: string | null;
   closing_date: string | null;
   closed_at: string | null;
+  funded_at: string | null;
   loan_amount_cents: number | null;
   lead_created_at: string | null;
   application_completed_at: string | null;
@@ -73,6 +80,8 @@ type LoanRow = {
   lock_expiration_date: string | null;
   finance_contingency_date: string | null;
   appraisal_contingency_date: string | null;
+  lendingpad_loan_uuid: string | null;
+  lendingpad_status_raw: string | null;
   loan_stage_events: Array<{ stage: string; entered_at: string }> | null;
   conditions: Array<{ status: "open" | "cleared" }> | null;
 };
@@ -158,7 +167,7 @@ export default async function LoanOfficerDashboardPage({
   /* ---------- data fetch ---------- */
 
   const LOAN_SELECT =
-    "id,shape_record_id,record_type,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,loan_amount_cents,lead_created_at,application_completed_at,credit_report_requested_at,appraisal_ordered_at,appraisal_received_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,loan_stage_events(stage,entered_at),conditions(status)";
+    "id,shape_record_id,record_type,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,funded_at,loan_amount_cents,lead_created_at,application_completed_at,credit_report_requested_at,appraisal_ordered_at,appraisal_received_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,lendingpad_loan_uuid,lendingpad_status_raw,loan_stage_events(stage,entered_at),conditions(status)";
 
   let loans: LoanRow[] | null = null;
   let loansError: { message: string } | null = null;
@@ -205,9 +214,19 @@ export default async function LoanOfficerDashboardPage({
 
   const rows = (loans ?? []) as unknown as LoanRow[];
 
-  /* ---------- computed loan data ---------- */
+  // ── LP-synced vs Shape-only split ─────────────────────────────────────────
+  // Pipeline sections (Command Center, Action Queue, etc.) only show loans
+  // that are confirmed in LendingPad. Shape-only leads appear in their own
+  // section so the LO knows what's missing from LP.
+  const lpSyncedRows = rows.filter((l) => !!l.lendingpad_loan_uuid);
+  const shapeOnlyRows = rows.filter((l) => !l.lendingpad_loan_uuid);
 
-  const loanWithComputed = rows.map((l) => {
+  const fundedOrClosedAt = (l: Pick<LoanRow, "closed_at" | "funded_at">) =>
+    l.closed_at ?? l.funded_at ?? null;
+
+  /* ---------- computed loan data (LP-synced only) ---------- */
+
+  const loanWithComputed = lpSyncedRows.map((l) => {
     const openConditions = (l.conditions ?? []).filter((c) => c.status === "open").length;
     const stageEntered = latestStageEntry(l.loan_stage_events, l.current_stage);
     const hoursInStage = stageEntered ? differenceInHours(now, stageEntered) : null;
@@ -242,9 +261,13 @@ export default async function LoanOfficerDashboardPage({
 
   /* ---------- categorize loans using status_raw ---------- */
 
-  const commandCenterLoans = loanWithComputed.filter((l) => isCommandCenterStatus(l.status_raw));
+  const commandCenterLoans = loanWithComputed.filter((l) =>
+    isCommandCenterPipelineStatus(l.status_raw, l.current_stage),
+  );
   const prePipelineLoans = loanWithComputed.filter(
-    (l) => !isCommandCenterStatus(l.status_raw) && l.status_raw !== "Funded" && l.status_raw !== "Purchased" && l.status_raw !== "Closed",
+    (l) =>
+      !isCommandCenterPipelineStatus(l.status_raw, l.current_stage) &&
+      !isTerminalRetailStatus(l.status_raw, l.current_stage),
   );
   const pitchQueueLoans = loanWithComputed.filter((l) => PITCH_QUEUE_SET.has(l.status_raw ?? ""));
 
@@ -252,7 +275,7 @@ export default async function LoanOfficerDashboardPage({
 
   const loansByMicro = new Map<MicroStageKey, MicroLoan[]>();
   for (const l of commandCenterLoans) {
-    const micro = getMicroStage(l.status_raw);
+    const micro = getPipelineMicroStage(l.status_raw, l.current_stage);
     if (!micro) continue;
     if (!loansByMicro.has(micro)) loansByMicro.set(micro, []);
     loansByMicro.get(micro)!.push({
@@ -291,8 +314,9 @@ export default async function LoanOfficerDashboardPage({
 
   const avgDaysToClose = avg(
     loanWithComputed.map((l) => {
-      if (!l.lead_created_at || !l.closed_at) return null;
-      return differenceInCalendarDays(new Date(l.closed_at), new Date(l.lead_created_at));
+      const end = fundedOrClosedAt(l);
+      if (!l.lead_created_at || !end) return null;
+      return differenceInCalendarDays(new Date(end), new Date(l.lead_created_at));
     }),
   );
 
@@ -354,8 +378,14 @@ export default async function LoanOfficerDashboardPage({
   const mStart = monthStart();
   const yStart = yearStart();
 
-  const fundedMtd = loanWithComputed.filter((l) => l.closed_at && new Date(l.closed_at) >= mStart && new Date(l.closed_at) <= now);
-  const fundedYtd = loanWithComputed.filter((l) => l.closed_at && new Date(l.closed_at) >= yStart && new Date(l.closed_at) <= now);
+  const fundedMtd = loanWithComputed.filter((l) => {
+    const end = fundedOrClosedAt(l);
+    return end && new Date(end) >= mStart && new Date(end) <= now;
+  });
+  const fundedYtd = loanWithComputed.filter((l) => {
+    const end = fundedOrClosedAt(l);
+    return end && new Date(end) >= yStart && new Date(end) <= now;
+  });
 
   const mtdVolumeCents = sum(fundedMtd.map((l) => l.loan_amount_cents ?? null));
   const ytdVolumeCents = sum(fundedYtd.map((l) => l.loan_amount_cents ?? null));
@@ -379,14 +409,16 @@ export default async function LoanOfficerDashboardPage({
   );
   const pipedToClosed = avg(
     loanWithComputed.map((l) => {
-      if (!l.appraisal_ordered_at || !l.closed_at) return null;
-      return differenceInCalendarDays(new Date(l.closed_at), new Date(l.appraisal_ordered_at));
+      const end = fundedOrClosedAt(l);
+      if (!l.appraisal_ordered_at || !end) return null;
+      return differenceInCalendarDays(new Date(end), new Date(l.appraisal_ordered_at));
     }),
   );
   const totalDaysToClose = avg(
     loanWithComputed.map((l) => {
-      if (!l.lead_created_at || !l.closed_at) return null;
-      return differenceInCalendarDays(new Date(l.closed_at), new Date(l.lead_created_at));
+      const end = fundedOrClosedAt(l);
+      if (!l.lead_created_at || !end) return null;
+      return differenceInCalendarDays(new Date(end), new Date(l.lead_created_at));
     }),
   );
 
@@ -406,7 +438,7 @@ export default async function LoanOfficerDashboardPage({
     if (eligibleUsers.length > 0) {
       const { data: allLoans } = await adminClient
         .from("loans")
-        .select("assigned_loan_officer_user_id,credit_report_requested_at,appraisal_ordered_at,closed_at,loan_amount_cents")
+        .select("assigned_loan_officer_user_id,credit_report_requested_at,appraisal_ordered_at,closed_at,funded_at,loan_amount_cents")
         .in("assigned_loan_officer_user_id", eligibleUsers.map((u) => u.id))
         .limit(5000);
 
@@ -421,7 +453,8 @@ export default async function LoanOfficerDashboardPage({
         const s = stats.get(uid)!;
         if (loan.credit_report_requested_at) s.creditPulls++;
         if (loan.appraisal_ordered_at) s.appraisalsOrdered++;
-        if (loan.closed_at) {
+        const endAt = loan.closed_at ?? loan.funded_at;
+        if (endAt) {
           s.closedLoans++;
           s.fundedVolumeCents += loan.loan_amount_cents ?? 0;
         }
@@ -664,6 +697,105 @@ export default async function LoanOfficerDashboardPage({
           <StatCard label="Total Days to Close" value={totalDaysToClose?.toFixed(1) ?? "—"} />
         </div>
       </section>
+
+      {/* ================================================================ */}
+      {/*  In Shape, Not in LendingPad                                     */}
+      {/* ================================================================ */}
+
+      {shapeOnlyRows.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-4 rounded-full" style={{ background: "rgba(245,158,11,0.8)" }} />
+            <div className="text-sm font-semibold tracking-tight">
+              In Shape, Not in LendingPad
+            </div>
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+              style={{ background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}
+            >
+              {shapeOnlyRows.length}
+            </span>
+          </div>
+          <p className="text-xs text-mutedForeground">
+            These leads exist in Shape but have no linked LendingPad loan. They do not appear in the pipeline above.
+          </p>
+          <div
+            className="overflow-hidden rounded-xl"
+            style={{
+              border: "1px solid rgba(245,158,11,0.18)",
+              background: "rgba(245,158,11,0.03)",
+            }}
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                  style={{ background: "rgba(255,255,255,0.03)" }}
+                >
+                  <th className="px-4 py-2.5">Borrower</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Loan Type</th>
+                  <th className="px-4 py-2.5 text-right">Amount</th>
+                  <th className="px-4 py-2.5">Lead Created</th>
+                  <th className="px-4 py-2.5 text-right">Shape #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shapeOnlyRows
+                  .filter(
+                    (l) =>
+                      !isTerminalRetailStatus(l.status_raw, l.current_stage)
+                  )
+                  .sort((a, b) => {
+                    const da = a.lead_created_at ? new Date(a.lead_created_at).getTime() : 0;
+                    const db = b.lead_created_at ? new Date(b.lead_created_at).getTime() : 0;
+                    return db - da;
+                  })
+                  .slice(0, 50)
+                  .map((l) => (
+                    <tr
+                      key={l.id}
+                      className="transition-colors hover:bg-white/[0.02]"
+                      style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                    >
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{ background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}
+                        >
+                          {l.status_raw ?? l.current_stage ?? "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-mutedForeground">
+                        {l.loan_type ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-mutedForeground">
+                        {l.loan_amount_cents
+                          ? formatCurrency(l.loan_amount_cents)
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-mutedForeground">
+                        {l.lead_created_at
+                          ? new Date(l.lead_created_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs text-mutedForeground">
+                        {l.shape_record_id ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

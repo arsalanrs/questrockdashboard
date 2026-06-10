@@ -240,6 +240,8 @@ function mergeLoanDetail(
   setIf("loan_type", detail.loanType);
   setIf("loan_purpose", detail.loanPurpose);
   setIf("funded_at", detail.fundedAt);
+  setIf("first_payment_date", detail.firstPaymentDate);
+  setIf("note_date", detail.noteDate);
   return map;
 }
 

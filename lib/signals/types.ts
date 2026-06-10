@@ -9,7 +9,7 @@
  * Supabase writes/reads happen in callers.
  */
 
-export type SignalCategory = "stall" | "refi" | "portfolio" | "life_event";
+export type SignalCategory = "stall" | "refi" | "portfolio" | "life_event" | "lead_tier";
 
 /**
  * Stable string identifiers. New detectors append here — do NOT rename
@@ -28,7 +28,23 @@ export type SignalType =
   | "fha_to_conventional"
   | "va_irrrl"
   | "arm_reset_window"
-  | "credit_score_improved";
+  | "credit_score_improved"
+  // Lead tier / re-engagement (Supabase-only)
+  | "never_contacted"
+  | "pre_signature"
+  | "packaged_not_closed"
+  | "ctc_expired"
+  | "appraisal_ordered_stalled"
+  /** @deprecated Prefer book_checkin_6m / book_checkin_12m; kept for legacy DB rows. */
+  | "closing_8month_due"
+  | "epo_window_opening"
+  | "book_checkin_6m"
+  | "book_checkin_12m"
+  | "post_close_skip_payment_due"
+  | "first_payment_touch"
+  | "fha_seasoning_prep"
+  | "arm_book_checkin_due"
+  | "orange_pipeline_hot";
 
 export type SignalPriority = 1 | 2 | 3 | 4 | 5; // 5 = urgent, 1 = nice-to-have
 
@@ -88,6 +104,14 @@ export type SignalLoanRow = {
   last_contacted_at: string | null;
   funded_at: string | null;
   loan_age_months: number | null;
+  /** Tier + lifecycle (Phase lead-tier migration). */
+  lead_tier: string | null;
+  epo_date: string | null;
+  epo_window_activated: boolean | null;
+  reengagement_8month_completed_at: string | null;
+  appraisal_received_at: string | null;
+  first_payment_date: string | null;
+  note_date: string | null;
 };
 
 export type MarketRate = {
@@ -129,6 +153,20 @@ export const SIGNAL_CATEGORY_BY_TYPE: Record<SignalType, SignalCategory> = {
   va_irrrl: "refi",
   arm_reset_window: "refi",
   credit_score_improved: "life_event",
+  never_contacted: "lead_tier",
+  pre_signature: "lead_tier",
+  packaged_not_closed: "lead_tier",
+  ctc_expired: "lead_tier",
+  appraisal_ordered_stalled: "lead_tier",
+  closing_8month_due: "lead_tier",
+  epo_window_opening: "lead_tier",
+  book_checkin_6m: "lead_tier",
+  book_checkin_12m: "lead_tier",
+  post_close_skip_payment_due: "lead_tier",
+  first_payment_touch: "lead_tier",
+  fha_seasoning_prep: "lead_tier",
+  arm_book_checkin_due: "lead_tier",
+  orange_pipeline_hot: "lead_tier",
 };
 
 export const SIGNAL_LABEL: Record<SignalType, string> = {
@@ -143,4 +181,18 @@ export const SIGNAL_LABEL: Record<SignalType, string> = {
   va_irrrl: "VA IRRRL eligible",
   arm_reset_window: "ARM adjustment approaching",
   credit_score_improved: "Credit score improved",
+  never_contacted: "Never contacted",
+  pre_signature: "Pre-signature lead",
+  packaged_not_closed: "Packaged — not closed",
+  ctc_expired: "CTC aging / expired window",
+  appraisal_ordered_stalled: "Appraisal ordered — stalled",
+  closing_8month_due: "8-month closing check-in due",
+  epo_window_opening: "EPO window opening",
+  book_checkin_6m: "6-month book check-in",
+  book_checkin_12m: "12-month book check-in",
+  post_close_skip_payment_due: "Post-close skip payment / referral call",
+  first_payment_touch: "First payment date touchpoint",
+  fha_seasoning_prep: "FHA seasoning prep (~180d)",
+  arm_book_checkin_due: "ARM fixed-period check-in",
+  orange_pipeline_hot: "Active pipeline (closing window)",
 };

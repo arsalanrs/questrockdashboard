@@ -336,6 +336,8 @@ export type NormalizedLpLoanDetail = {
   loanType: string | null;
   loanPurpose: string | null;
   fundedAt: string | null;
+  firstPaymentDate: string | null;
+  noteDate: string | null;
 };
 
 function pickNumber(o: Record<string, unknown>, keys: string[]): number | null {
@@ -450,6 +452,14 @@ export function normalizeLendingPadLoanDetailRow(
   const loanPurpose =
     strField(o, "loanPurpose", "loan_purpose", "purpose") || null;
   const fundedAt = pickTimestamp(o, ["fundedDate", "fundDate", "fundedAt", "disbursementDate"]);
+  const firstPaymentDate = pickDate(o, [
+    "firstPaymentDate",
+    "first_payment_date",
+    "scheduledFirstPaymentDate",
+    "firstPaymentDueDate",
+    "paymentDueDate",
+  ]);
+  const noteDate = pickDate(o, ["noteDate", "note_date", "noteSignedDate", "signingDate"]);
 
   return {
     id,
@@ -468,6 +478,8 @@ export function normalizeLendingPadLoanDetailRow(
     loanType,
     loanPurpose,
     fundedAt,
+    firstPaymentDate,
+    noteDate,
   };
 }
 

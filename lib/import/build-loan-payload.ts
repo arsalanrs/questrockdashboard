@@ -4,6 +4,24 @@ import { normalizeLendingPadLoanUuid } from "@/lib/lendingpad/parse-response";
 
 const SLOW_TRACK_TYPES = new Set(["Construction", "Fix & Flip", "Rehab"]);
 
+/**
+ * Normalize LO name from Shape.
+ * Shape sometimes exports names as "Last, First" (CSV ordering).
+ * We flip those to "First Last" to avoid duplicate cards in dashboards.
+ * "Nikk, Smith" → "Nikk Smith", "Ray, Conway" → "Ray Conway".
+ */
+export function normalizeLoName(raw: string): string {
+  const s = raw.trim();
+  if (!s) return s;
+  // Only flip if exactly one comma and both sides are non-empty single words/names
+  const commaIdx = s.indexOf(",");
+  if (commaIdx === -1) return s;
+  const before = s.slice(0, commaIdx).trim();
+  const after = s.slice(commaIdx + 1).trim();
+  if (before && after) return `${after} ${before}`;
+  return s;
+}
+
 function deriveTrack(loanType: string | null): string | null {
   if (!loanType) return null;
   return SLOW_TRACK_TYPES.has(loanType) ? "slow" : "fast";
@@ -89,10 +107,16 @@ export function buildLoanPayloadFromRow(
   const statusRaw = String(r["Status"] ?? "").trim() || null;
   const currentStage = statusRaw ? (statusToStage.get(statusRaw) ?? null) : null;
 
-  const loName = String(r["Loan Officer User Name"] ?? "").trim() || null;
+  // Normalize "Last, First" → "First Last" — Shape sometimes exports names
+  // in CSV Last,First order which creates duplicates in the loans table.
+  const loNameRaw = String(r["Loan Officer User Name"] ?? "").trim();
+  const loName = normalizeLoName(loNameRaw) || null;
   const assignedLoUserId = loName ? nameToUserId.get(loName.toLowerCase()) ?? null : null;
 
-  const { loan_amount_raw, loan_amount_cents } = parseLoanAmountCents(r["Loan Amount"]);
+  // Prefer "Loan Amount"; fall back to "Purchase Price" for purchase-money loans
+  // where Shape stores the amount under borpurchasePrice instead of LoanAmount.
+  const loanAmountSource = r["Loan Amount"] ?? r["Purchase Price"];
+  const { loan_amount_raw, loan_amount_cents } = parseLoanAmountCents(loanAmountSource);
 
   const loanType = trimOrNull(r["Loan Type"]);
   const loanPurpose = trimOrNull(r["Loan Purpose"]);
@@ -114,7 +138,7 @@ export function buildLoanPayloadFromRow(
   const cltv_bps = pctToBps(r["CLTV"]);
   const dti_bps = pctToBps(r["DTI"]);
 
-  const credit_score_mid = parseInt0(r["Credit Score"]);
+  const credit_score_mid = parseInt0(r["Credit Score"] ?? r["borcreditscore"]);
   const is_veteran = parseBool(r["Is Veteran"]);
   const is_self_employed = parseBool(r["Is Self Employed"]);
   const arm_first_reset_date = parseMaybeDate(r["ARM First Reset Date"]);
@@ -227,6 +251,11 @@ export function buildLoanPayloadFromRow(
     last_contacted_at,
     insellerate_ref_id,
     funded_at,
+
+    // Notes — stored as-is (may be HTML); consumers strip tags as needed.
+    notes_sidebar: trimOrNull(r["Notes Sidebar"]),
+    notes_sidebar_ai_note: trimOrNull(r["Notes Sidebar AI Note"]),
+    recent_notes: trimOrNull(r["Recent Note"]),
   };
   return compactPayload(payload);
 }

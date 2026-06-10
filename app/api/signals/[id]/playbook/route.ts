@@ -48,12 +48,21 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   const { searchParams } = new URL(request.url);
+  const peek = searchParams.get("peek") === "1";
   const useLlm = searchParams.get("polish") === "1";
   const force = searchParams.get("force") === "1";
 
   const admin = createSupabaseAdminClient();
   const ctx = await loadSignalContext(admin, id);
   if (!ctx) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  /** Read-only: return stored playbook or null — never generate or write. */
+  if (peek) {
+    return NextResponse.json({
+      peek: true,
+      playbook: ctx.signal.playbook_json ?? null,
+    });
+  }
 
   if (!force && ctx.signal.playbook_json) {
     return NextResponse.json({ cached: true, playbook: ctx.signal.playbook_json });

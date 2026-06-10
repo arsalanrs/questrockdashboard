@@ -5,6 +5,7 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { canViewExecutiveDashboard } from "@/lib/permissions";
 import { computeSignalsForLoans } from "@/lib/signals/run";
 import { fetchSignalEngineInput, persistSignals } from "@/lib/signals/repository";
+import { persistLeadTiers } from "@/lib/signals/tier-classifier";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,10 +52,12 @@ export async function POST(request: Request) {
     }
 
     const summary = await persistSignals(admin, signals);
+    const leadTiers = await persistLeadTiers(admin);
     return NextResponse.json({
       ok: true,
       ...summary,
       loansScanned: input.loans.length,
+      leadTiers,
     });
   } catch (err) {
     console.error("signals/run error:", err);

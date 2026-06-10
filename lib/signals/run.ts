@@ -15,6 +15,7 @@ import type {
 } from "./types";
 import { buildDetectorContext, STALL_DETECTORS, type DetectorContext } from "./stall";
 import { buildRefiContext, REFI_DETECTORS, type RefiContext } from "./refi";
+import { LEAD_TIER_DETECTORS } from "./lead-tier-detectors";
 
 export type SignalDetector = (loan: SignalLoanRow, ctx: DetectorContext) => DealSignal | null;
 export type RefiDetector = (loan: SignalLoanRow, ctx: RefiContext) => DealSignal | null;
@@ -32,6 +33,10 @@ export function computeSignalsForLoans(input: SignalEngineInput): DealSignal[] {
     }
     for (const detector of REFI_DETECTORS) {
       const sig = detector(loan, refiCtx);
+      if (sig) out.push(sig);
+    }
+    for (const detector of LEAD_TIER_DETECTORS) {
+      const sig = detector(loan, stallCtx);
       if (sig) out.push(sig);
     }
   }

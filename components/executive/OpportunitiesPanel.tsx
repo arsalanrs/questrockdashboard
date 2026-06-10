@@ -1,12 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { SIGNAL_LABEL, type SignalCategory, type SignalType } from "@/lib/signals/types";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
+
+export type CachedPlaybook = {
+  headline: string;
+  callScript: string;
+  email: { subject: string; body: string };
+  nextSteps: string[];
+  source: "template" | "llm";
+  generatedAt: string;
+};
 
 export type PanelSignal = {
   id: string;
@@ -21,6 +30,9 @@ export type PanelSignal = {
   borrowerName: string | null;
   loanAmountCents: number | null;
   shapeRecordId: number | null;
+  computedAt: string | null;
+  /** Persisted `deal_signals.playbook_json` — shown after refresh without regenerating. */
+  cachedPlaybook: CachedPlaybook | null;
 };
 
 export type LoRollup = {
@@ -36,6 +48,18 @@ type Props = {
   loRollups: LoRollup[];
   lastRunAt: string | null;
 };
+
+/** Funded-book cadence & retention (distinct from general funnel hygiene in the same category). */
+const BOOK_CADENCE_SIGNAL_TYPES = new Set<SignalType>([
+  "book_checkin_6m",
+  "book_checkin_12m",
+  "post_close_skip_payment_due",
+  "first_payment_touch",
+  "fha_seasoning_prep",
+  "arm_book_checkin_due",
+  "closing_8month_due",
+  "epo_window_opening",
+]);
 
 const SHAPE_BASE =
   process.env.NEXT_PUBLIC_SHAPE_LEAD_BASE_URL?.trim() || "https://secure.setshape.com/prospects/";
@@ -113,14 +137,7 @@ function SignalRow({
 /*  Detail drawer                                                      */
 /* ------------------------------------------------------------------ */
 
-type Playbook = {
-  headline: string;
-  callScript: string;
-  email: { subject: string; body: string };
-  nextSteps: string[];
-  source: "template" | "llm";
-  generatedAt: string;
-};
+type Playbook = CachedPlaybook;
 
 function DetailDrawer({
   signal,
@@ -134,10 +151,32 @@ function DetailDrawer({
   const [error, setError] = useState<string | null>(null);
   const [polishing, setPolishing] = useState(false);
 
-  useMemo(() => {
-    setPlaybook(null);
+  useEffect(() => {
+    if (!signal) return;
+    let cancelled = false;
     setError(null);
-  }, [signal?.id]);
+
+    if (signal.cachedPlaybook) {
+      setPlaybook(signal.cachedPlaybook);
+      return;
+    }
+
+    setPlaybook(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/signals/${signal.id}/playbook?peek=1`, { method: "GET" });
+        const body = await res.json();
+        if (cancelled || !res.ok) return;
+        if (body.playbook) setPlaybook(body.playbook as Playbook);
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [signal?.id, signal?.cachedPlaybook]);
 
   if (!signal) return null;
   const shapeHref = signal.shapeRecordId ? `${SHAPE_BASE}${signal.shapeRecordId}/edit` : null;
@@ -200,52 +239,22 @@ function DetailDrawer({
           </button>
         </header>
         <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
-          <div>
-            <div className="text-xs font-medium text-mutedForeground">Borrower</div>
-            <div className="font-medium">{signal.borrowerName ?? "—"}</div>
-          </div>
-          <div>
-            <div className="text-xs font-medium text-mutedForeground">Assigned LO</div>
-            <div>{signal.loName ?? "Unassigned"}</div>
-          </div>
-          <div>
-            <div className="text-xs font-medium text-mutedForeground">Loan amount</div>
-            <div className="tabular-nums">{fmt$(signal.loanAmountCents)}</div>
-          </div>
-          <div>
-            <div className="text-xs font-medium text-mutedForeground">Reason</div>
-            <div>{signal.reason}</div>
-          </div>
-          {Object.keys(signal.meta ?? {}).length > 0 && (
-            <div>
-              <div className="text-xs font-medium text-mutedForeground">Meta</div>
-              <pre className="rounded bg-muted/40 p-2 text-[11px] leading-snug">
-                {JSON.stringify(signal.meta, null, 2)}
-              </pre>
-            </div>
-          )}
-          {shapeHref && (
-            <a
-              href={shapeHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
-            >
-              Open in Shape ↗
-            </a>
-          )}
-
           <div className="rounded-md border border-border p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-xs font-medium text-foreground">Playbook</div>
-              <div className="flex items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-medium text-foreground">
+                Playbook
+                {playbook && (
+                  <span className="ml-2 font-normal text-mutedForeground">· saved — refresh-safe</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 {!playbook && !loading && (
                   <button
                     type="button"
                     onClick={() => loadPlaybook()}
-                    className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+                    className="rounded-md border border-border bg-primary px-2 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90"
                   >
-                    Generate
+                    Generate &amp; save
                   </button>
                 )}
                 {playbook && (
@@ -253,23 +262,28 @@ function DetailDrawer({
                     <button
                       type="button"
                       onClick={() => loadPlaybook({ force: true })}
-                      className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+                      className="rounded-md border border-border px-2 py-1.5 text-[11px] hover:bg-muted"
                       disabled={loading}
                     >
-                      {loading ? "…" : "Regenerate"}
+                      {loading ? "…" : "Regenerate &amp; save"}
                     </button>
                     <button
                       type="button"
                       onClick={() => loadPlaybook({ polish: true, force: true })}
-                      className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+                      className="rounded-md border border-border px-2 py-1.5 text-[11px] hover:bg-muted"
                       disabled={polishing}
                     >
-                      {polishing ? "AI polish…" : "AI polish"}
+                      {polishing ? "AI polish…" : "AI polish &amp; save"}
                     </button>
                   </>
                 )}
               </div>
             </div>
+            {!playbook && !loading && (
+              <p className="mb-2 text-[11px] text-mutedForeground">
+                Creates a call script + email and stores it on this signal. After that, reload the page — you won&apos;t need to generate again unless you choose Regenerate.
+              </p>
+            )}
 
             {loading && !playbook && (
               <div className="text-xs text-mutedForeground">Generating playbook…</div>
@@ -336,6 +350,41 @@ function DetailDrawer({
               </div>
             )}
           </div>
+
+          <div>
+            <div className="text-xs font-medium text-mutedForeground">Borrower</div>
+            <div className="font-medium">{signal.borrowerName ?? "—"}</div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-mutedForeground">Assigned LO</div>
+            <div>{signal.loName ?? "Unassigned"}</div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-mutedForeground">Loan amount</div>
+            <div className="tabular-nums">{fmt$(signal.loanAmountCents)}</div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-mutedForeground">Reason</div>
+            <div>{signal.reason}</div>
+          </div>
+          {Object.keys(signal.meta ?? {}).length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-mutedForeground">Meta</div>
+              <pre className="rounded bg-muted/40 p-2 text-[11px] leading-snug">
+                {JSON.stringify(signal.meta, null, 2)}
+              </pre>
+            </div>
+          )}
+          {shapeHref && (
+            <a
+              href={shapeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+            >
+              Open in Shape ↗
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -359,12 +408,19 @@ export function OpportunitiesPanel({ signals, loRollups, lastRunAt }: Props) {
     const stall: PanelSignal[] = [];
     const refi: PanelSignal[] = [];
     const life: PanelSignal[] = [];
+    const leadTier: PanelSignal[] = [];
+    const bookCadence: PanelSignal[] = [];
+    const funnelLeadTier: PanelSignal[] = [];
     for (const s of filtered) {
       if (s.category === "stall") stall.push(s);
       else if (s.category === "refi") refi.push(s);
-      else life.push(s);
+      else if (s.category === "lead_tier") {
+        leadTier.push(s);
+        if (BOOK_CADENCE_SIGNAL_TYPES.has(s.signalType)) bookCadence.push(s);
+        else funnelLeadTier.push(s);
+      } else life.push(s);
     }
-    return { stall, refi, life };
+    return { stall, refi, life, leadTier, bookCadence, funnelLeadTier };
   }, [filtered]);
 
   const loNames = useMemo(() => loRollups.map((l) => l.loName), [loRollups]);
@@ -475,6 +531,61 @@ export function OpportunitiesPanel({ signals, loRollups, lastRunAt }: Props) {
           onSelect={setSelected}
           onFocusLo={(name) => setFilterLo(name)}
         />
+
+        {/* Lead tier & retention */}
+        <div className="rounded-lg border border-rose-500/30 bg-card p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold text-rose-500">
+              Lead tier &amp; retention
+            </span>
+          </div>
+          <h3 className="text-base font-semibold">Funnel, pipeline hygiene, book cadence</h3>
+          <div className="mt-3 space-y-4">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-mutedForeground">
+                Book cadence &amp; funded-book outreach
+              </div>
+              <ul className="mt-1 space-y-1 divide-y divide-border">
+                {byCategory.bookCadence.length === 0 && (
+                  <li className="px-2 py-2 text-xs text-mutedForeground">No book cadence signals right now.</li>
+                )}
+                {byCategory.bookCadence.slice(0, 6).map((s) => (
+                  <li key={s.id}>
+                    <SignalRow
+                      s={s}
+                      tone={s.priority >= 4 ? "red" : "orange"}
+                      onSelect={setSelected}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-mutedForeground">
+                Funnel &amp; pipeline hygiene
+              </div>
+              <ul className="mt-1 space-y-1 divide-y divide-border">
+                {byCategory.leadTier.length === 0 && (
+                  <li className="px-2 py-3 text-xs text-mutedForeground">
+                    No active lead-tier signals — run the nightly job or widen pipeline volume.
+                  </li>
+                )}
+                {byCategory.leadTier.length > 0 && byCategory.funnelLeadTier.length === 0 && (
+                  <li className="px-2 py-2 text-xs text-mutedForeground">No funnel-only signals (book cadence above).</li>
+                )}
+                {byCategory.funnelLeadTier.slice(0, 6).map((s) => (
+                  <li key={s.id}>
+                    <SignalRow
+                      s={s}
+                      tone={s.priority >= 4 ? "red" : "orange"}
+                      onSelect={setSelected}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
 
         {/* Life-event signals */}
         <div className="rounded-lg border border-violet-500/30 bg-card p-4">

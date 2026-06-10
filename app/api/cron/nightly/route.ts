@@ -5,9 +5,10 @@
  * Order matters:
  *   1. Shape incremental sync (updatedDateRange from watermark)
  *   2. LendingPad loans + conditions + documents (depends on Shape for shape_record_id links)
- *   3. Signal engine run (depends on fresh loans)
+ *   3. Signal engine run + lead tier classification (tiers refresh after signals persist)
  *   4. Outcome labeler (depends on signals)
- *   5. Morning digest (depends on signals + notifications)
+ *   5. Lead tier retention digest (8-month / EPO summary for execs)
+ *   6. Morning digest (depends on signals + notifications)
  *
  * Failures are caught per-step so later steps still run. Each step's result is
  * returned in the response JSON so you can inspect the cron log.
@@ -28,8 +29,10 @@ import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 import { computeSignalsForLoans } from "@/lib/signals/run";
 import { fetchSignalEngineInput, persistSignals } from "@/lib/signals/repository";
+import { persistLeadTiers } from "@/lib/signals/tier-classifier";
 import { runOutcomeLabeler } from "@/lib/signals/outcomes";
 import { deliverMorningDigest } from "@/lib/notifications/morning-digest";
+import { deliverLeadTierRetentionDigest } from "@/lib/notifications/lead-tier-retention";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,12 +97,18 @@ async function handle(request: Request) {
     const input = await fetchSignalEngineInput(admin);
     const signals = computeSignalsForLoans(input);
     const summary = await persistSignals(admin, signals);
-    return { ...summary, loansScanned: input.loans.length };
+    const leadTiers = await persistLeadTiers(admin);
+    return { ...summary, loansScanned: input.loans.length, leadTiers };
   });
 
   results.outcomes = await step("outcomes", async () => {
     const admin = createSupabaseAdminClient();
     return await runOutcomeLabeler(admin);
+  });
+
+  results.leadTierRetention = await step("leadTierRetention", async () => {
+    const admin = createSupabaseAdminClient();
+    return await deliverLeadTierRetentionDigest(admin);
   });
 
   results.digest = await step("digest", async () => {
