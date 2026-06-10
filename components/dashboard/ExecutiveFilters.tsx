@@ -18,6 +18,7 @@ const ClientPieChart = dynamic(
 
 export type ExecLoan = {
   id: string;
+  lead_tier: string | null;
   source: string | null;
   utm_campaign: string | null;
   property_state: string | null;

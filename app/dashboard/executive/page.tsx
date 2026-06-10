@@ -111,8 +111,8 @@ export default async function ExecutiveDashboardPage() {
 
   // ── Tier breakdown from the loans we already fetched ──────────────────────
   const tierStatsMap = new Map<string | null, { count: number; volumeCents: number }>();
-  for (const r of loans ?? []) {
-    const t = (r.lead_tier as string | null) ?? null;
+  for (const r of (loans as ExecLoan[] | null) ?? []) {
+    const t = r.lead_tier ?? null;
     const b = tierStatsMap.get(t) ?? { count: 0, volumeCents: 0 };
     b.count += 1;
     b.volumeCents += (r.loan_amount_cents as number | null) ?? 0;
