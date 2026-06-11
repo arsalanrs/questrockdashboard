@@ -100,6 +100,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {canViewExecutiveDashboard(appUser.role) ? <NavLink href="/dashboard/executive">Executive</NavLink> : null}
             {canAccessAdmin(appUser.role) ? <NavLink href="/dashboard/admin-view">Team View</NavLink> : null}
             {canAccessAdmin(appUser.role) ? <NavLink href="/admin/import">Admin</NavLink> : null}
+            <span className="hidden md:inline rounded-lg px-3 py-1.5 text-[13px] font-medium text-mutedForeground">
+              {appUser.full_name ?? appUser.email}
+            </span>
             <NotificationBell />
             <SignOutButton />
           </nav>
