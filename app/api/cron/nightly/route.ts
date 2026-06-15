@@ -33,6 +33,9 @@ import { persistLeadTiers } from "@/lib/signals/tier-classifier";
 import { runOutcomeLabeler } from "@/lib/signals/outcomes";
 import { deliverMorningDigest } from "@/lib/notifications/morning-digest";
 import { deliverLeadTierRetentionDigest } from "@/lib/notifications/lead-tier-retention";
+import { buildDailyReport, renderDailyReportMarkdown } from "@/lib/reports/daily";
+import { buildWeeklyReport, renderWeeklyReportMarkdown } from "@/lib/reports/weekly";
+import { buildMonthlyReport, renderMonthlyReportMarkdown } from "@/lib/reports/monthly";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,6 +118,71 @@ async function handle(request: Request) {
     const admin = createSupabaseAdminClient();
     return await deliverMorningDigest(admin);
   });
+
+  // ── Reports — deliver via executive_notifications ─────────────────────────
+  results.dailyReport = await step("dailyReport", async () => {
+    const admin = createSupabaseAdminClient();
+    const data = await buildDailyReport(admin);
+    const body = renderDailyReportMarkdown(data);
+    const { data: execs } = await admin.from("users").select("id").in("role", ["executive", "admin"]);
+    const rows = (execs ?? []).map((u) => ({
+      user_id: u.id as string,
+      kind: "report_daily",
+      title: `Daily Report — ${data.date}`,
+      body,
+      payload: { report_type: "daily", generated_at: new Date().toISOString() },
+    }));
+    if (rows.length > 0) {
+      const { error } = await admin.from("executive_notifications").insert(rows);
+      if (error) throw error;
+    }
+    return { delivered: rows.length, newLeads: data.newLeadsCount, slaRed: data.slaRedCount };
+  });
+
+  // Weekly report — Mondays only
+  const todayDow = new Date().getDay();
+  if (todayDow === 1) {
+    results.weeklyReport = await step("weeklyReport", async () => {
+      const admin = createSupabaseAdminClient();
+      const data = await buildWeeklyReport(admin);
+      const body = renderWeeklyReportMarkdown(data);
+      const { data: execs } = await admin.from("users").select("id").in("role", ["executive", "admin"]);
+      const rows = (execs ?? []).map((u) => ({
+        user_id: u.id as string,
+        kind: "report_weekly",
+        title: `Weekly Report — ${data.weekLabel}`,
+        body,
+        payload: { report_type: "weekly", generated_at: new Date().toISOString() },
+      }));
+      if (rows.length > 0) {
+        const { error } = await admin.from("executive_notifications").insert(rows);
+        if (error) throw error;
+      }
+      return { delivered: rows.length };
+    });
+  }
+
+  // Monthly report — 1st of the month only
+  if (new Date().getDate() === 1) {
+    results.monthlyReport = await step("monthlyReport", async () => {
+      const admin = createSupabaseAdminClient();
+      const data = await buildMonthlyReport(admin);
+      const body = renderMonthlyReportMarkdown(data);
+      const { data: execs } = await admin.from("users").select("id").in("role", ["executive", "admin"]);
+      const rows = (execs ?? []).map((u) => ({
+        user_id: u.id as string,
+        kind: "report_monthly",
+        title: `Monthly Report — ${data.monthLabel}`,
+        body,
+        payload: { report_type: "monthly", generated_at: new Date().toISOString() },
+      }));
+      if (rows.length > 0) {
+        const { error } = await admin.from("executive_notifications").insert(rows);
+        if (error) throw error;
+      }
+      return { delivered: rows.length, totalLeads: data.totalLeads, funded: data.fundedCount };
+    });
+  }
 
   const anyFailures = Object.values(results).some((r) => !r.ok);
   return NextResponse.json(

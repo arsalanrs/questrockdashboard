@@ -7,6 +7,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canAccessAdmin } from "@/lib/permissions";
+import { shapeLeadUrl } from "@/lib/shape-link";
+import { SLA_BREACH_LABELS } from "@/lib/sla/compute";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
 import { PrePipelineDashboard } from "@/components/dashboard/PrePipelineDashboard";
@@ -465,6 +467,225 @@ export default async function LoanOfficerDashboardPage({
     // leaderboard is best-effort
   }
 
+  /* ---------- SLA data from activity log ------------------------------------ */
+
+  type SlaViewRow = {
+    loan_id: string;
+    shape_record_id: number | null;
+    borrower_name: string | null;
+    borrower_phone?: string | null;
+    source?: string | null;
+    status_raw: string | null;
+    current_stage: string | null;
+    sla_color: "green" | "yellow" | "red";
+    sla_breach_type: string | null;
+    hours_since_last_activity: number | null;
+    lead_created_at: string | null;
+  };
+
+  let slaViewRows: SlaViewRow[] = [];
+  let newLeadsToday: SlaViewRow[] = [];
+
+  try {
+    const slaClient = effectiveViewAsId ? adminClient : await createSupabaseServerClient();
+    let slaQuery = slaClient
+      .from("v_lead_sla_status")
+      .select(
+        "loan_id,shape_record_id,borrower_name,status_raw,current_stage,sla_color,sla_breach_type,hours_since_last_activity,lead_created_at",
+      )
+      .in("sla_color", ["red", "yellow"])
+      .order("sla_color", { ascending: true })
+      .order("hours_since_last_activity", { ascending: false })
+      .limit(50);
+
+    if (effectiveViewAsId) {
+      slaQuery = (slaQuery as ReturnType<typeof adminClient.from>).eq(
+        "assigned_loan_officer_user_id",
+        effectiveViewAsId,
+      ) as typeof slaQuery;
+    }
+
+    const { data: slaData } = await slaQuery;
+    slaViewRows = (slaData ?? []) as SlaViewRow[];
+
+    // New leads created today (all colors)
+    const todayIso = today.toISOString().slice(0, 10);
+    let newLeadsQuery = slaClient
+      .from("v_lead_sla_status")
+      .select(
+        "loan_id,shape_record_id,borrower_name,source,status_raw,current_stage,sla_color,sla_breach_type,hours_since_last_activity,lead_created_at",
+      )
+      .gte("lead_created_at", `${todayIso}T00:00:00`)
+      .order("lead_created_at", { ascending: false })
+      .limit(20);
+
+    if (effectiveViewAsId) {
+      newLeadsQuery = (newLeadsQuery as ReturnType<typeof adminClient.from>).eq(
+        "assigned_loan_officer_user_id",
+        effectiveViewAsId,
+      ) as typeof newLeadsQuery;
+    }
+
+    const { data: newLeadsData } = await newLeadsQuery;
+    newLeadsToday = (newLeadsData ?? []) as SlaViewRow[];
+  } catch {
+    // SLA view not yet deployed — gracefully degrade
+  }
+
+  const slaRedCount = slaViewRows.filter((r) => r.sla_color === "red").length;
+  const slaYellowCount = slaViewRows.filter((r) => r.sla_color === "yellow").length;
+
+  /* ---------- What's Next — per-loan actionable guidance -------------------- */
+
+  type NextActionItem = {
+    loanId: string;
+    borrowerName: string;
+    statusRaw: string | null;
+    stage: string | null;
+    nextAction: string;
+    priority: number; // lower = more urgent
+    shapeRecordId: number | null;
+  };
+
+  function deriveNextAction(statusRaw: string | null, stage: string | null): { action: string; priority: number } | null {
+    const s = statusRaw?.trim() ?? "";
+    switch (s) {
+      case "New Lead":
+      case "Not Contacted":
+      case "Attempting Contact":
+        return { action: "Make initial contact — call + text + email", priority: 1 };
+      case "Contacted":
+        return { action: "Schedule verification appointment", priority: 2 };
+      case "Verification":
+        return { action: "Verify docs, pull credit report, price loan", priority: 2 };
+      case "App Started":
+        return { action: "Follow up — push borrower to complete application", priority: 2 };
+      case "App Completed":
+        return { action: "Review application, schedule pitch appointment", priority: 2 };
+      case "Pitch Appt":
+        return { action: "Confirm appointment is on calendar — prepare proposal", priority: 1 };
+      case "Pitched Advance":
+        return { action: "Send pre-pipe docs / intent letter", priority: 2 };
+      case "Pitched and Waiting":
+        return { action: "Follow up — confirm borrower decision", priority: 1 };
+      case "Pitched Not Advance":
+        return { action: "Nurture — re-engage in 30 days", priority: 4 };
+      case "Pre-Pipe":
+        return { action: "Send Package Out / intent letter to borrower", priority: 2 };
+      case "Package Out":
+        return { action: "Chase signed package + collect appraisal payment", priority: 1 };
+      case "Signed Not Piped":
+        return { action: "Collect appraisal payment — then pipe to processing", priority: 1 };
+      case "Piped":
+        return { action: "Submit to processing — ensure all docs uploaded", priority: 2 };
+      case "Registered":
+        return { action: "Confirm registration, await processing checklist", priority: 3 };
+      case "Processing":
+        return { action: "Monitor conditions — respond to processor requests", priority: 2 };
+      case "Submitted":
+        return { action: "Awaiting UW decision — watch for conditions", priority: 3 };
+      case "Underwriting":
+        return { action: "Respond to UW requests within 24h", priority: 2 };
+      case "Conditions Out":
+        return { action: "Collect and submit all outstanding conditions", priority: 1 };
+      case "Approval Conditions":
+        return { action: "Clear final approval conditions immediately", priority: 1 };
+      case "Clear to Close":
+        return { action: "Confirm closing date + wiring instructions with title", priority: 1 };
+      case "Closing":
+        return { action: "Confirm closing is on schedule — check for last-minute issues", priority: 1 };
+      default:
+        if (stage === "lead" || stage === "application") {
+          return { action: "Make contact — move to next stage", priority: 2 };
+        }
+        if (stage === "underwriting" || stage === "conditions") {
+          return { action: "Clear conditions — respond to UW", priority: 2 };
+        }
+        return null;
+    }
+  }
+
+  const whatsNextItems: NextActionItem[] = [];
+  for (const l of rows) {
+    if (!l.status_raw) continue;
+    const result = deriveNextAction(l.status_raw, l.current_stage);
+    if (!result) continue;
+    // Skip terminal statuses
+    if (["Funded", "Duplicate", "Bad Lead", "Do Not Contact", "Long Term Nurture", "Withdrawn", "Denied"].includes(l.status_raw)) continue;
+    whatsNextItems.push({
+      loanId: l.id,
+      borrowerName: [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "Unknown",
+      statusRaw: l.status_raw,
+      stage: l.current_stage,
+      nextAction: result.action,
+      priority: result.priority,
+      shapeRecordId: l.shape_record_id,
+    });
+  }
+  // Sort by priority then by lead_created_at desc (most recent first)
+  whatsNextItems.sort((a, b) => a.priority - b.priority);
+  // Group by priority bucket
+  const criticalNextItems = whatsNextItems.filter((i) => i.priority === 1).slice(0, 20);
+  const importantNextItems = whatsNextItems.filter((i) => i.priority === 2).slice(0, 15);
+
+  /* ---------- Six-Month Reminders ------------------------------------------- */
+
+  type ReminderLoan = {
+    id: string;
+    borrower_first_name: string | null;
+    borrower_last_name: string | null;
+    funded_at: string | null;
+    closed_at: string | null;
+    loan_amount_cents: number | null;
+    loan_type: string | null;
+    shape_record_id: number | null;
+  };
+
+  let sixMonthReminders: ReminderLoan[] = [];
+  try {
+    const reminderClient = effectiveViewAsId ? adminClient : await createSupabaseServerClient();
+    const fiveMonthsAgo = new Date();
+    fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 7);
+    const sevenMonthsAgo = new Date();
+    sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 5);
+
+    let reminderQuery = reminderClient
+      .from("loans")
+      .select("id,borrower_first_name,borrower_last_name,funded_at,closed_at,loan_amount_cents,loan_type,shape_record_id")
+      .or(`funded_at.gte.${fiveMonthsAgo.toISOString()},closed_at.gte.${fiveMonthsAgo.toISOString()}`)
+      .lt("funded_at", sevenMonthsAgo.toISOString())
+      .order("funded_at", { ascending: false })
+      .limit(20);
+
+    if (effectiveViewAsId) {
+      reminderQuery = (reminderQuery as ReturnType<typeof adminClient.from>).eq(
+        "assigned_loan_officer_user_id",
+        effectiveViewAsId,
+      ) as typeof reminderQuery;
+    }
+
+    const { data: reminderData } = await reminderQuery;
+    sixMonthReminders = (reminderData ?? []) as ReminderLoan[];
+  } catch {
+    // best-effort
+  }
+
+  /* ---------- Pipeline summary counts --------------------------------------- */
+
+  const PIPELINE_GROUPS: Array<{ label: string; statuses: Set<string> }> = [
+    { label: "Verification / App", statuses: new Set(["Verification", "App Started", "App Completed", "Contacted"]) },
+    { label: "Pitch Appt / Pitched", statuses: new Set(["Pitch Appt", "Pitched Advance", "Pitched and Waiting"]) },
+    { label: "Pre-Pipe / Package", statuses: new Set(["Pre-Pipe", "Package Out", "Signed Not Piped"]) },
+    { label: "Processing / UW", statuses: new Set(["Piped", "Registered", "Processing", "Submitted", "Underwriting"]) },
+    { label: "Conditions / CTC", statuses: new Set(["Conditions Out", "Approval Conditions", "Clear to Close"]) },
+    { label: "Closing", statuses: new Set(["Closing"]) },
+  ];
+
+  const pipelineCounts = PIPELINE_GROUPS.map((g) => ({
+    label: g.label,
+    count: rows.filter((l) => l.status_raw && g.statuses.has(l.status_raw)).length,
+  }));
+
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
@@ -498,6 +719,201 @@ export default async function LoanOfficerDashboardPage({
           </p>
         </div>
       </div>
+
+      {/* ================================================================ */}
+      {/*  SLA Status Bar (from 15-min sync)                              */}
+      {/* ================================================================ */}
+
+      {(slaRedCount > 0 || slaYellowCount > 0) ? (
+        <section
+          className="rounded-xl p-4"
+          style={{
+            background: slaRedCount > 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.07)",
+            border: `1px solid ${slaRedCount > 0 ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.2)"}`,
+          }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold">SLA Status</span>
+              {slaRedCount > 0 && (
+                <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                  style={{ background: "rgba(239,68,68,0.18)", color: "#f87171" }}>
+                  <span className="h-2 w-2 rounded-full bg-red-400 animate-pulse" />
+                  {slaRedCount} critical
+                </span>
+              )}
+              {slaYellowCount > 0 && (
+                <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                  style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}>
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  {slaYellowCount} at risk
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-mutedForeground">Synced every 15 min · See SLA table below</span>
+          </div>
+        </section>
+      ) : (
+        <section
+          className="rounded-xl p-3.5"
+          style={{
+            background: "rgba(34,197,94,0.06)",
+            border: "1px solid rgba(34,197,94,0.15)",
+          }}
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <span className="h-2 w-2 rounded-full bg-green-400" />
+            <span className="font-medium text-green-400">All loans on track</span>
+            <span className="text-xs text-mutedForeground">· No SLA violations detected</span>
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================ */}
+      {/*  New Leads Today                                                 */}
+      {/* ================================================================ */}
+
+      {newLeadsToday.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold tracking-tight">New Leads Today</div>
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+              style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
+              {newLeadsToday.length} new
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-xl"
+            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                  style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <th className="px-4 py-2.5">Borrower</th>
+                  <th className="px-4 py-2.5">Phone</th>
+                  <th className="px-4 py-2.5">Source</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Created</th>
+                  <th className="px-4 py-2.5">SLA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {newLeadsToday.map((lead) => {
+                  const shapeUrl = shapeLeadUrl(lead.shape_record_id);
+                  return (
+                  <tr key={lead.loan_id}
+                    style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                    className={cn(
+                      lead.sla_color === "red" && "bg-red-950/20",
+                      lead.sla_color === "yellow" && "bg-yellow-950/10",
+                    )}>
+                    <td className="px-4 py-3 font-medium">
+                      {shapeUrl ? (
+                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                          {lead.borrower_name || "—"}
+                        </a>
+                      ) : (lead.borrower_name || "—")}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-mutedForeground">—</td>
+                    <td className="px-4 py-3 text-xs text-mutedForeground">{lead.source || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-mutedForeground">{lead.status_raw || "—"}</td>
+                    <td className="px-4 py-3 text-xs font-mono text-mutedForeground">
+                      {lead.lead_created_at
+                        ? new Date(lead.lead_created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {lead.sla_color === "red" ? (
+                        <Badge variant="red">
+                          {lead.sla_breach_type ? SLA_BREACH_LABELS[lead.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? lead.sla_breach_type : "Critical"}
+                        </Badge>
+                      ) : lead.sla_color === "yellow" ? (
+                        <Badge variant="yellow">
+                          {lead.sla_breach_type ? SLA_BREACH_LABELS[lead.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? lead.sla_breach_type : "At risk"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="green">On track</Badge>
+                      )}
+                    </td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================ */}
+      {/*  SLA Violations Queue (from activity log)                        */}
+      {/* ================================================================ */}
+
+      {slaViewRows.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold tracking-tight">SLA Violations — Needs Attention</div>
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+              style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}>
+              {slaViewRows.length} loan{slaViewRows.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-xl"
+            style={{ border: "1px solid rgba(239,68,68,0.2)", background: "rgba(255,255,255,0.02)" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                  style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <th className="px-4 py-2.5">Borrower</th>
+                  <th className="px-4 py-2.5">Stage</th>
+                  <th className="px-4 py-2.5">Hours Without Activity</th>
+                  <th className="px-4 py-2.5">Violation</th>
+                  <th className="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {slaViewRows.map((row) => {
+                  const shapeUrl = shapeLeadUrl(row.shape_record_id);
+                  return (
+                  <tr key={row.loan_id}
+                    style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                    className={cn(
+                      row.sla_color === "red" && "bg-red-950/20",
+                      row.sla_color === "yellow" && "bg-yellow-950/10",
+                    )}>
+                    <td className="px-4 py-3 font-medium">{row.borrower_name || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-mutedForeground">
+                      {row.current_stage?.replace(/_/g, " ") ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {row.hours_since_last_activity != null ? `${row.hours_since_last_activity}h` : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.sla_color === "red" ? (
+                        <Badge variant="red">
+                          {row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "Critical"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="yellow">
+                          {row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "At risk"}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {shapeUrl && (
+                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium hover:opacity-80"
+                          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
+                          Shape ↗
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ================================================================ */}
       {/*  Goal Banner                                                     */}
@@ -697,6 +1113,230 @@ export default async function LoanOfficerDashboardPage({
           <StatCard label="Total Days to Close" value={totalDaysToClose?.toFixed(1) ?? "—"} />
         </div>
       </section>
+
+      {/* ================================================================ */}
+      {/*  Pipeline Summary Counts                                         */}
+      {/* ================================================================ */}
+
+      <section className="space-y-3">
+        <div className="text-sm font-semibold tracking-tight">Pipeline at a Glance</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {pipelineCounts.map((g) => (
+            <div
+              key={g.label}
+              className="rounded-xl p-3 text-center"
+              style={{
+                border: g.count > 0 ? "1px solid rgba(232,255,0,0.15)" : "1px solid rgba(255,255,255,0.06)",
+                background: g.count > 0 ? "rgba(232,255,0,0.04)" : "rgba(255,255,255,0.02)",
+              }}
+            >
+              <div
+                className="text-2xl font-bold tabular-nums"
+                style={{ color: g.count > 0 ? "#E8FF00" : "hsl(215 14% 42%)" }}
+              >
+                {g.count}
+              </div>
+              <div className="mt-1 text-[10px] leading-tight text-mutedForeground">{g.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/*  What's Next — Actionable guidance per loan                      */}
+      {/* ================================================================ */}
+
+      {(criticalNextItems.length > 0 || importantNextItems.length > 0) && (
+        <section className="space-y-4">
+          <div className="text-sm font-semibold tracking-tight">What&apos;s Next</div>
+
+          {criticalNextItems.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-red-400">
+                Needs action now ({criticalNextItems.length})
+              </p>
+              <div
+                className="overflow-hidden rounded-xl"
+                style={{ border: "1px solid rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.03)" }}
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr
+                      className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                      style={{ background: "rgba(255,255,255,0.03)" }}
+                    >
+                      <th className="px-4 py-2.5">Borrower</th>
+                      <th className="px-4 py-2.5">Current Status</th>
+                      <th className="px-4 py-2.5">Next Action</th>
+                      <th className="px-4 py-2.5 text-right">Shape #</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {criticalNextItems.map((item) => (
+                      <tr
+                        key={item.loanId}
+                        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                        className="transition-colors hover:bg-white/[0.02]"
+                      >
+                        <td className="px-4 py-3 font-medium">{item.borrowerName}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                            style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
+                          >
+                            {item.statusRaw}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-mutedForeground">{item.nextAction}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-mutedForeground">
+                          {item.shapeRecordId ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {importantNextItems.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-amber-400">
+                Up next ({importantNextItems.length})
+              </p>
+              <div
+                className="overflow-hidden rounded-xl"
+                style={{ border: "1px solid rgba(245,158,11,0.15)", background: "rgba(245,158,11,0.03)" }}
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr
+                      className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                      style={{ background: "rgba(255,255,255,0.03)" }}
+                    >
+                      <th className="px-4 py-2.5">Borrower</th>
+                      <th className="px-4 py-2.5">Current Status</th>
+                      <th className="px-4 py-2.5">Next Action</th>
+                      <th className="px-4 py-2.5 text-right">Shape #</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importantNextItems.map((item) => (
+                      <tr
+                        key={item.loanId}
+                        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                        className="transition-colors hover:bg-white/[0.02]"
+                      >
+                        <td className="px-4 py-3 font-medium">{item.borrowerName}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                            style={{ background: "rgba(245,158,11,0.1)", color: "#fbbf24" }}
+                          >
+                            {item.statusRaw}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-mutedForeground">{item.nextAction}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-mutedForeground">
+                          {item.shapeRecordId ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ================================================================ */}
+      {/*  Six-Month Repeat Client Reminders                               */}
+      {/* ================================================================ */}
+
+      {sixMonthReminders.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-4 rounded-full" style={{ background: "#a78bfa" }} />
+            <div className="text-sm font-semibold tracking-tight">Repeat Client Reminders</div>
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+              style={{ background: "rgba(139,92,246,0.12)", color: "#a78bfa" }}
+            >
+              6-month window
+            </span>
+          </div>
+          <p className="text-xs text-mutedForeground">
+            These clients funded 5–7 months ago. Now is the time to reconnect — check-in call, ask for referrals, discuss rate improvement opportunities.
+          </p>
+          <div
+            className="overflow-hidden rounded-xl"
+            style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }}
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                  style={{ background: "rgba(255,255,255,0.03)" }}
+                >
+                  <th className="px-4 py-2.5">Borrower</th>
+                  <th className="px-4 py-2.5">Loan Type</th>
+                  <th className="px-4 py-2.5 text-right">Loan Amount</th>
+                  <th className="px-4 py-2.5">Funded</th>
+                  <th className="px-4 py-2.5">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sixMonthReminders.map((l) => {
+                  const fundedDate = l.funded_at ?? l.closed_at;
+                  const monthsAgo = fundedDate
+                    ? Math.round(
+                        (now.getTime() - new Date(fundedDate).getTime()) / (1000 * 60 * 60 * 24 * 30),
+                      )
+                    : null;
+                  return (
+                    <tr
+                      key={l.id}
+                      style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                      className="transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-mutedForeground">
+                        {l.loan_type ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-xs">
+                        {l.loan_amount_cents ? formatCurrency(l.loan_amount_cents) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-mutedForeground">
+                        {fundedDate
+                          ? new Date(fundedDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "—"}
+                        {monthsAgo != null ? (
+                          <span className="ml-1.5 text-mutedForeground/60">({monthsAgo}mo ago)</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                          style={{ background: "rgba(139,92,246,0.15)", color: "#a78bfa" }}
+                        >
+                          Call to reconnect
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ================================================================ */}
       {/*  In Shape, Not in LendingPad                                     */}

@@ -20,3 +20,7 @@ export function canAccessAdmin(role: AppRole) {
   return role === "executive" || role === "admin";
 }
 
+export function canViewMonitor(role: AppRole) {
+  return role === "manager" || role === "executive" || role === "admin";
+}
+

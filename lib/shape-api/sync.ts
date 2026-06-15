@@ -3,6 +3,7 @@ import { shapeBulkExport } from "@/lib/shape-api/client";
 import { mapApiRecordToCsvLike } from "@/lib/shape-api/field-map";
 import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
+import { detectChanges, type ActivityEvent, type ExistingLoanRow } from "@/lib/shape-api/change-detector";
 import type { ShapeBulkExportResponse } from "@/lib/shape-api/types";
 
 // Shape API returns "Referral Partners" (with 's'); CSV exports use "Referral Partner" (no 's').
@@ -17,6 +18,34 @@ const MAX_PAGES = 1000;
 /** First incremental run when no watermark: pull this many days of updates. */
 const INCREMENTAL_BOOTSTRAP_DAYS = 30;
 
+/** Columns fetched from loans for change detection. */
+const EXISTING_LOAN_SELECT = [
+  "id",
+  "shape_record_id",
+  "status_raw",
+  "assigned_loan_officer_name",
+  "notes_sidebar",
+  "notes_sidebar_ai_note",
+  "recent_notes",
+  "borrower_first_name",
+  "borrower_last_name",
+  "loan_amount_cents",
+  "current_stage",
+  "source",
+  "loan_type",
+  "loan_purpose",
+  "credit_score_mid",
+  "lendingpad_loan_uuid",
+  "appraisal_payment_collected_at",
+  "esign_returned_at",
+  "application_completed_at",
+  "submitted_to_processing_at",
+  "submitted_to_uw_at",
+  "ctc_at",
+  "funded_at",
+  "closing_scheduled_at",
+].join(",");
+
 export type ShapeSyncMode = "incremental" | "full";
 
 export type ShapeSyncOptions = {
@@ -30,6 +59,7 @@ export type ShapeSyncResult = {
   recordsProcessed: number;
   recordsSkipped: number;
   loansUpserted: number;
+  activityEventsWritten: number;
   importBatchId: string;
   fields_not_found?: string[];
   unmappedStatuses?: string[];
@@ -145,6 +175,8 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
   let recordsSkipped = 0;
   const allRawPayload: Array<{ import_batch_id: string; record_id: number; row: unknown }> = [];
   const allLoansPayload: Record<string, unknown>[] = [];
+  // Map from shape_record_id → built loan payload (for post-upsert change detection)
+  const incomingByRecordId = new Map<number, Record<string, unknown>>();
   let fieldsNotFound: string[] | undefined;
   const unmappedStatuses = new Set<string>();
   const seenPageFingerprints = new Set<string>();
@@ -190,7 +222,10 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
       }
 
       const loan = buildLoanPayloadFromRow(row, statusToStage, nameToUserId, importBatchId);
-      if (loan) allLoansPayload.push(loan);
+      if (loan) {
+        allLoansPayload.push(loan);
+        incomingByRecordId.set(recordId, loan);
+      }
     }
 
     // Safety guard: some Shape accounts keep returning 50 rows even after the
@@ -211,20 +246,144 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     stoppedEarlyReason = `Reached MAX_PAGES (${MAX_PAGES}); stopping to avoid infinite loop.`;
   }
 
-  // Persist raw
+  // ── Persist raw ───────────────────────────────────────────────────────────
   for (let i = 0; i < allRawPayload.length; i += 500) {
     const chunk = allRawPayload.slice(i, i + 500);
     const { error } = await admin.from("raw_shape_kpi_leads").insert(chunk);
     if (error) throw error;
   }
 
-  // Persist loans
+  // ── Fetch existing rows for change detection ──────────────────────────────
+  const recordIds = allLoansPayload
+    .map((l) => l.shape_record_id as number)
+    .filter((id) => Number.isFinite(id));
+
+  const existingByRecordId = new Map<number, ExistingLoanRow>();
+  if (recordIds.length > 0) {
+    // Query in batches of 500 to avoid URL length limits
+    for (let i = 0; i < recordIds.length; i += 500) {
+      const chunk = recordIds.slice(i, i + 500);
+      const { data: existingRows, error: existingError } = await admin
+        .from("loans")
+        .select(EXISTING_LOAN_SELECT)
+        .in("shape_record_id", chunk);
+      if (existingError) {
+        console.error("[sync] Failed to fetch existing rows for change detection:", existingError);
+      } else {
+        (existingRows ?? []).forEach((r) => {
+          existingByRecordId.set(r.shape_record_id as number, r as ExistingLoanRow);
+        });
+      }
+    }
+  }
+
+  // ── Persist loans ─────────────────────────────────────────────────────────
   for (let i = 0; i < allLoansPayload.length; i += 500) {
     const chunk = allLoansPayload.slice(i, i + 500);
     const { error } = await admin.from("loans").upsert(chunk, { onConflict: "shape_record_id" });
     if (error) throw error;
   }
 
+  // ── Fetch upserted loan IDs (we need the DB uuid for activity log FKs) ────
+  const loanIdByRecordId = new Map<number, string>();
+  if (recordIds.length > 0) {
+    for (let i = 0; i < recordIds.length; i += 500) {
+      const chunk = recordIds.slice(i, i + 500);
+      const { data: idRows } = await admin
+        .from("loans")
+        .select("id,shape_record_id")
+        .in("shape_record_id", chunk);
+      (idRows ?? []).forEach((r) => {
+        loanIdByRecordId.set(r.shape_record_id as number, r.id as string);
+      });
+    }
+  }
+
+  // ── Build activity events + stage events ─────────────────────────────────
+  const syncedAt = new Date().toISOString();
+  const allActivityEvents: ActivityEvent[] = [];
+  const stageEventRows: Array<{ loan_id: string; stage: string; entered_at: string }> = [];
+  // For touch log: map loan_id → latest event data
+  const touchByLoanId = new Map<string, { lo_name: string | null; change_type: string }>();
+
+  for (const [recordId, incoming] of incomingByRecordId) {
+    const loanId = loanIdByRecordId.get(recordId);
+    if (!loanId) continue;
+
+    const existing = existingByRecordId.get(recordId) ?? null;
+    const events = detectChanges(existing, incoming, loanId);
+
+    for (const ev of events) {
+      allActivityEvents.push({ ...ev, synced_at: syncedAt });
+    }
+
+    if (events.length > 0) {
+      const loName = events[0].lo_name ?? null;
+      touchByLoanId.set(loanId, { lo_name: loName, change_type: events[0].change_type });
+    }
+
+    // Append loan_stage_events when status/stage changed
+    const statusEvent = events.find((e) => e.change_type === "status_changed");
+    if (statusEvent && statusEvent.new_value) {
+      const newStage = incoming.current_stage as string | null;
+      if (newStage && newStage !== existing?.current_stage) {
+        stageEventRows.push({ loan_id: loanId, stage: newStage, entered_at: syncedAt });
+      }
+    }
+  }
+
+  // ── Persist activity events ───────────────────────────────────────────────
+  let activityEventsWritten = 0;
+  if (allActivityEvents.length > 0) {
+    for (let i = 0; i < allActivityEvents.length; i += 500) {
+      const chunk = allActivityEvents.slice(i, i + 500);
+      const { error } = await admin.from("shape_activity_log").insert(chunk);
+      if (error) {
+        console.error("[sync] Failed to insert activity events:", error);
+      } else {
+        activityEventsWritten += chunk.length;
+      }
+    }
+  }
+
+  // ── Persist stage events ──────────────────────────────────────────────────
+  if (stageEventRows.length > 0) {
+    for (let i = 0; i < stageEventRows.length; i += 500) {
+      const chunk = stageEventRows.slice(i, i + 500);
+      const { error } = await admin.from("loan_stage_events").insert(chunk);
+      if (error) {
+        console.error("[sync] Failed to insert stage events:", error);
+      }
+    }
+  }
+
+  // ── Upsert lead_touch_log ─────────────────────────────────────────────────
+  const today8601 = today;
+  if (touchByLoanId.size > 0) {
+    const touchRows = Array.from(touchByLoanId.entries()).map(([loanId, info]) => ({
+      loan_id: loanId,
+      touch_date: today8601,
+      touch_count: 1,
+      last_touch_type: info.change_type,
+      last_touch_at: syncedAt,
+      lo_name: info.lo_name,
+    }));
+
+    for (let i = 0; i < touchRows.length; i += 500) {
+      const chunk = touchRows.slice(i, i + 500);
+      const { error } = await admin
+        .from("lead_touch_log")
+        .upsert(chunk, {
+          onConflict: "loan_id,touch_date",
+          ignoreDuplicates: false,
+        });
+      if (error) {
+        console.error("[sync] Failed to upsert touch log:", error);
+      }
+    }
+  }
+
+  // ── Update watermark ──────────────────────────────────────────────────────
   const watermarkIso = new Date().toISOString();
   const { error: wmUpsertError } = await admin.from("shape_sync_watermark").upsert(
     { id: 1, last_updated_sync_to: today, updated_at: watermarkIso },
@@ -237,6 +396,7 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     recordsProcessed,
     recordsSkipped,
     loansUpserted: allLoansPayload.length,
+    activityEventsWritten,
     importBatchId,
     fields_not_found: fieldsNotFound,
     unmappedStatuses: unmappedStatuses.size ? Array.from(unmappedStatuses).sort() : undefined,

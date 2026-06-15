@@ -8,6 +8,8 @@
 --                       Jason Friday (Director of Growth)
 --   Loan Officers     : Tyler Johnson  (Team T-Rex)
 --                       Stephen Curry  (Team T-Rex)
+--                       Gregory Bethea Jr (Team T-Rex)
+--                       Zachary Davis  (Team T-Rex)
 --
 -- No longer with QuestRock (deactivated): Chamell Scardina, Matt Icard,
 --                                          Jessica Sherard

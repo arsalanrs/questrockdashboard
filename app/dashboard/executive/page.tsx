@@ -51,6 +51,286 @@ async function MlReadinessSection() {
   }
 }
 
+// ─── Live Activity Feed ───────────────────────────────────────────────────────
+
+type ActivityLogRow = {
+  id: string;
+  synced_at: string;
+  change_type: string;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  lo_name: string | null;
+  borrower_name: string | null;
+};
+
+const CHANGE_TYPE_LABELS: Record<string, string> = {
+  loan_created: "New Lead",
+  status_changed: "Status",
+  owner_changed: "Reassigned",
+  note_added: "Note",
+  field_changed: "Field",
+};
+
+function ActivityBadge({ type }: { type: string }) {
+  const label = CHANGE_TYPE_LABELS[type] ?? type;
+  const style =
+    type === "loan_created"
+      ? { background: "rgba(34,197,94,0.15)", color: "#4ade80" }
+      : type === "status_changed"
+      ? { background: "rgba(232,255,0,0.1)", color: "#E8FF00" }
+      : type === "owner_changed"
+      ? { background: "rgba(139,92,246,0.15)", color: "#a78bfa" }
+      : type === "note_added"
+      ? { background: "rgba(59,130,246,0.15)", color: "#60a5fa" }
+      : { background: "rgba(255,255,255,0.07)", color: "hsl(215 14% 52%)" };
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={style}>
+      {label}
+    </span>
+  );
+}
+
+async function LiveActivityFeedSection() {
+  const admin = createSupabaseAdminClient();
+  try {
+    const { data } = await admin
+      .from("shape_activity_log")
+      .select("id,synced_at,change_type,field_name,old_value,new_value,lo_name,borrower_name")
+      .order("synced_at", { ascending: false })
+      .limit(50);
+
+    const rows = (data ?? []) as ActivityLogRow[];
+    if (rows.length === 0) return null;
+
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+          <span className="text-sm font-semibold tracking-tight">Live Activity Feed</span>
+          <span className="text-xs text-mutedForeground">— last 50 changes from Shape sync</span>
+        </div>
+        <div
+          className="overflow-hidden rounded-xl"
+          style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}
+        >
+          <table className="w-full text-sm">
+            <thead>
+              <tr
+                className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                style={{ background: "rgba(255,255,255,0.04)" }}
+              >
+                <th className="px-4 py-2.5">Time</th>
+                <th className="px-4 py-2.5">Type</th>
+                <th className="px-4 py-2.5">Borrower</th>
+                <th className="px-4 py-2.5">LO</th>
+                <th className="px-4 py-2.5">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.id}
+                  style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                  className="transition-colors hover:bg-white/[0.02]"
+                >
+                  <td className="px-4 py-2.5 font-mono text-xs text-mutedForeground">
+                    {new Date(row.synced_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <ActivityBadge type={row.change_type} />
+                  </td>
+                  <td className="px-4 py-2.5 text-xs font-medium">{row.borrower_name || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-mutedForeground">{row.lo_name || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-mutedForeground max-w-xs truncate">
+                    {row.change_type === "status_changed"
+                      ? `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`
+                      : row.change_type === "owner_changed"
+                      ? `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`
+                      : row.change_type === "note_added"
+                      ? (row.new_value ?? "").slice(0, 80)
+                      : row.field_name
+                      ? `${row.field_name}: ${row.new_value ?? "—"}`
+                      : row.new_value ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  } catch {
+    return null;
+  }
+}
+
+// ─── Manager Scorecards ───────────────────────────────────────────────────────
+
+type ManagerScorecardData = {
+  managerId: string;
+  managerName: string;
+  teamName: string;
+  totalActive: number;
+  slaRed: number;
+  slaGreen: number;
+  slaGreenPct: number;
+  closedMtd: number;
+  mtdVolumeCents: number;
+};
+
+async function ManagerScorecardsSection() {
+  const admin = createSupabaseAdminClient();
+  try {
+    const [{ data: teams }, { data: slaRows }, { data: mStart }] = await Promise.all([
+      admin
+        .from("teams")
+        .select("id,name,manager_user_id,users!team_members(id)")
+        .limit(20),
+      admin
+        .from("v_lead_sla_status")
+        .select("loan_id,assigned_loan_officer_user_id,sla_color"),
+      Promise.resolve(null),
+    ]);
+
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+
+    const { data: managers } = await admin
+      .from("users")
+      .select("id,full_name")
+      .eq("role", "manager");
+
+    if (!managers?.length) return null;
+
+    const slaByLo = new Map<string, { red: number; total: number }>();
+    for (const r of slaRows ?? []) {
+      const loId = r.assigned_loan_officer_user_id as string | null;
+      if (!loId) continue;
+      const s = slaByLo.get(loId) ?? { red: 0, total: 0 };
+      s.total += 1;
+      if (r.sla_color === "red") s.red += 1;
+      slaByLo.set(loId, s);
+    }
+
+    const { data: mtdLoans } = await admin
+      .from("loans")
+      .select("assigned_loan_officer_user_id,loan_amount_cents,closed_at,funded_at")
+      .or(`closed_at.gte.${monthStart},funded_at.gte.${monthStart}`);
+
+    const scorecards: ManagerScorecardData[] = [];
+
+    for (const mgr of managers) {
+      const team = (teams ?? []).find((t) => t.manager_user_id === mgr.id);
+      if (!team) continue;
+
+      const teamMemberIds = new Set(
+        ((team.users as Array<{ id: string }>) ?? []).map((u) => u.id),
+      );
+
+      let slaRed = 0;
+      let totalSla = 0;
+      for (const [loId, stats] of slaByLo) {
+        if (teamMemberIds.has(loId)) {
+          slaRed += stats.red;
+          totalSla += stats.total;
+        }
+      }
+
+      let closedMtd = 0;
+      let mtdVolumeCents = 0;
+      for (const loan of mtdLoans ?? []) {
+        const loId = loan.assigned_loan_officer_user_id as string | null;
+        if (loId && teamMemberIds.has(loId)) {
+          closedMtd += 1;
+          mtdVolumeCents += (loan.loan_amount_cents as number | null) ?? 0;
+        }
+      }
+
+      scorecards.push({
+        managerId: mgr.id as string,
+        managerName: (mgr.full_name as string | null) ?? "Manager",
+        teamName: (team.name as string) ?? "Team",
+        totalActive: totalSla,
+        slaRed,
+        slaGreen: totalSla - slaRed,
+        slaGreenPct: totalSla > 0 ? Math.round(((totalSla - slaRed) / totalSla) * 100) : 100,
+        closedMtd,
+        mtdVolumeCents,
+      });
+    }
+
+    if (scorecards.length === 0) return null;
+
+    function formatCurrencyK(cents: number) {
+      const dollars = cents / 100;
+      if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(1)}M`;
+      if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(0)}K`;
+      return `$${dollars.toFixed(0)}`;
+    }
+
+    return (
+      <section className="space-y-3">
+        <div className="text-sm font-semibold tracking-tight">Manager Scorecards</div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {scorecards.map((sc) => (
+            <div
+              key={sc.managerId}
+              className="rounded-xl p-5 space-y-4"
+              style={{
+                border: sc.slaRed > 0 ? "1px solid rgba(239,68,68,0.25)" : "1px solid rgba(255,255,255,0.07)",
+                background: "rgba(255,255,255,0.03)",
+              }}
+            >
+              <div>
+                <div className="text-sm font-semibold">{sc.managerName}</div>
+                <div className="text-xs text-mutedForeground">{sc.teamName}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaRed > 0 ? "#f87171" : "inherit" }}>
+                    {sc.slaRed}
+                  </div>
+                  <div className="text-[10px] text-mutedForeground mt-0.5">SLA Critical</div>
+                </div>
+                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaGreenPct >= 80 ? "#4ade80" : "#fbbf24" }}>
+                    {sc.slaGreenPct}%
+                  </div>
+                  <div className="text-[10px] text-mutedForeground mt-0.5">SLA Compliant</div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-mutedForeground">MTD Closed</span>
+                <span className="font-medium">
+                  {sc.closedMtd} loans · {formatCurrencyK(sc.mtdVolumeCents)}
+                </span>
+              </div>
+
+              {/* SLA compliance bar */}
+              <div className="space-y-1">
+                <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${sc.slaGreenPct}%`,
+                      background: sc.slaGreenPct >= 80 ? "#4ade80" : sc.slaGreenPct >= 60 ? "#fbbf24" : "#f87171",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  } catch {
+    return null;
+  }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function ExecutiveDashboardPage() {
@@ -195,6 +475,16 @@ export default async function ExecutiveDashboardPage() {
 
       <Suspense fallback={null}>
         <MlReadinessSection />
+      </Suspense>
+
+      {/* Manager Scorecards — per-manager SLA compliance + MTD performance */}
+      <Suspense fallback={null}>
+        <ManagerScorecardsSection />
+      </Suspense>
+
+      {/* Live Activity Feed — most recent Shape sync changes */}
+      <Suspense fallback={null}>
+        <LiveActivityFeedSection />
       </Suspense>
 
       <ExecChat />

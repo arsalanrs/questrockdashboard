@@ -14,6 +14,8 @@
 --   tchisholm@questrock.com
 --   tjohnson@questrock.com
 --   scurry@questrock.com
+--   gbethea@questrock.com
+--   zdavis@questrock.com
 -- =============================================================================
 
 -- 1. Set full names (use real full names so existing ILIKE migrations still match)
@@ -26,6 +28,8 @@ UPDATE public.users SET full_name = 'Jason Friday'      WHERE email = 'jfriday@q
 UPDATE public.users SET full_name = 'Tashawna Chisholm' WHERE email = 'tchisholm@questrock.com';
 UPDATE public.users SET full_name = 'Tyler Johnson'     WHERE email = 'tjohnson@questrock.com';
 UPDATE public.users SET full_name = 'Stephen Curry'     WHERE email = 'scurry@questrock.com';
+UPDATE public.users SET full_name = 'Gregory Bethea Jr' WHERE email = 'gbethea@questrock.com';
+UPDATE public.users SET full_name = 'Zachary Davis'     WHERE email = 'zdavis@questrock.com';
 
 -- 2. Assign roles
 -- 'executive' is the top-level role in the schema (Ray, Bill, Nikk, Arsalan)
@@ -47,7 +51,9 @@ UPDATE public.users SET role = 'manager'
 UPDATE public.users SET role = 'loan_officer'
   WHERE email IN (
     'tjohnson@questrock.com',
-    'scurry@questrock.com'
+    'scurry@questrock.com',
+    'gbethea@questrock.com',
+    'zdavis@questrock.com'
   );
 
 -- 3. Mark all active
@@ -55,7 +61,8 @@ UPDATE public.users SET is_active = true
   WHERE email IN (
     'arashid@questrock.com','bmedley@questrock.com','nikksmith@questrock.com',
     'rayconway@questrock.com','bastianjohnston@questrock.com','jfriday@questrock.com',
-    'tchisholm@questrock.com','tjohnson@questrock.com','scurry@questrock.com'
+    'tchisholm@questrock.com','tjohnson@questrock.com','scurry@questrock.com',
+    'gbethea@questrock.com','zdavis@questrock.com'
   );
 
 -- 4. Create teams
@@ -71,7 +78,7 @@ UPDATE public.teams
   SET manager_user_id = (SELECT id FROM public.users WHERE email = 'tchisholm@questrock.com')
   WHERE name = 'Team Pumps and Profit';
 
--- 6. Team T-Rex members: Bastian + Tyler Johnson + Stephen Curry
+-- 6. Team T-Rex members: Bastian + Tyler + Stephen + Gregory + Zachary
 INSERT INTO public.team_members (team_id, user_id)
   SELECT t.id, u.id
   FROM public.teams t
@@ -80,7 +87,9 @@ INSERT INTO public.team_members (team_id, user_id)
     AND u.email IN (
       'bastianjohnston@questrock.com',
       'tjohnson@questrock.com',
-      'scurry@questrock.com'
+      'scurry@questrock.com',
+      'gbethea@questrock.com',
+      'zdavis@questrock.com'
     )
   ON CONFLICT (team_id, user_id) DO NOTHING;
 
@@ -99,7 +108,9 @@ UPDATE public.users
   WHERE email IN (
     'bastianjohnston@questrock.com',
     'tjohnson@questrock.com',
-    'scurry@questrock.com'
+    'scurry@questrock.com',
+    'gbethea@questrock.com',
+    'zdavis@questrock.com'
   );
 
 UPDATE public.users

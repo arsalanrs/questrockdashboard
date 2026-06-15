@@ -8,6 +8,7 @@ import {
   canViewCloserDashboard,
   canViewExecutiveDashboard,
   canViewManagerDashboard,
+  canViewMonitor,
   canViewProcessorDashboard,
 } from "@/lib/permissions";
 
@@ -95,6 +96,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <nav className="flex items-center gap-0.5">
             <NavLink href="/dashboard/lo">Loan Officer</NavLink>
             {canViewManagerDashboard(appUser.role) ? <NavLink href="/dashboard/manager">Manager</NavLink> : null}
+            {canViewMonitor(appUser.role) ? <NavLink href="/dashboard/monitor">Monitor</NavLink> : null}
             {canViewProcessorDashboard(appUser.role) ? <NavLink href="/dashboard/processor">Processor</NavLink> : null}
             {canViewCloserDashboard(appUser.role) ? <NavLink href="/dashboard/closer">Closer</NavLink> : null}
             {canViewExecutiveDashboard(appUser.role) ? <NavLink href="/dashboard/executive">Executive</NavLink> : null}
