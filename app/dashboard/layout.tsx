@@ -112,7 +112,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </header>
 
       {/* ── Page content ─────────────────────────────────────────────── */}
-      <main className="relative z-10 mx-auto max-w-7xl px-6 py-6">{children}</main>
+      <main className="relative z-10 mx-auto max-w-[1360px] px-6 py-6">{children}</main>
     </div>
   );
 }

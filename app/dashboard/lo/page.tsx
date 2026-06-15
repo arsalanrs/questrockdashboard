@@ -10,6 +10,7 @@ import { canAccessAdmin } from "@/lib/permissions";
 import { shapeLeadUrl } from "@/lib/shape-link";
 import { SLA_BREACH_LABELS } from "@/lib/sla/compute";
 import { StatCard } from "@/components/StatCard";
+import { KpiCard } from "@/components/KpiCard";
 import { Badge } from "@/components/Badge";
 import { PrePipelineDashboard } from "@/components/dashboard/PrePipelineDashboard";
 import { PitchQueue } from "@/components/dashboard/PitchQueue";
@@ -685,9 +686,9 @@ export default async function LoanOfficerDashboardPage({
   /* ---------------------------------------------------------------- */
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col gap-5 animate-fade-up">
       {dataError ? (
-        <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm dark:bg-amber-950/30">
+        <div className="rounded-lg border border-amber-500/50 bg-amber-950/30 p-4 text-sm">
           <p className="font-medium">Database setup required</p>
           <p className="mt-1 text-mutedForeground">
             Run the SQL in <code className="rounded bg-muted px-1">supabase/migrations/</code> in your Supabase project. Then refresh.
@@ -696,72 +697,83 @@ export default async function LoanOfficerDashboardPage({
         </div>
       ) : null}
 
-      {isAdmin && <ViewAsSelector users={loUsersForSelector} currentViewAs={effectiveViewAsId} />}
-
-      <div className="flex items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-xl font-bold tracking-tight">Loan Officer Dashboard</h1>
-          <p className="text-sm text-mutedForeground">
+      {/* ── Page header ─────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          {isAdmin && <ViewAsSelector users={loUsersForSelector} currentViewAs={effectiveViewAsId} />}
+          <h1 className="text-xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
+            Loan Officer Dashboard
+          </h1>
+          <p className="mt-0.5 text-[13px] text-mutedForeground">
             {viewAsUser ? (
               <>
-                <span className="text-xs uppercase tracking-wide text-mutedForeground/60 mr-1">Viewing as</span>
-                {viewAsUser.full_name} &middot; {viewAsUser.role.replace("_", " ")}
+                <span className="mr-1 text-[11px] uppercase tracking-wide opacity-60">Viewing as</span>
+                {viewAsUser.full_name}
               </>
             ) : (
-              <>{appUser.full_name} &middot; {appUser.role.replace("_", " ")}</>
+              appUser.full_name
             )}
           </p>
         </div>
+        <div className="flex items-center gap-2 pt-0.5">
+          {slaRedCount > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+              style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+              {slaRedCount} critical
+            </span>
+          )}
+          {slaYellowCount > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+              style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+              {slaYellowCount} at risk
+            </span>
+          )}
+          {slaRedCount === 0 && slaYellowCount === 0 && (
+            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+              style={{ background: "rgba(34,197,94,0.10)", color: "#22C55E" }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+              All on track
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ================================================================ */}
-      {/*  SLA Status Bar (from 15-min sync)                              */}
-      {/* ================================================================ */}
-
-      {(slaRedCount > 0 || slaYellowCount > 0) ? (
-        <section
-          className="rounded-xl p-4"
-          style={{
-            background: slaRedCount > 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.07)",
-            border: `1px solid ${slaRedCount > 0 ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.2)"}`,
-          }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold">SLA Status</span>
-              {slaRedCount > 0 && (
-                <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
-                  style={{ background: "rgba(239,68,68,0.18)", color: "#f87171" }}>
-                  <span className="h-2 w-2 rounded-full bg-red-400 animate-pulse" />
-                  {slaRedCount} critical
-                </span>
-              )}
-              {slaYellowCount > 0 && (
-                <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
-                  style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}>
-                  <span className="h-2 w-2 rounded-full bg-amber-400" />
-                  {slaYellowCount} at risk
-                </span>
-              )}
-            </div>
-            <span className="text-xs text-mutedForeground">Synced every 15 min · See SLA table below</span>
-          </div>
-        </section>
-      ) : (
-        <section
-          className="rounded-xl p-3.5"
-          style={{
-            background: "rgba(34,197,94,0.06)",
-            border: "1px solid rgba(34,197,94,0.15)",
-          }}
-        >
-          <div className="flex items-center gap-2 text-sm">
-            <span className="h-2 w-2 rounded-full bg-green-400" />
-            <span className="font-medium text-green-400">All loans on track</span>
-            <span className="text-xs text-mutedForeground">· No SLA violations detected</span>
-          </div>
-        </section>
-      )}
+      {/* ── KPI strip ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 anim-d1">
+        <KpiCard
+          label="Active Pipeline"
+          value={commandCenterLoans.length}
+          sub={`${lpSyncedRows.length} in LendingPad`}
+          color="yellow"
+        />
+        <KpiCard
+          label="Funded MTD"
+          value={mtdLoansClosed}
+          sub={formatCurrency(mtdVolumeCents)}
+          color="green"
+          subColor="up"
+        />
+        <KpiCard
+          label="Closing Soon"
+          value={commandCenterLoans.filter((l) => l.closingSoon).length}
+          sub="within 5 days"
+          color={commandCenterLoans.filter((l) => l.closingSoon).length > 0 ? "amber" : "muted"}
+        />
+        <KpiCard
+          label="Past Turn Time"
+          value={commandCenterLoans.filter((l) => l.slaExceeded).length}
+          sub="SLA exceeded"
+          color={commandCenterLoans.filter((l) => l.slaExceeded).length > 0 ? "red" : "green"}
+          subColor={commandCenterLoans.filter((l) => l.slaExceeded).length > 0 ? "down" : "up"}
+        />
+        <KpiCard
+          label="Shape Only"
+          value={shapeOnlyRows.length}
+          sub="not in LendingPad"
+          color={shapeOnlyRows.length > 0 ? "blue" : "muted"}
+        />
+      </div>
 
       {/* ================================================================ */}
       {/*  New Leads Today                                                 */}
@@ -1047,12 +1059,21 @@ export default async function LoanOfficerDashboardPage({
         {/* micro pipeline */}
         <MicroPipeline loansByMicro={loansByMicro} />
 
-        {/* compact KPI row */}
-        <div className="grid gap-3 md:grid-cols-4">
+        {/* compact KPI row — detailed breakdowns below the top KPI strip */}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Active Loans" value={commandCenterLoans.length} />
-          <StatCard label="Conditions Outstanding" value={commandCenterLoans.filter((l) => l.openConditions > 0).length} />
+          <StatCard
+            label="Conditions Outstanding"
+            value={commandCenterLoans.filter((l) => l.openConditions > 0).length}
+            accent={commandCenterLoans.filter((l) => l.openConditions > 0).length > 0}
+          />
           <StatCard label="Closing Soon" value={commandCenterLoans.filter((l) => l.closingSoon).length} subtext="Within 5 days" />
-          <StatCard label="Past Turn Time" value={commandCenterLoans.filter((l) => l.slaExceeded).length} subtext="SLA exceeded" />
+          <StatCard
+            label="Past Turn Time"
+            value={commandCenterLoans.filter((l) => l.slaExceeded).length}
+            accent={commandCenterLoans.filter((l) => l.slaExceeded).length > 0}
+            subtext="SLA exceeded"
+          />
         </div>
       </section>
 

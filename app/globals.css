@@ -7,13 +7,14 @@
 /* ------------------------------------------------------------------ */
 
 :root {
-  --background:       0 0% 0%;           /* pure black */
-  --foreground:       210 20% 96%;       /* #F1F3F5 */
+  /* ── Core surfaces ── */
+  --background:       0 0% 0%;           /* pure black   #000 */
+  --foreground:       210 20% 96%;       /* near-white   #F1F3F5 */
 
-  --muted:            220 10% 13%;       /* card hover / subtle bg */
+  --muted:            220 10% 13%;       /* hover bg */
   --muted-foreground: 215 14% 50%;       /* secondary text */
 
-  --border:           220 8% 16%;        /* very subtle border */
+  --border:           220 8% 16%;        /* subtle border */
 
   --card:             220 10% 10%;       /* card surface */
   --card-foreground:  210 20% 96%;
@@ -26,8 +27,24 @@
 
   --radius: 12px;
 
+  /* ── Brand accent ── */
   --accent-yellow:     #E8FF00;
   --accent-yellow-dim: rgba(232, 255, 0, 0.10);
+  --accent-yellow-glow: rgba(232, 255, 0, 0.18);
+
+  /* ── Semantic status colors ── */
+  --color-red:        #FF4B4B;
+  --color-red-dim:    rgba(255, 75, 75, 0.12);
+  --color-green:      #22C55E;
+  --color-green-dim:  rgba(34, 197, 94, 0.10);
+  --color-amber:      #F59E0B;
+  --color-amber-dim:  rgba(245, 158, 11, 0.10);
+  --color-blue:       #60A5FA;
+  --color-blue-dim:   rgba(96, 165, 250, 0.10);
+
+  /* ── Font family ── */
+  --font-sans: var(--font-geist, -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+               'Segoe UI Variable', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
 }
 
 /* ---- Base ---- */
@@ -36,12 +53,13 @@ html, body { height: 100%; }
 body {
   background: #000;
   color: hsl(var(--foreground));
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* ---- Scrollbar ---- */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(220 8% 20%); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(220 8% 28%); }
@@ -68,3 +86,89 @@ body {
 .accent-text   { color: var(--accent-yellow); }
 .accent-border { border-color: var(--accent-yellow); }
 .accent-glow   { box-shadow: 0 0 0 1px var(--accent-yellow-dim), 0 4px 24px var(--accent-yellow-dim); }
+
+/* ---- Dashboard card ---- */
+.dash-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.dash-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.dash-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* ---- KPI card top-stripe color variants ---- */
+.kpi-stripe-yellow::before { background: var(--accent-yellow) !important; }
+.kpi-stripe-red::before    { background: var(--color-red) !important; }
+.kpi-stripe-green::before  { background: var(--color-green) !important; }
+.kpi-stripe-amber::before  { background: var(--color-amber) !important; }
+.kpi-stripe-blue::before   { background: var(--color-blue) !important; }
+
+/* ---- Semantic pills ---- */
+.pill-red   { background: var(--color-red-dim);   color: var(--color-red); }
+.pill-green { background: var(--color-green-dim); color: var(--color-green); }
+.pill-amber { background: var(--color-amber-dim); color: var(--color-amber); }
+.pill-blue  { background: var(--color-blue-dim);  color: var(--color-blue); }
+.pill-yellow { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+.pill-muted  { background: rgba(255,255,255,0.06); color: hsl(var(--muted-foreground)); }
+
+/* ---- Section label ---- */
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.7;
+}
+
+/* ---- Table shared styles ---- */
+.dt { /* "dashboard table" */
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.dt thead th {
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.7;
+  text-align: left;
+  background: rgba(255,255,255,0.025);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.dt thead th.r { text-align: right; }
+.dt tbody td {
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: hsl(var(--foreground));
+  vertical-align: middle;
+}
+.dt tbody td.r { text-align: right; }
+.dt tbody tr:last-child td { border-bottom: none; }
+.dt tbody tr { transition: background 0.12s; }
+.dt tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+/* ---- Fade-up animation ---- */
+@keyframes qr-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up   { animation: qr-fade-up 0.35s ease both; }
+.anim-d1 { animation-delay: 0.05s; }
+.anim-d2 { animation-delay: 0.10s; }
+.anim-d3 { animation-delay: 0.15s; }
+.anim-d4 { animation-delay: 0.20s; }

@@ -444,12 +444,14 @@ export default async function ExecutiveDashboardPage() {
   }));
 
   return (
-    <div className="space-y-10">
+    <div className="flex flex-col gap-8 animate-fade-up">
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Executive Dashboard</h1>
-          <p className="text-sm text-mutedForeground">
-            All-company visibility with filters, drill-downs, deal detection signals, and AI command center.
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
+            Executive Dashboard
+          </h1>
+          <p className="mt-0.5 text-[13px] text-mutedForeground">
+            All-company visibility · signals · AI command center
           </p>
         </div>
         <ExecNotifications initial={notifications} />

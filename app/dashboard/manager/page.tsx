@@ -1,7 +1,8 @@
 import { differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badge";
-import { StatCard } from "@/components/StatCard";
+import { KpiCard } from "@/components/KpiCard";
+import { NotMovingTabs, type StuckLoan, type BasicLoan } from "@/components/dashboard/NotMovingTabs";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewManagerDashboard } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -557,392 +558,352 @@ export default async function ManagerDashboardPage() {
   const losTouchedToday = dailyActivity.filter((r) => r.loans_touched_today > 0).length;
   const totalLoansTouchedToday = dailyActivity.reduce((acc, r) => acc + (r.loans_touched_today ?? 0), 0);
 
+  // ── Stage SLA health bars ────────────────────────────────────────────────
+  const stageHealthMap = new Map<string, { total: number; breach: number }>();
+  for (const l of annotated) {
+    if (!l.current_stage) continue;
+    const s = stageHealthMap.get(l.current_stage) ?? { total: 0, breach: 0 };
+    s.total += 1;
+    if (l.slaExceeded) s.breach += 1;
+    stageHealthMap.set(l.current_stage, s);
+  }
+  const stageHealthBars = [...stageHealthMap.entries()]
+    .filter(([, v]) => v.total >= 2)
+    .map(([stage, v]) => ({
+      label: stageLabel(stage),
+      pct: Math.round(((v.total - v.breach) / v.total) * 100),
+      total: v.total,
+    }))
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, 5);
+
+  // ── Prepare serialisable props for NotMovingTabs ─────────────────────────
+  const stuckLoansProps: StuckLoan[] = stuckLoans.map((l) => ({
+    id: l.id,
+    borrowerName: borrowerName(l),
+    stage: l.current_stage,
+    stageLabel: stageLabel(l.current_stage),
+    loName: l.assigned_loan_officer_name ?? null,
+    daysInStage: l.daysInCurrentStage,
+    slaMax: l.slaMax,
+    daysOver: l.daysOverSla,
+    openConditions: l.openConditions,
+    shapeUrl: shapeLeadUrl(l.shape_record_id),
+  }));
+
+  const toBasic = (list: LoanRow[]): BasicLoan[] =>
+    list.map((l) => ({
+      id: l.id,
+      borrowerName: borrowerName(l),
+      phone: l.borrower_phone,
+      source: l.source,
+      stage: l.current_stage,
+      statusRaw: l.status_raw,
+      loName: l.assigned_loan_officer_name ?? null,
+      createdAt: l.lead_created_at,
+      shapeUrl: shapeLeadUrl(l.shape_record_id),
+    }));
+
+  const prePipeStalledBasic: BasicLoan[] = prePipeStalled.map((l) => ({
+    id: l.id,
+    borrowerName: borrowerName(l),
+    phone: l.borrower_phone,
+    source: l.source,
+    stage: l.current_stage,
+    statusRaw: l.status_raw,
+    loName: l.assigned_loan_officer_name ?? null,
+    createdAt: l.lead_created_at,
+    shapeUrl: shapeLeadUrl(l.shape_record_id),
+    daysStuck: l.daysStuck,
+  }));
+
+  // ── LO initials helper ───────────────────────────────────────────────────
+  function loInitials(name: string): string {
+    return name.split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
+  }
+
+  const LO_AVATAR_COLORS = [
+    { bg: "rgba(96,165,250,0.12)",  text: "#60A5FA" },
+    { bg: "rgba(34,197,94,0.12)",   text: "#22C55E" },
+    { bg: "rgba(232,255,0,0.10)",   text: "#E8FF00" },
+    { bg: "rgba(245,158,11,0.12)",  text: "#F59E0B" },
+    { bg: "rgba(167,139,250,0.12)", text: "#a78bfa" },
+  ];
+
+  function loHealth(stuck: number, active: number): { label: string; color: "green" | "amber" | "red" } {
+    if (active === 0) return { label: "No data", color: "amber" };
+    const ratio = stuck / active;
+    if (ratio === 0) return { label: "Good", color: "green" };
+    if (ratio <= 0.08) return { label: "Fair", color: "amber" };
+    return { label: "At Risk", color: "red" };
+  }
+
+  const PILL_STYLES = {
+    green: { background: "rgba(34,197,94,0.10)",  color: "#22C55E" },
+    amber: { background: "rgba(245,158,11,0.10)", color: "#F59E0B" },
+    red:   { background: "rgba(255,75,75,0.12)",  color: "#FF4B4B" },
+  };
+
   return (
-    <div className="space-y-10 px-1 py-2">
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Pipeline</h1>
-        <p className="text-sm text-mutedForeground">{teamLabel}</p>
+    <div className="flex flex-col gap-5 py-3 animate-fade-up">
+
+      {/* ── Page header ───────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
+            Pipeline
+          </h1>
+          <p className="mt-0.5 text-[13px] text-mutedForeground">{teamLabel}</p>
+        </div>
+        <div className="text-[11px] text-mutedForeground shrink-0 pt-0.5">
+          {format(new Date(), "EEE MMM d, yyyy")}
+        </div>
       </div>
 
-      {/* ── Stat cards ────────────────────────────────────────────────────── */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-        <StatCard label="Active Loans" value={activeLoans.length} subtext={`${lpSyncedCount} in LP`} />
-        <StatCard label="Untouched >24h" value={untouchedLeads.length} accent={untouchedLeads.length > 0} subtext="new leads" />
-        <StatCard label="Not Contacted" value={notContactedStuck.length} accent={notContactedStuck.length > 0} />
-        <StatCard label="Pitched Waiting" value={pitchedWaiting.length} subtext="needs follow-up" />
-        <StatCard label="No Appraisal" value={signedNoAppraisal.length} accent={signedNoAppraisal.length > 0} subtext="signed/pkg out" />
-        <StatCard label="LOs Active Today" value={losTouchedToday} subtext={`${totalLoansTouchedToday} touched`} />
-        <StatCard
+      {/* ── KPI strip ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 anim-d1">
+        <KpiCard
+          label="Active Pipeline"
+          value={activeLoans.length}
+          sub={`${lpSyncedCount} in LendingPad`}
+          color="yellow"
+          subColor="neutral"
+        />
+        <KpiCard
+          label="Stuck (7+ days)"
+          value={stuckLoans.length}
+          sub={stuckLoans.length > 0 ? "need attention" : "all clear ✓"}
+          color={stuckLoans.length > 0 ? "red" : "green"}
+          subColor={stuckLoans.length > 0 ? "down" : "up"}
+        />
+        <KpiCard
           label="Closing This Week"
           value={closingThisWeek}
-          subtext={atRiskClosings.length > 0 ? `${atRiskClosings.length} at risk` : undefined}
+          sub={atRiskClosings.length > 0 ? `${atRiskClosings.length} at risk` : "none at risk"}
+          color="amber"
+          subColor={atRiskClosings.length > 0 ? "down" : "neutral"}
         />
-        <StatCard label="MTD Volume" value={formatCurrency(mtdVolumeCents)} subtext={`${fundedMtd.length} loans`} />
+        <KpiCard
+          label="Funded MTD"
+          value={fundedMtd.length}
+          sub={formatCurrency(mtdVolumeCents)}
+          color="green"
+          subColor="up"
+        />
+        <KpiCard
+          label="Unassigned"
+          value={unassignedLoans.length}
+          sub={unassignedLoans.length > 0 ? "needs assignment" : "all assigned ✓"}
+          color={unassignedLoans.length > 0 ? "red" : "green"}
+          subColor={unassignedLoans.length > 0 ? "down" : "up"}
+        />
       </div>
 
-      {/* ── Section 1: What's Not Moving ──────────────────────────────────── */}
-      <section className="space-y-4">
-        <SectionHeading>What&apos;s Not Moving</SectionHeading>
+      {/* ── Main bento grid ───────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 anim-d2">
 
-        {/* 1a — SLA exceeded (turn-time) */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#f87171" }}>
-            Past Turn Time ({stuckLoans.length})
-          </p>
-          <TableWrapper>
-            <thead>
-              <tr>
-                <Th>Borrower</Th>
-                <Th>Stage</Th>
-                <Th right>Days in Stage</Th>
-                <Th right>Open Cond.</Th>
-                <Th>Owner</Th>
-                <Th right>Shape #</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {stuckLoans.map((l) => (
-                <tr key={l.id} className="transition-colors hover:bg-white/[0.02]">
-                  <Td><span className="font-medium text-foreground">{borrowerName(l)}</span></Td>
-                  <Td><Badge variant="red">{stageLabel(l.current_stage)}</Badge></Td>
-                  <Td right><DaysOverBadge days={l.daysInCurrentStage!} sla={l.slaMax!} /></Td>
-                  <Td right><ConditionPill count={l.openConditions} /></Td>
-                  <Td><span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</span></Td>
-                  <Td right mono>{l.shape_record_id ?? "—"}</Td>
-                </tr>
-              ))}
-              {stuckLoans.length === 0 && <EmptyRow cols={6} message="No loans past their SLA threshold." />}
-            </tbody>
-          </TableWrapper>
-        </div>
-
-        {/* 1b — New leads > 24h untouched */}
-        {untouchedLeads.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#f87171" }}>
-              New Leads &gt; 24h Untouched ({untouchedLeads.length})
-            </p>
-            <TableWrapper>
-              <thead>
-                <tr>
-                  <Th>Borrower</Th>
-                  <Th>Phone</Th>
-                  <Th>Source</Th>
-                  <Th>Status</Th>
-                  <Th>Lead Created</Th>
-                  <Th>Owner</Th>
-                  <Th right>Shape</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {untouchedLeads.map((l) => {
-                  const shapeUrl = shapeLeadUrl(l.shape_record_id);
-                  return (
-                  <tr key={l.id} className="bg-red-950/15 transition-colors hover:bg-red-950/25">
-                    <Td><span className="font-medium">{borrowerName(l)}</span></Td>
-                    <Td>
-                      {l.borrower_phone ? (
-                        <a href={`tel:${l.borrower_phone}`} className="text-xs text-mutedForeground hover:text-foreground">{l.borrower_phone}</a>
-                      ) : <span className="text-xs text-mutedForeground">—</span>}
-                    </Td>
-                    <Td><span className="text-xs text-mutedForeground">{l.source ?? "—"}</span></Td>
-                    <Td><Badge variant="red">{l.status_raw ?? "—"}</Badge></Td>
-                    <Td>
-                      <span className="text-xs text-mutedForeground">
-                        {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
-                      </span>
-                    </Td>
-                    <Td><span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "Unassigned"}</span></Td>
-                    <Td right>
-                      {shapeUrl ? (
-                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
-                          className="rounded px-2 py-0.5 text-xs font-medium hover:opacity-80"
-                          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
-                          Open ↗
-                        </a>
-                      ) : <span className="font-mono text-xs text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
-                    </Td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </TableWrapper>
-          </div>
-        )}
-
-        {/* 1c — Not Contacted stuck */}
-        {notContactedStuck.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#fbbf24" }}>
-              Not Contacted / Attempting ({notContactedStuck.length})
-            </p>
-            <TableWrapper>
-              <thead>
-                <tr>
-                  <Th>Borrower</Th>
-                  <Th>Status</Th>
-                  <Th>Lead Created</Th>
-                  <Th>Owner</Th>
-                  <Th right>Shape #</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {notContactedStuck.map((l) => {
-                  const shapeUrl = shapeLeadUrl(l.shape_record_id);
-                  return (
-                  <tr key={l.id} className="bg-yellow-950/10 transition-colors hover:bg-yellow-950/20">
-                    <Td><span className="font-medium">{borrowerName(l)}</span></Td>
-                    <Td><Badge variant="yellow">{l.status_raw ?? "—"}</Badge></Td>
-                    <Td>
-                      <span className="text-xs text-mutedForeground">
-                        {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d") : "—"}
-                      </span>
-                    </Td>
-                    <Td><span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "Unassigned"}</span></Td>
-                    <Td right>
-                      {shapeUrl ? (
-                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
-                          className="rounded px-2 py-0.5 text-xs font-medium hover:opacity-80"
-                          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
-                          Open ↗
-                        </a>
-                      ) : <span className="font-mono text-xs text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
-                    </Td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </TableWrapper>
-          </div>
-        )}
-
-        {/* 1d — Pitched and Waiting */}
-        {pitchedWaiting.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#fbbf24" }}>
-              Pitched and Waiting — Needs Follow-Up ({pitchedWaiting.length})
-            </p>
-            <TableWrapper>
-              <thead>
-                <tr>
-                  <Th>Borrower</Th>
-                  <Th>Owner</Th>
-                  <Th>Lead Created</Th>
-                  <Th right>Shape #</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {pitchedWaiting.map((l) => (
-                  <tr key={l.id} className="bg-yellow-950/10 transition-colors hover:bg-yellow-950/20">
-                    <Td><span className="font-medium">{borrowerName(l)}</span></Td>
-                    <Td><span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</span></Td>
-                    <Td>
-                      <span className="text-xs text-mutedForeground">
-                        {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d") : "—"}
-                      </span>
-                    </Td>
-                    <Td right mono>{l.shape_record_id ?? "—"}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableWrapper>
-          </div>
-        )}
-
-        {/* 1e — Pre-Pipe stalled */}
-        {prePipeStalled.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#fbbf24" }}>
-              Pre-Pipe Stalled — Not Moving to Package ({prePipeStalled.length})
-            </p>
-            <TableWrapper>
-              <thead>
-                <tr>
-                  <Th>Borrower</Th>
-                  <Th>Status</Th>
-                  <Th right>Days</Th>
-                  <Th>Owner</Th>
-                  <Th right>Shape #</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {prePipeStalled.map((l) => (
-                  <tr key={l.id} className="bg-yellow-950/10 transition-colors hover:bg-yellow-950/20">
-                    <Td><span className="font-medium">{borrowerName(l)}</span></Td>
-                    <Td><Badge variant="yellow">{l.status_raw ?? "—"}</Badge></Td>
-                    <Td right>
-                      <span className="font-mono text-xs">{l.daysStuck ?? "—"}d</span>
-                    </Td>
-                    <Td><span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</span></Td>
-                    <Td right mono>{l.shape_record_id ?? "—"}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableWrapper>
-          </div>
-        )}
-
-        {/* 1f — Signed Not Piped without appraisal */}
-        {signedNoAppraisal.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#f87171" }}>
-              Signed / Package Out — No Appraisal Payment ({signedNoAppraisal.length})
-            </p>
-            <TableWrapper>
-              <thead>
-                <tr>
-                  <Th>Borrower</Th>
-                  <Th>Status</Th>
-                  <Th>Owner</Th>
-                  <Th right>Shape #</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {signedNoAppraisal.map((l) => {
-                  const shapeUrl = shapeLeadUrl(l.shape_record_id);
-                  return (
-                  <tr key={l.id} className="bg-red-950/20 transition-colors hover:bg-red-950/30">
-                    <Td><span className="font-medium">{borrowerName(l)}</span></Td>
-                    <Td><Badge variant="red">{l.status_raw ?? "—"}</Badge></Td>
-                    <Td><span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</span></Td>
-                    <Td right>
-                      {shapeUrl ? (
-                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
-                          className="rounded px-2 py-0.5 text-xs font-medium hover:opacity-80"
-                          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
-                          Open ↗
-                        </a>
-                      ) : <span className="font-mono text-xs text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
-                    </Td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </TableWrapper>
-          </div>
-        )}
-      </section>
-
-      {/* ── Section 2: What's Late ─────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <SectionHeading>What&apos;s Late</SectionHeading>
-
-        {/* 2a — Overdue closings */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-mutedForeground">
-            Past closing date — not yet closed
-          </p>
-          <TableWrapper>
-            <thead>
-              <tr>
-                <Th>Borrower</Th>
-                <Th>Closing Date</Th>
-                <Th right>How Late</Th>
-                <Th right>Open Cond.</Th>
-                <Th>Stage</Th>
-                <Th>Owner</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {overdueClosings.map((l) => (
-                <tr key={l.id} className="transition-colors hover:bg-white/[0.02]">
-                  <Td>
-                    <span className="font-medium text-foreground">{borrowerName(l)}</span>
-                  </Td>
-                  <Td>
-                    <span style={{ color: "#f87171" }}>{formatClosingDate(l.closing_date!)}</span>
-                  </Td>
-                  <Td right>
-                    <OverdueBadge daysLate={l.daysLate} />
-                  </Td>
-                  <Td right>
-                    <ConditionPill count={l.openConditions} />
-                  </Td>
-                  <Td>
-                    <span className="text-mutedForeground">{stageLabel(l.current_stage)}</span>
-                  </Td>
-                  <Td>
-                    <span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</span>
-                  </Td>
-                </tr>
-              ))}
-              {overdueClosings.length === 0 && (
-                <EmptyRow cols={6} message="No overdue closings." />
+        {/* What's Not Moving — 8 cols */}
+        <div className="lg:col-span-8 dash-card">
+          <div className="dash-card-header">
+            <div className="flex items-center gap-2.5">
+              <span className="dash-card-title">What&apos;s Not Moving</span>
+              {(stuckLoans.length + untouchedLeads.length + signedNoAppraisal.length) > 0 && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
+                  style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}
+                >
+                  {stuckLoans.length + untouchedLeads.length + signedNoAppraisal.length}
+                </span>
               )}
-            </tbody>
-          </TableWrapper>
+            </div>
+          </div>
+          <NotMovingTabs
+            stuckLoans={stuckLoansProps}
+            untouchedLeads={toBasic(untouchedLeads)}
+            notContactedStuck={toBasic(notContactedStuck)}
+            pitchedWaiting={toBasic(pitchedWaiting)}
+            prePipeStalled={prePipeStalledBasic}
+            signedNoAppraisal={toBasic(signedNoAppraisal)}
+          />
         </div>
 
-        {/* 2b — At-risk (closing this week with open conditions) */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-mutedForeground">
-            Closing within 7 days — open conditions outstanding
-          </p>
-          <TableWrapper>
-            <thead>
-              <tr>
-                <Th>Borrower</Th>
-                <Th>Closing Date</Th>
-                <Th right>Days Left</Th>
-                <Th right>Open Cond.</Th>
-                <Th>Stage</Th>
-                <Th>Owner</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {atRiskClosings.map((l) => (
-                <tr key={l.id} className="transition-colors hover:bg-white/[0.02]">
-                  <Td>
-                    <span className="font-medium text-foreground">{borrowerName(l)}</span>
-                  </Td>
-                  <Td>
-                    <span style={{ color: "#fbbf24" }}>{formatClosingDate(l.closing_date!)}</span>
-                  </Td>
-                  <Td right>
-                    <DaysWarningBadge days={l.daysLeft} />
-                  </Td>
-                  <Td right>
-                    <ConditionPill count={l.openConditions} />
-                  </Td>
-                  <Td>
-                    <span className="text-mutedForeground">{stageLabel(l.current_stage)}</span>
-                  </Td>
-                  <Td>
-                    <span className="text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</span>
-                  </Td>
-                </tr>
-              ))}
-              {atRiskClosings.length === 0 && (
-                <EmptyRow cols={6} message="No at-risk closings this week." />
+        {/* Right column — 4 cols */}
+        <div className="flex flex-col gap-4 lg:col-span-4">
+
+          {/* What's Late — Overdue closings */}
+          <div className="dash-card">
+            <div className="dash-card-header">
+              <span className="dash-card-title">What&apos;s Late</span>
+              {overdueClosings.length > 0 && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
+                  {overdueClosings.length} overdue
+                </span>
               )}
-            </tbody>
-          </TableWrapper>
-        </div>
-      </section>
+            </div>
+            {overdueClosings.length === 0 && atRiskClosings.length === 0 ? (
+              <div className="flex items-center gap-2 px-4 py-5 text-[12px]" style={{ color: "hsl(215 14% 45%)" }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" opacity={0.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                No overdue or at-risk closings
+              </div>
+            ) : (
+              <div>
+                {overdueClosings.slice(0, 4).map((l) => (
+                  <div
+                    key={l.id}
+                    className="flex items-start gap-3 px-4 py-3"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                  >
+                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#FF4B4B" }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium">{borrowerName(l)}</div>
+                      <div className="mt-0.5 text-[11px] text-mutedForeground">
+                        {l.assigned_loan_officer_name ?? "—"} · {stageLabel(l.current_stage)} · Was {formatClosingDate(l.closing_date!)}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.12)", color: "#FF4B4B" }}>
+                      {l.daysLate}d late
+                    </span>
+                  </div>
+                ))}
+                {atRiskClosings.slice(0, 3).map((l) => (
+                  <div
+                    key={l.id}
+                    className="flex items-start gap-3 px-4 py-3"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                  >
+                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#F59E0B" }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium">{borrowerName(l)}</div>
+                      <div className="mt-0.5 text-[11px] text-mutedForeground">
+                        {l.assigned_loan_officer_name ?? "—"} · {formatClosingDate(l.closing_date!)} · {l.openConditions} open cond.
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+                      {l.daysLeft}d left
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-      {/* ── Section 3: Who Has What ────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <SectionHeading>Who Has What</SectionHeading>
+          {/* SLA Health bars */}
+          {stageHealthBars.length > 0 && (
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <span className="dash-card-title">Stage SLA Health</span>
+                <span className="text-[11px]" style={{ color: "hsl(215 14% 50%)" }}>% on time</span>
+              </div>
+              <div className="flex flex-col gap-3 px-4 py-4">
+                {stageHealthBars.map((s) => (
+                  <div key={s.label} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-medium">{s.label}</span>
+                      <span
+                        className="text-[12px] font-semibold tabular-nums"
+                        style={{ color: s.pct >= 80 ? "#22C55E" : s.pct >= 60 ? "#F59E0B" : "#FF4B4B" }}
+                      >
+                        {s.pct}%
+                      </span>
+                    </div>
+                    <div className="h-[4px] overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${s.pct}%`,
+                          background: s.pct >= 80 ? "#22C55E" : s.pct >= 60 ? "#F59E0B" : "#FF4B4B",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Who Has What ─────────────────────────────────────────────────── */}
+      <div className="dash-card anim-d3">
+        <div className="dash-card-header">
+          <span className="dash-card-title">Who Has What</span>
+          <span className="text-[11px] text-mutedForeground">{loCards.length} active LOs</span>
+        </div>
         {loCards.length === 0 ? (
-          <p className="text-sm text-mutedForeground">No active loan officers found.</p>
+          <div className="px-4 py-8 text-center text-[12px] text-mutedForeground">No active loan officers found.</div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {loCards.map((r) => (
-              <LoCard key={r.name} {...r} />
-            ))}
-          </div>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Loan Officer</th>
+                <th className="r">Active</th>
+                <th className="r">Stuck</th>
+                <th className="r">Closing</th>
+                <th className="r">Funded MTD</th>
+                <th className="r">Volume MTD</th>
+                <th className="r">Health</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loCards.map((r, i) => {
+                const av = LO_AVATAR_COLORS[i % LO_AVATAR_COLORS.length];
+                const health = loHealth(r.stuck, r.active);
+                return (
+                  <tr key={r.name}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                          style={{ background: av.bg, color: av.text }}
+                        >
+                          {loInitials(r.name)}
+                        </div>
+                        <span className="font-medium">{r.name}</span>
+                      </div>
+                    </td>
+                    <td className="r font-semibold tabular-nums">{r.active}</td>
+                    <td className="r tabular-nums">
+                      <span style={{ color: r.stuck > 0 ? "#FF4B4B" : "hsl(210 20% 96%)", fontWeight: r.stuck > 0 ? 600 : 400 }}>
+                        {r.stuck}
+                      </span>
+                    </td>
+                    <td className="r tabular-nums">
+                      <span style={{ color: r.closingThisWeek > 0 ? "#F59E0B" : undefined }}>
+                        {r.closingThisWeek}
+                      </span>
+                    </td>
+                    <td className="r tabular-nums">
+                      <span style={{ color: r.mtdLoans > 0 ? "#22C55E" : undefined }}>
+                        {r.mtdLoans}
+                      </span>
+                    </td>
+                    <td className="r tabular-nums text-[12px]">{formatCurrency(r.mtdVolumeCents)}</td>
+                    <td className="r">
+                      <span
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={PILL_STYLES[health.color]}
+                      >
+                        {health.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
-      </section>
+      </div>
 
-      {/* ── Section 3b: Contact Rate by LO ───────────────────────────────── */}
+      {/* ── Contact Rate Today ────────────────────────────────────────────── */}
       {dailyActivity.length > 0 && (
-        <section className="space-y-3">
-          <SectionHeading>Contact Rate Today</SectionHeading>
-          <p className="text-xs text-mutedForeground">
-            Loans touched today vs total active loans per LO. Green = active, Yellow = low, Red = no activity.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="dash-card anim-d4">
+          <div className="dash-card-header">
+            <span className="dash-card-title">Contact Rate Today</span>
+            <span className="text-[11px] text-mutedForeground">{losTouchedToday} LOs active · {totalLoansTouchedToday} loans touched</span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
             {loCards.map((lo) => {
               const activity = dailyActivity.find(
                 (a) => (a.lo_name ?? "").toLowerCase() === lo.name.toLowerCase(),
@@ -950,234 +911,182 @@ export default async function ManagerDashboardPage() {
               const touched = activity?.loans_touched_today ?? 0;
               const total = lo.active;
               const pct = total > 0 ? Math.round((touched / total) * 100) : 0;
-              const color =
-                total === 0
-                  ? "hsl(215 14% 42%)"
-                  : pct >= 60
-                  ? "#4ade80"
-                  : pct >= 30
-                  ? "#fbbf24"
-                  : "#f87171";
-              const barColor =
-                total === 0 ? "rgba(255,255,255,0.1)" : pct >= 60 ? "#4ade80" : pct >= 30 ? "#fbbf24" : "#f87171";
+              const clr = total === 0 ? "hsl(215 14% 42%)" : pct >= 60 ? "#22C55E" : pct >= 30 ? "#F59E0B" : "#FF4B4B";
               return (
                 <div
                   key={lo.name}
-                  className="rounded-xl p-4 space-y-3"
-                  style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.03)" }}
+                  className="flex flex-col gap-3 rounded-xl p-3.5"
+                  style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold">{lo.name}</div>
+                    <div className="text-[13px] font-semibold leading-tight">{lo.name}</div>
                     <div className="text-right">
-                      <div className="text-xl font-bold tabular-nums" style={{ color }}>{pct}%</div>
-                      <div className="text-[10px] text-mutedForeground">contact rate</div>
+                      <div className="text-lg font-bold tabular-nums" style={{ color: clr }}>{pct}%</div>
+                      <div className="text-[10px] text-mutedForeground">touch rate</div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${Math.min(pct, 100)}%`, background: barColor }}
-                      />
+                  <div>
+                    <div className="mb-1.5 h-[3px] overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: clr }} />
                     </div>
                     <div className="flex justify-between text-[10px] text-mutedForeground">
-                      <span>{touched} touched today</span>
+                      <span>{touched} touched</span>
                       <span>{total} active</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
+                  <div className="grid grid-cols-3 gap-1 border-t pt-2.5 text-center" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
                     <div>
-                      <div className="font-semibold text-xs">{activity?.status_changes_today ?? 0}</div>
-                      <div className="text-mutedForeground">Status</div>
+                      <div className="text-[12px] font-semibold">{activity?.status_changes_today ?? 0}</div>
+                      <div className="text-[10px] text-mutedForeground">Status</div>
                     </div>
                     <div>
-                      <div className="font-semibold text-xs">{activity?.notes_today ?? 0}</div>
-                      <div className="text-mutedForeground">Notes</div>
+                      <div className="text-[12px] font-semibold">{activity?.notes_today ?? 0}</div>
+                      <div className="text-[10px] text-mutedForeground">Notes</div>
                     </div>
                     <div>
-                      <div className="font-semibold text-xs" style={{ color: (activity?.new_leads_today ?? 0) > 0 ? "#4ade80" : undefined }}>
+                      <div className="text-[12px] font-semibold" style={{ color: (activity?.new_leads_today ?? 0) > 0 ? "#22C55E" : undefined }}>
                         {activity?.new_leads_today ?? 0}
                       </div>
-                      <div className="text-mutedForeground">New</div>
+                      <div className="text-[10px] text-mutedForeground">New</div>
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </section>
+        </div>
       )}
 
-      {/* ── Section 4: SLA Alerts (from 15-min sync) ──────────────────────── */}
+      {/* ── SLA Alerts ───────────────────────────────────────────────────── */}
       {slaAlerts.length > 0 && (
-        <section className="space-y-3">
-          <SectionHeading>SLA Alerts — Needs Attention</SectionHeading>
-          <div
-            className="overflow-hidden rounded-xl"
-            style={{ border: "1px solid rgba(239,68,68,0.2)", background: "rgba(255,255,255,0.02)" }}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr
-                  className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
-                  style={{ background: "rgba(255,255,255,0.04)" }}
-                >
-                  <th className="px-4 py-2.5">Borrower</th>
-                  <th className="px-4 py-2.5">Loan Officer</th>
-                  <th className="px-4 py-2.5">Stage</th>
-                  <th className="px-4 py-2.5 text-right">Hours Idle</th>
-                  <th className="px-4 py-2.5">Violation</th>
-                  <th className="px-4 py-2.5">Touched Today</th>
-                </tr>
-              </thead>
-              <tbody>
-                {slaAlerts.map((row) => (
-                  <tr
-                    key={row.loan_id}
-                    style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-                    className={
-                      row.sla_color === "red" ? "bg-red-950/20" : "bg-yellow-950/10"
-                    }
-                  >
-                    <td className="px-4 py-3 font-medium">{row.borrower_name || "—"}</td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">{row.lo_name || "Unassigned"}</td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">
-                      {row.current_stage?.replace(/_/g, " ") ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">
-                      {row.hours_since_last_activity != null ? `${row.hours_since_last_activity}h` : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.sla_color === "red" ? (
-                        <Badge variant="red">
-                          {row.sla_breach_type
-                            ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type
-                            : "Critical"}
-                        </Badge>
-                      ) : (
-                        <Badge variant="yellow">
-                          {row.sla_breach_type
-                            ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type
-                            : "At risk"}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      {row.touched_today ? (
-                        <span style={{ color: "#4ade80" }}>Yes</span>
-                      ) : (
-                        <span style={{ color: "#f87171" }}>No</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <div className="flex items-center gap-2">
+              <span className="dash-card-title">SLA Alerts</span>
+              {slaRedCount > 0 && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
+                  {slaRedCount} critical
+                </span>
+              )}
+              {slaYellowCount > 0 && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+                  {slaYellowCount} at risk
+                </span>
+              )}
+            </div>
           </div>
-        </section>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Borrower</th>
+                <th>Loan Officer</th>
+                <th>Stage</th>
+                <th className="r">Hours Idle</th>
+                <th>Violation</th>
+                <th>Touched Today</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slaAlerts.map((row) => (
+                <tr key={row.loan_id} style={{ background: row.sla_color === "red" ? "rgba(255,75,75,0.04)" : "rgba(245,158,11,0.03)" }}>
+                  <td className="font-medium">{row.borrower_name || "—"}</td>
+                  <td className="text-mutedForeground">{row.lo_name || "Unassigned"}</td>
+                  <td className="text-mutedForeground">{row.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                  <td className="r font-mono text-[12px]">{row.hours_since_last_activity != null ? `${row.hours_since_last_activity}h` : "—"}</td>
+                  <td>
+                    {row.sla_color === "red" ? (
+                      <Badge variant="red">{row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "Critical"}</Badge>
+                    ) : (
+                      <Badge variant="yellow">{row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "At risk"}</Badge>
+                    )}
+                  </td>
+                  <td>
+                    {row.touched_today
+                      ? <span style={{ color: "#22C55E", fontSize: "12px", fontWeight: 500 }}>Yes</span>
+                      : <span style={{ color: "#FF4B4B", fontSize: "12px", fontWeight: 500 }}>No</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* ── Section 5: Daily Activity by LO ───────────────────────────────── */}
+      {/* ── Daily Activity by LO ──────────────────────────────────────────── */}
       {dailyActivity.length > 0 && (
-        <section className="space-y-3">
-          <SectionHeading>Today&apos;s Activity by LO</SectionHeading>
-          <div
-            className="overflow-hidden rounded-xl"
-            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr
-                  className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
-                  style={{ background: "rgba(255,255,255,0.04)" }}
-                >
-                  <th className="px-4 py-2.5">Loan Officer</th>
-                  <th className="px-4 py-2.5 text-right">Loans Touched</th>
-                  <th className="px-4 py-2.5 text-right">Status Changes</th>
-                  <th className="px-4 py-2.5 text-right">Notes Added</th>
-                  <th className="px-4 py-2.5 text-right">New Leads</th>
-                  <th className="px-4 py-2.5">Last Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailyActivity.map((row, i) => (
-                  <tr
-                    key={i}
-                    style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-                    className="transition-colors hover:bg-white/[0.02]"
-                  >
-                    <td className="px-4 py-3 font-medium">{row.lo_name || "Unknown"}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">{row.loans_touched_today}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">{row.status_changes_today}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">{row.notes_today}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs"
-                      style={{ color: row.new_leads_today > 0 ? "#4ade80" : undefined }}>
-                      {row.new_leads_today}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">
-                      {row.last_activity_at
-                        ? new Date(row.last_activity_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <span className="dash-card-title">Today&apos;s Activity by LO</span>
           </div>
-        </section>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Loan Officer</th>
+                <th className="r">Loans Touched</th>
+                <th className="r">Status Changes</th>
+                <th className="r">Notes Added</th>
+                <th className="r">New Leads</th>
+                <th>Last Active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dailyActivity.map((row, i) => (
+                <tr key={i}>
+                  <td className="font-medium">{row.lo_name || "Unknown"}</td>
+                  <td className="r font-mono text-[12px]">{row.loans_touched_today}</td>
+                  <td className="r font-mono text-[12px]">{row.status_changes_today}</td>
+                  <td className="r font-mono text-[12px]">{row.notes_today}</td>
+                  <td className="r font-mono text-[12px]" style={{ color: row.new_leads_today > 0 ? "#22C55E" : undefined }}>
+                    {row.new_leads_today}
+                  </td>
+                  <td className="text-[12px] text-mutedForeground">
+                    {row.last_activity_at
+                      ? new Date(row.last_activity_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* ── Section 6: Unassigned Leads ───────────────────────────────────── */}
+      {/* ── Unassigned Leads ─────────────────────────────────────────────── */}
       {unassignedLoans.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <SectionHeading>Unassigned Leads</SectionHeading>
-            <span
-              className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
-              style={{ background: "rgba(239,68,68,0.15)", color: "#f87171" }}
-            >
-              {unassignedLoans.length} unassigned
-            </span>
+        <div className="dash-card" style={{ borderColor: "rgba(255,75,75,0.2)" }}>
+          <div className="dash-card-header">
+            <div className="flex items-center gap-2">
+              <span className="dash-card-title">Unassigned Leads</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
+                {unassignedLoans.length}
+              </span>
+            </div>
           </div>
-          <div
-            className="overflow-hidden rounded-xl"
-            style={{ border: "1px solid rgba(239,68,68,0.2)", background: "rgba(255,255,255,0.02)" }}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr
-                  className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
-                  style={{ background: "rgba(255,255,255,0.04)" }}
-                >
-                  <th className="px-4 py-2.5">Borrower</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5">Stage</th>
-                  <th className="px-4 py-2.5">Created</th>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Borrower</th>
+                <th>Status</th>
+                <th>Stage</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {unassignedLoans.map((l) => (
+                <tr key={l.id} style={{ background: "rgba(255,75,75,0.03)" }}>
+                  <td className="font-medium">
+                    {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
+                  </td>
+                  <td className="text-[12px] text-mutedForeground">{l.status_raw || "—"}</td>
+                  <td className="text-[12px] text-mutedForeground">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                  <td className="font-mono text-[11px] text-mutedForeground">
+                    {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {unassignedLoans.map((l) => (
-                  <tr
-                    key={l.id}
-                    style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-                    className="bg-red-950/10 transition-colors hover:bg-red-950/20"
-                  >
-                    <td className="px-4 py-3 font-medium">
-                      {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">{l.status_raw || "—"}</td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">
-                      {l.current_stage?.replace(/_/g, " ") ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs font-mono text-mutedForeground">
-                      {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuestRock — Dashboard Redesign Concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080808;
+    --s1: #111111;
+    --s2: #161616;
+    --s3: #1c1c1c;
+    --bd: rgba(255,255,255,0.07);
+    --bd2: rgba(255,255,255,0.04);
+    --t1: #F0F2F5;
+    --t2: #8A8F98;
+    --t3: #555A63;
+    --y: #E8FF00;
+    --yd: rgba(232,255,0,0.08);
+    --yg: rgba(232,255,0,0.18);
+    --r: #FF4B4B;
+    --rd: rgba(255,75,75,0.12);
+    --g: #22C55E;
+    --gd: rgba(34,197,94,0.10);
+    --a: #F59E0B;
+    --ad: rgba(245,158,11,0.10);
+    --b: #60A5FA;
+    --bd3: rgba(96,165,250,0.10);
+    --rad: 12px;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--t1);
+    font-family: 'Geist', 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+
+  /* ── Sticky Header ── */
+  .hdr {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 54px; padding: 0 28px;
+    background: rgba(8,8,8,0.85);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--bd);
+  }
+  .hdr-brand { display: flex; align-items: center; gap: 10px; }
+  .qr-badge {
+    background: var(--y); color: #000;
+    font-weight: 700; font-size: 11px; letter-spacing: 0.08em;
+    padding: 4px 9px; border-radius: 6px;
+  }
+  .hdr-nav { display: flex; align-items: center; gap: 2px; }
+  .n {
+    padding: 6px 13px; font-size: 13px; color: var(--t2);
+    border-radius: 8px; cursor: pointer; border: none; background: none;
+    transition: all .15s;
+  }
+  .n:hover { background: rgba(255,255,255,0.05); color: var(--t1); }
+  .n.on { background: var(--yd); color: var(--y); border: 1px solid var(--yg); }
+  .hdr-right { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--t2); }
+  .av {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--yd); border: 1px solid var(--yg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: var(--y);
+  }
+  .ib {
+    width: 32px; height: 32px; border-radius: 7px;
+    background: var(--s1); border: 1px solid var(--bd);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; cursor: pointer; transition: background .15s; position: relative;
+  }
+  .ib:hover { background: var(--s2); }
+  .notif-dot {
+    position: absolute; top: 6px; right: 6px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--r); border: 1.5px solid var(--bg);
+  }
+
+  /* ── Page ── */
+  .pg {
+    max-width: 1360px; margin: 0 auto;
+    padding: 28px 28px 60px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+
+  /* ── Page header ── */
+  .pg-hdr {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    animation: fadeUp .35s ease both;
+  }
+  .pg-title { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; color: var(--t1); }
+  .pg-sub { font-size: 13px; color: var(--t2); margin-top: 3px; }
+  .ctrl-row { display: flex; align-items: center; gap: 8px; }
+  .chip {
+    padding: 5px 12px; border-radius: 7px; font-size: 12px; font-weight: 500;
+    background: var(--s1); border: 1px solid var(--bd); color: var(--t2);
+    cursor: pointer; transition: all .12s;
+  }
+  .chip:hover { border-color: rgba(255,255,255,0.14); color: var(--t1); }
+  .chip.on { background: var(--yd); border-color: var(--yg); color: var(--y); }
+  .date-lbl { font-size: 11px; color: var(--t3); padding-left: 4px; }
+
+  /* ── KPI Strip ── */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    animation: fadeUp .35s ease .05s both;
+  }
+  .kpi {
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: var(--rad); padding: 16px 18px;
+    position: relative; overflow: hidden;
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .kpi:hover { background: var(--s2); border-color: rgba(255,255,255,0.12); }
+  .kpi::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+  }
+  .kpi.y::before { background: var(--y); }
+  .kpi.r::before { background: var(--r); }
+  .kpi.g::before { background: var(--g); }
+  .kpi.a::before { background: var(--a); }
+  .kpi.b::before { background: var(--b); }
+  .kpi-lbl { font-size: 11px; font-weight: 500; color: var(--t2); letter-spacing: 0.02em; margin-bottom: 6px; }
+  .kpi-val { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .kpi-val.y { color: var(--y); }
+  .kpi-val.r { color: var(--r); }
+  .kpi-val.g { color: var(--g); }
+  .kpi-val.a { color: var(--a); }
+  .kpi-val.b { color: var(--b); }
+  .kpi-foot { display: flex; align-items: center; gap: 4px; margin-top: 5px; font-size: 11px; color: var(--t3); }
+  .kpi-foot.up { color: var(--g); }
+  .kpi-foot.dn { color: var(--r); }
+
+  /* ── Bento ── */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 10px;
+    animation: fadeUp .35s ease .10s both;
+  }
+  .c4 { grid-column: span 4; }
+  .c5 { grid-column: span 5; }
+  .c7 { grid-column: span 7; }
+  .c8 { grid-column: span 8; }
+  .c6 { grid-column: span 6; }
+  .c12 { grid-column: span 12; }
+
+  .card {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--rad);
+    overflow: hidden;
+  }
+  .ch {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--bd2);
+  }
+  .ct { font-size: 13px; font-weight: 600; color: var(--t1); }
+  .cb { padding: 14px 18px; }
+
+  /* ── Alert list ── */
+  .al { display: flex; flex-direction: column; }
+  .ar {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--bd2);
+    cursor: pointer; transition: background .12s;
+  }
+  .ar:last-child { border-bottom: none; }
+  .ar:hover { background: rgba(255,255,255,0.02); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .arc { flex: 1; min-width: 0; }
+  .at { font-size: 13px; font-weight: 500; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .as { font-size: 11px; color: var(--t2); margin-top: 1px; }
+  .aend { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+
+  /* ── Pills ── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .pill.r { background: var(--rd); color: var(--r); }
+  .pill.g { background: var(--gd); color: var(--g); }
+  .pill.a { background: var(--ad); color: var(--a); }
+  .pill.b { background: var(--bd3); color: var(--b); }
+  .pill.y { background: var(--yd); color: var(--y); }
+  .pill.m { background: rgba(255,255,255,0.05); color: var(--t2); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; padding: 0 18px; border-bottom: 1px solid var(--bd2); }
+  .tab {
+    padding: 10px 14px; font-size: 12.5px; font-weight: 500; color: var(--t2);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: all .15s;
+  }
+  .tab:hover { color: var(--t1); }
+  .tab.on { color: var(--t1); border-bottom-color: var(--y); }
+  .tp { display: none; }
+  .tp.on { display: block; }
+
+  /* ── SLA bars ── */
+  .sla-wrap { padding: 14px 18px; display: flex; flex-direction: column; gap: 11px; }
+  .si { display: flex; flex-direction: column; gap: 4px; }
+  .si-top { display: flex; justify-content: space-between; align-items: center; }
+  .si-name { font-size: 12px; font-weight: 500; color: var(--t1); }
+  .si-pct { font-size: 12px; font-weight: 600; }
+  .si-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .si-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
+
+  /* ── LO table ── */
+  .lo-tbl { width: 100%; border-collapse: collapse; }
+  .lo-tbl th {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--t3);
+    padding: 8px 16px; text-align: right; border-bottom: 1px solid var(--bd2);
+  }
+  .lo-tbl th:first-child { text-align: left; padding-left: 18px; }
+  .lo-tbl td {
+    padding: 11px 16px; font-size: 13px;
+    font-weight: 500; color: var(--t1); text-align: right;
+    border-bottom: 1px solid var(--bd2);
+  }
+  .lo-tbl td:first-child { text-align: left; padding-left: 18px; }
+  .lo-tbl tbody tr { cursor: pointer; transition: background .12s; }
+  .lo-tbl tbody tr:hover { background: rgba(255,255,255,0.025); }
+  .lo-tbl tbody tr:last-child td { border-bottom: none; }
+  .lo-id { display: flex; align-items: center; gap: 10px; }
+  .lo-av {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .lo-nm { font-size: 13px; font-weight: 500; }
+  .lo-team { font-size: 11px; color: var(--t2); }
+  .num-red { color: var(--r); }
+  .num-green { color: var(--g); }
+  .num-amber { color: var(--a); }
+
+  /* ── Spark mini bar ── */
+  .spark { display: flex; align-items: flex-end; gap: 2px; height: 22px; }
+  .sp-bar { width: 6px; border-radius: 2px 2px 0 0; background: var(--s3); }
+  .sp-bar.hi { background: var(--y); }
+
+  /* ── Empty ── */
+  .empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 6px;
+    padding: 28px 18px; color: var(--t3); font-size: 12px;
+  }
+  .empty-ic { font-size: 22px; opacity: 0.35; }
+
+  /* ── Annotation badges ── */
+  .anno {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--y); color: #000;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    position: absolute; z-index: 9;
+    pointer-events: none;
+  }
+
+  /* ── Section below bento ── */
+  .section { animation: fadeUp .35s ease .15s both; }
+  .sec-hdr {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .sec-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--t3);
+  }
+  .sec-line { flex: 1; height: 1px; background: var(--bd2); }
+
+  /* ── Badge count ── */
+  .bc {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 4px;
+    background: var(--r); color: #fff;
+    font-size: 10px; font-weight: 700; border-radius: 9px;
+  }
+
+  /* ── Callout box ── */
+  .callout {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 14px 18px;
+    background: rgba(232,255,0,0.04);
+    border: 1px solid rgba(232,255,0,0.12);
+    border-radius: 10px;
+    font-size: 12.5px; color: var(--t2); line-height: 1.5;
+  }
+  .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Design notes panel ── */
+  .notes-panel {
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: var(--rad); padding: 24px 28px;
+    animation: fadeUp .35s ease .20s both;
+  }
+  .notes-title { font-size: 14px; font-weight: 600; color: var(--t1); margin-bottom: 16px; }
+  .notes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .notes-item { display: flex; flex-direction: column; gap: 6px; }
+  .ni-icon { font-size: 22px; }
+  .ni-title { font-size: 13px; font-weight: 600; color: var(--t1); }
+  .ni-desc { font-size: 12px; color: var(--t2); line-height: 1.5; }
+  .ni-tag {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 4px;
+    background: var(--yd); color: var(--y);
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+    margin-top: 2px; width: fit-content;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── HEADER ───────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hdr-brand">
+    <div class="qr-badge">QR</div>
+    <div>
+      <div style="font-size:13px;font-weight:600;letter-spacing:-0.01em">LO Command Center</div>
+      <div style="font-size:11px;color:var(--t2)">QuestRock Mortgage</div>
+    </div>
+  </div>
+  <nav class="hdr-nav">
+    <button class="n">Loan Officer</button>
+    <button class="n on">Manager</button>
+    <button class="n">Monitor</button>
+    <button class="n">Processor</button>
+    <button class="n">Executive</button>
+  </nav>
+  <div class="hdr-right">
+    <span>Nikk Smith</span>
+    <div class="ib" title="Notifications">
+      🔔<div class="notif-dot"></div>
+    </div>
+    <div class="av">NS</div>
+  </div>
+</header>
+
+<!-- ─── PAGE ─────────────────────────────────────────────────────── -->
+<div class="pg">
+
+  <!-- Page header -->
+  <div class="pg-hdr">
+    <div>
+      <div class="pg-title">Manager Dashboard</div>
+      <div class="pg-sub">Pipeline health · 2 urgent items need attention</div>
+    </div>
+    <div class="ctrl-row">
+      <div class="chip on">MTD</div>
+      <div class="chip">QTD</div>
+      <div class="chip">YTD</div>
+      <div class="date-lbl">Mon Jun 15, 2026</div>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpis">
+    <div class="kpi y">
+      <div class="kpi-lbl">Active Pipeline</div>
+      <div class="kpi-val y">243</div>
+      <div class="kpi-foot up">↑ 12 vs last month</div>
+    </div>
+    <div class="kpi r">
+      <div class="kpi-lbl">Stuck (7+ days)</div>
+      <div class="kpi-val r">18</div>
+      <div class="kpi-foot">avg 11.3 days stuck</div>
+    </div>
+    <div class="kpi a">
+      <div class="kpi-lbl">Closing This Week</div>
+      <div class="kpi-val a">7</div>
+      <div class="kpi-foot">$2.1M total volume</div>
+    </div>
+    <div class="kpi g">
+      <div class="kpi-lbl">Funded MTD</div>
+      <div class="kpi-val g">4</div>
+      <div class="kpi-foot up">$1.24M closed</div>
+    </div>
+    <div class="kpi b">
+      <div class="kpi-lbl">New Leads (7d)</div>
+      <div class="kpi-val b">31</div>
+      <div class="kpi-foot up" style="color:var(--b)">↑ 8 this week</div>
+    </div>
+  </div>
+
+  <!-- Bento -->
+  <div class="bento">
+
+    <!-- What's Not Moving (8 cols) -->
+    <div class="card c8">
+      <div class="ch">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="ct">What's Not Moving</span>
+          <span class="bc">18</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div class="chip on" style="font-size:11px;padding:3px 9px">All LOs</div>
+          <div class="chip" style="font-size:11px;padding:3px 9px">Tyler</div>
+          <div class="chip" style="font-size:11px;padding:3px 9px">Stephen</div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab on" onclick="tab(this,'t1')">Stuck &gt;7d (18)</div>
+        <div class="tab" onclick="tab(this,'t2')">SLA Breach (3)</div>
+        <div class="tab" onclick="tab(this,'t3')">No Contact (5)</div>
+      </div>
+
+      <div id="t1" class="tp on">
+        <div class="al">
+          <div class="ar">
+            <div class="dot" style="background:var(--r)"></div>
+            <div class="arc">
+              <div class="at">Marcus Whitfield <span class="pill m" style="margin-left:6px">Underwriting</span></div>
+              <div class="as">Tyler Johnson · Stuck 19 days · Last note 8 days ago · 3 open conditions</div>
+            </div>
+            <div class="aend">
+              <div class="pill r">19d stuck</div>
+              <div style="font-size:11px;color:var(--t3)">$425K</div>
+            </div>
+          </div>
+          <div class="ar">
+            <div class="dot" style="background:var(--r)"></div>
+            <div class="arc">
+              <div class="at">Sandra Liu <span class="pill m" style="margin-left:6px">Conditions</span></div>
+              <div class="as">Stephen Curry · Stuck 14 days · 3 open conditions</div>
+            </div>
+            <div class="aend">
+              <div class="pill r">14d stuck</div>
+              <div style="font-size:11px;color:var(--t3)">$380K</div>
+            </div>
+          </div>
+          <div class="ar">
+            <div class="dot" style="background:var(--a)"></div>
+            <div class="arc">
+              <div class="at">Devon Patel <span class="pill m" style="margin-left:6px">Processing</span></div>
+              <div class="as">Bastian Johnston · Stuck 9 days · No update</div>
+            </div>
+            <div class="aend">
+              <div class="pill a">9d stuck</div>
+              <div style="font-size:11px;color:var(--t3)">$310K</div>
+            </div>
+          </div>
+          <div class="ar">
+            <div class="dot" style="background:var(--a)"></div>
+            <div class="arc">
+              <div class="at">Keisha Brown <span class="pill m" style="margin-left:6px">Submission</span></div>
+              <div class="as">Tyler Johnson · Stuck 7 days</div>
+            </div>
+            <div class="aend">
+              <div class="pill a">7d stuck</div>
+              <div style="font-size:11px;color:var(--t3)">$292K</div>
+            </div>
+          </div>
+          <div class="ar" style="background:rgba(255,255,255,0.01)">
+            <div class="dot" style="background:var(--t3)"></div>
+            <div class="arc">
+              <div class="at" style="color:var(--t2)">+ 14 more loans (7–19 days, various stages)</div>
+            </div>
+            <button onclick="" style="font-size:11px;padding:4px 12px;border-radius:6px;background:var(--s2);border:1px solid var(--bd);color:var(--t2);cursor:pointer">View all →</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="t2" class="tp">
+        <div class="empty"><div class="empty-ic">✓</div>No SLA breaches active today</div>
+      </div>
+      <div id="t3" class="tp">
+        <div class="al">
+          <div class="ar">
+            <div class="dot" style="background:var(--a)"></div>
+            <div class="arc">
+              <div class="at">James Wu</div>
+              <div class="as">Tyler Johnson · No contact in 7 days · Lead stage</div>
+            </div>
+            <div class="aend"><div class="pill a">7d silent</div></div>
+          </div>
+          <div class="ar">
+            <div class="dot" style="background:var(--a)"></div>
+            <div class="arc">
+              <div class="at">Amara Osei</div>
+              <div class="as">Stephen Curry · No contact in 5 days · Application</div>
+            </div>
+            <div class="aend"><div class="pill a">5d silent</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Closing + SLA -->
+    <div class="c4" style="display:flex;flex-direction:column;gap:10px">
+
+      <!-- Closing This Week -->
+      <div class="card">
+        <div class="ch">
+          <span class="ct">Closing This Week</span>
+          <span class="pill a">7 loans</span>
+        </div>
+        <div class="al">
+          <div class="ar">
+            <div class="dot" style="background:var(--g)"></div>
+            <div class="arc">
+              <div class="at">James Okafor</div>
+              <div class="as">Tyler · CTC · $510K · Jun 17</div>
+            </div>
+            <div class="pill g">2d</div>
+          </div>
+          <div class="ar">
+            <div class="dot" style="background:var(--g)"></div>
+            <div class="arc">
+              <div class="at">Priya Mehta</div>
+              <div class="as">Stephen · CTC · $325K · Jun 18</div>
+            </div>
+            <div class="pill g">3d</div>
+          </div>
+          <div class="ar">
+            <div class="dot" style="background:var(--a)"></div>
+            <div class="arc">
+              <div class="at">Tom Buchanan</div>
+              <div class="as">Bastian · Closing · $445K · Jun 20</div>
+            </div>
+            <div class="pill a">5d</div>
+          </div>
+          <div class="ar" style="opacity:0.55">
+            <div class="arc"><div class="at" style="color:var(--t2)">+ 4 more</div></div>
+            <button style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--s2);border:1px solid var(--bd);color:var(--t2);cursor:pointer">See all</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLA Health -->
+      <div class="card">
+        <div class="ch">
+          <span class="ct">Stage SLA Health</span>
+          <span class="pill g">78% on track</span>
+        </div>
+        <div class="sla-wrap">
+          <div class="si">
+            <div class="si-top">
+              <span class="si-name">Lead → Application</span>
+              <span class="si-pct" style="color:var(--g)">91%</span>
+            </div>
+            <div class="si-track"><div class="si-fill" style="width:91%;background:var(--g)"></div></div>
+          </div>
+          <div class="si">
+            <div class="si-top">
+              <span class="si-name">Processing</span>
+              <span class="si-pct" style="color:var(--a)">67%</span>
+            </div>
+            <div class="si-track"><div class="si-fill" style="width:67%;background:var(--a)"></div></div>
+          </div>
+          <div class="si">
+            <div class="si-top">
+              <span class="si-name">Underwriting</span>
+              <span class="si-pct" style="color:var(--r)">44%</span>
+            </div>
+            <div class="si-track"><div class="si-fill" style="width:44%;background:var(--r)"></div></div>
+          </div>
+          <div class="si">
+            <div class="si-top">
+              <span class="si-name">Conditions → CTC</span>
+              <span class="si-pct" style="color:var(--a)">71%</span>
+            </div>
+            <div class="si-track"><div class="si-fill" style="width:71%;background:var(--a)"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- WHO HAS WHAT — full width -->
+    <div class="card c12">
+      <div class="ch">
+        <div class="ct">Who Has What</div>
+        <div style="display:flex;gap:6px">
+          <div class="chip on" style="font-size:11px;padding:3px 9px">Active only</div>
+          <div class="chip" style="font-size:11px;padding:3px 9px">Sort: Volume ↓</div>
+        </div>
+      </div>
+      <table class="lo-tbl">
+        <thead>
+          <tr>
+            <th>Loan Officer</th>
+            <th>Active</th>
+            <th>Stuck</th>
+            <th>Closing</th>
+            <th>Funded MTD</th>
+            <th>Volume MTD</th>
+            <th>7-day trend</th>
+            <th>Health</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="lo-id">
+                <div class="lo-av" style="background:var(--bd3);color:var(--b)">TJ</div>
+                <div><div class="lo-nm">Tyler Johnson</div><div class="lo-team">Team T-Rex</div></div>
+              </div>
+            </td>
+            <td>70</td>
+            <td class="num-red">4</td>
+            <td class="num-amber">3</td>
+            <td class="num-green">2</td>
+            <td>$1.24M</td>
+            <td>
+              <div class="spark">
+                <div class="sp-bar" style="height:8px"></div>
+                <div class="sp-bar" style="height:12px"></div>
+                <div class="sp-bar" style="height:9px"></div>
+                <div class="sp-bar" style="height:15px"></div>
+                <div class="sp-bar" style="height:11px"></div>
+                <div class="sp-bar" style="height:18px"></div>
+                <div class="sp-bar hi" style="height:22px"></div>
+              </div>
+            </td>
+            <td><span class="pill a">Fair</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="lo-id">
+                <div class="lo-av" style="background:var(--gd);color:var(--g)">SC</div>
+                <div><div class="lo-nm">Stephen Curry</div><div class="lo-team">Team T-Rex</div></div>
+              </div>
+            </td>
+            <td>62</td>
+            <td class="num-red">3</td>
+            <td class="num-amber">2</td>
+            <td class="num-green">1</td>
+            <td>$890K</td>
+            <td>
+              <div class="spark">
+                <div class="sp-bar" style="height:10px"></div>
+                <div class="sp-bar" style="height:7px"></div>
+                <div class="sp-bar" style="height:14px"></div>
+                <div class="sp-bar" style="height:11px"></div>
+                <div class="sp-bar" style="height:16px"></div>
+                <div class="sp-bar" style="height:19px"></div>
+                <div class="sp-bar hi" style="height:16px"></div>
+              </div>
+            </td>
+            <td><span class="pill g">Good</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="lo-id">
+                <div class="lo-av" style="background:var(--yd);color:var(--y)">BJ</div>
+                <div><div class="lo-nm">Bastian Johnston</div><div class="lo-team">Team T-Rex · Branch Builder</div></div>
+              </div>
+            </td>
+            <td>29</td>
+            <td>0</td>
+            <td class="num-amber">2</td>
+            <td class="num-green">1</td>
+            <td>$540K</td>
+            <td>
+              <div class="spark">
+                <div class="sp-bar" style="height:6px"></div>
+                <div class="sp-bar" style="height:10px"></div>
+                <div class="sp-bar" style="height:8px"></div>
+                <div class="sp-bar" style="height:13px"></div>
+                <div class="sp-bar" style="height:10px"></div>
+                <div class="sp-bar" style="height:15px"></div>
+                <div class="sp-bar hi" style="height:12px"></div>
+              </div>
+            </td>
+            <td><span class="pill g">Good</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="lo-id">
+                <div class="lo-av" style="background:var(--ad);color:var(--a)">TC</div>
+                <div><div class="lo-nm">Tashawna Chisholm</div><div class="lo-team">Team Pumps &amp; Profit</div></div>
+              </div>
+            </td>
+            <td>25</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>$0</td>
+            <td>
+              <div class="spark">
+                <div class="sp-bar" style="height:14px"></div>
+                <div class="sp-bar" style="height:11px"></div>
+                <div class="sp-bar" style="height:8px"></div>
+                <div class="sp-bar" style="height:6px"></div>
+                <div class="sp-bar" style="height:5px"></div>
+                <div class="sp-bar" style="height:4px"></div>
+                <div class="sp-bar hi" style="height:3px;background:var(--r)"></div>
+              </div>
+            </td>
+            <td><span class="pill r">At Risk</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /bento -->
+
+  <!-- Design notes -->
+  <div class="notes-panel">
+    <div class="notes-title">↑ What's different vs. current — Design improvements proposed</div>
+    <div class="notes-grid">
+      <div class="notes-item">
+        <div class="ni-icon">📐</div>
+        <div class="ni-title">Bento grid layout</div>
+        <div class="ni-desc">Variable tile sizes by importance. Hero KPIs dominate the top. Supporting cards fill in below. Nothing is the same size just to fill space.</div>
+        <div class="ni-tag">LAYOUT</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">🎨</div>
+        <div class="ni-title">Semantic color coding</div>
+        <div class="ni-desc">Red = urgent action. Amber = watch. Green = healthy. Blue = info. Yellow = primary metric. Every color has one meaning — never decorative.</div>
+        <div class="ni-tag">COLOR</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">✦</div>
+        <div class="ni-title">Geist font + proper type scale</div>
+        <div class="ni-desc">Current: everything is 11–13px. Proposed: KPI values at 30px bold, titles at 21px, body at 13px, labels at 11px. Breathing room between tiers.</div>
+        <div class="ni-tag">TYPOGRAPHY</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">⚡</div>
+        <div class="ni-title">Tabs replace giant tables</div>
+        <div class="ni-desc">Stuck / SLA Breach / No Contact are now tabs inside one card — less scrolling, same data. The count badge tells you immediately where to look.</div>
+        <div class="ni-tag">DENSITY</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">📊</div>
+        <div class="ni-title">Sparkline 7-day trend</div>
+        <div class="ni-desc">Each LO row gets a tiny bar chart showing activity trend. Falling trend = yellow flag. Immediately visible without reading numbers.</div>
+        <div class="ni-tag">DATA VIZ</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">🔍</div>
+        <div class="ni-title">LO filter chips</div>
+        <div class="ni-desc">Filter the "What's Not Moving" list by individual LO with one click. No page reload. Scoped to the right person instantly.</div>
+        <div class="ni-tag">INTERACTION</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">📏</div>
+        <div class="ni-title">2px top-border color coding on KPIs</div>
+        <div class="ni-desc">The thin colored bar at the top of each KPI card signals urgency at a glance — no need to read the label to know if something is red.</div>
+        <div class="ni-tag">VISUAL CUE</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">💡</div>
+        <div class="ni-title">MTD / QTD / YTD toggle</div>
+        <div class="ni-desc">All KPIs update together for the selected window. Currently the dashboard has no time-window control — you can't compare periods.</div>
+        <div class="ni-tag">FILTER</div>
+      </div>
+      <div class="notes-item">
+        <div class="ni-icon">🏥</div>
+        <div class="ni-title">SLA health bars</div>
+        <div class="ni-desc">Stage-by-stage SLA health in a compact card. Which stage is your biggest bottleneck? You see it in one glance — no table needed.</div>
+        <div class="ni-tag">NEW WIDGET</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /pg -->
+
+<script>
+function tab(el, pane) {
+  const card = el.closest('.card');
+  card.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  card.querySelectorAll('.tp').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById(pane).classList.add('on');
+}
+</script>
+</body>
+</html>
