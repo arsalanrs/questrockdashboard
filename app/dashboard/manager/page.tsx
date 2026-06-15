@@ -2,6 +2,8 @@ import { differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { KpiCard } from "@/components/KpiCard";
+import { SourceBadge } from "@/components/SourceBadge";
+import { ExpandableRows } from "@/components/ExpandableRows";
 import { NotMovingTabs, type StuckLoan, type BasicLoan } from "@/components/dashboard/NotMovingTabs";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewManagerDashboard } from "@/lib/permissions";
@@ -10,13 +12,15 @@ import { formatCurrency, monthStart, sum } from "@/lib/metrics";
 import { SLA_BREACH_LABELS } from "@/lib/sla/compute";
 import { shapeLeadUrl } from "@/lib/shape-link";
 
+export const revalidate = 60;
+
 type LoanRow = {
   id: string;
   shape_record_id: number | null;
   borrower_first_name: string | null;
   borrower_last_name: string | null;
   borrower_phone: string | null;
-  source: string | null;
+  source: string | null;  // lead source channel (Inbound Zoom, QuestMail, etc.)
   current_stage: string | null;
   status_raw: string | null;
   closing_date: string | null;
@@ -558,6 +562,49 @@ export default async function ManagerDashboardPage() {
   const losTouchedToday = dailyActivity.filter((r) => r.loans_touched_today > 0).length;
   const totalLoansTouchedToday = dailyActivity.reduce((acc, r) => acc + (r.loans_touched_today ?? 0), 0);
 
+  // ── Whiteboard: "Who are we calling today?" ──────────────────────────────
+  // Priority contact list: new leads, appointments, conditions, CTC
+  const callingTodayLoans = loanRows
+    .filter((l) => {
+      const s = l.status_raw ?? "";
+      const stage = l.current_stage ?? "";
+      return (
+        // New leads needing first contact
+        ["New Lead", "Not Contacted", "Attempting Contact", "Contacted"].includes(s) ||
+        // Appointment stages
+        ["Verification", "App Started", "App Completed", "Pitch Appt"].includes(s) ||
+        // Active pipeline needing attention
+        ["Conditions Out", "Approval Conditions", "Clear to Close", "Closing"].includes(s) ||
+        ["conditions", "approval_conditions", "clear_to_close", "closing"].includes(stage)
+      );
+    })
+    .filter((l) => !["funded", "closed", "withdrawn", "denied"].includes(l.current_stage ?? ""))
+    .sort((a, b) => {
+      const priority = (s: string | null) => {
+        if (["Clear to Close", "Closing"].includes(s ?? "") || ["clear_to_close", "closing"].includes(s ?? "")) return 0;
+        if (["Conditions Out", "Approval Conditions"].includes(s ?? "")) return 1;
+        if (["New Lead", "Not Contacted", "Attempting Contact"].includes(s ?? "")) return 2;
+        if (["Pitch Appt", "Pitched and Waiting"].includes(s ?? "")) return 3;
+        return 4;
+      };
+      return priority(a.status_raw ?? a.current_stage) - priority(b.status_raw ?? b.current_stage);
+    });
+
+  // ── Whiteboard: Contact rate scorecard ──────────────────────────────────
+  const contactedCount = loanRows.filter((l) =>
+    ["Contacted", "Verification", "App Started", "App Completed", "Pitch Appt", "Pitched Advance", "Pitched and Waiting", "Pre-Pipe", "Package Out", "Signed Not Piped", "Piped"].includes(l.status_raw ?? "")
+  ).length;
+  const notContactedCount = loanRows.filter((l) =>
+    ["New Lead", "Not Contacted", "Attempting Contact"].includes(l.status_raw ?? "")
+  ).length;
+  const totalContactable = contactedCount + notContactedCount;
+  const contactRatePct = totalContactable > 0 ? Math.round((contactedCount / totalContactable) * 100) : null;
+
+  // Piped + Pumped (in the active funnel past pitch)
+  const pipedCount = loanRows.filter((l) =>
+    ["Piped", "Registered", "Processing", "Submitted", "Underwriting", "Conditions Out", "Approval Conditions", "Clear to Close", "Closing"].includes(l.status_raw ?? "")
+  ).length;
+
   // ── Stage SLA health bars ────────────────────────────────────────────────
   const stageHealthMap = new Map<string, { total: number; breach: number }>();
   for (const l of annotated) {
@@ -603,6 +650,12 @@ export default async function ManagerDashboardPage() {
       createdAt: l.lead_created_at,
       shapeUrl: shapeLeadUrl(l.shape_record_id),
     }));
+
+  // Contact rate color
+  const contactRateColor = contactRatePct == null ? "#E8FF00"
+    : contactRatePct >= 70 ? "#22C55E"
+    : contactRatePct >= 50 ? "#F59E0B"
+    : "#FF4B4B";
 
   const prePipeStalledBasic: BasicLoan[] = prePipeStalled.map((l) => ({
     id: l.id,
@@ -825,6 +878,125 @@ export default async function ManagerDashboardPage() {
         </div>
       </div>
 
+      {/* ── Manager Scorecard strip ──────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Contact Rate */}
+        <div className="dash-card flex flex-col gap-2 p-4">
+          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>Contact Rate</div>
+          <div className="flex items-end gap-2">
+            <span className="text-2xl font-bold tabular-nums" style={{ color: contactRateColor }}>
+              {contactRatePct != null ? `${contactRatePct}%` : "—"}
+            </span>
+            <span className="mb-0.5 text-[11px] text-mutedForeground">
+              {contactedCount} contacted · {notContactedCount} not
+            </span>
+          </div>
+          <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+            <div className="h-full rounded-full" style={{ width: `${contactRatePct ?? 0}%`, background: contactRateColor }} />
+          </div>
+        </div>
+        {/* SLA colors */}
+        <div className="dash-card flex flex-col gap-2 p-4">
+          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>SLA Status</div>
+          <div className="flex items-center gap-3">
+            <div className="text-center">
+              <div className="text-xl font-bold tabular-nums" style={{ color: "#FF4B4B" }}>{slaRedCount}</div>
+              <div className="text-[10px] text-mutedForeground">Red</div>
+            </div>
+            <div className="h-6 w-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="text-center">
+              <div className="text-xl font-bold tabular-nums" style={{ color: "#F59E0B" }}>{slaYellowCount}</div>
+              <div className="text-[10px] text-mutedForeground">Yellow</div>
+            </div>
+            <div className="h-6 w-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="text-center">
+              <div className="text-xl font-bold tabular-nums" style={{ color: "#22C55E" }}>{Math.max(0, activeLoans.length - slaRedCount - slaYellowCount)}</div>
+              <div className="text-[10px] text-mutedForeground">Green</div>
+            </div>
+          </div>
+        </div>
+        {/* Piped & Pumped */}
+        <div className="dash-card flex flex-col gap-2 p-4">
+          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>Piped &amp; Pumped</div>
+          <div className="text-2xl font-bold tabular-nums" style={{ color: "#E8FF00" }}>{pipedCount}</div>
+          <div className="text-[11px] text-mutedForeground">in pipeline funnel</div>
+        </div>
+        {/* LOs active today */}
+        <div className="dash-card flex flex-col gap-2 p-4">
+          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>LOs Active Today</div>
+          <div className="text-2xl font-bold tabular-nums" style={{ color: losTouchedToday > 0 ? "#22C55E" : "#FF4B4B" }}>
+            {losTouchedToday}
+          </div>
+          <div className="text-[11px] text-mutedForeground">{totalLoansTouchedToday} loans touched</div>
+        </div>
+      </div>
+
+      {/* ── Who Are We Calling Today? ─────────────────────────────────────── */}
+      {callingTodayLoans.length > 0 && (
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <div className="flex items-center gap-2">
+              <span className="dash-card-title">Who Are We Calling Today?</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(232,255,0,0.10)", color: "#E8FF00" }}>
+                {callingTodayLoans.length}
+              </span>
+            </div>
+            <span className="text-[11px] text-mutedForeground">Priority: CTC → Conditions → New Leads → Appointments</span>
+          </div>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Borrower</th>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Owner</th>
+                <th>Phone</th>
+                <th className="r">Shape</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ExpandableRows max={6} label="leads" colSpan={6}>
+                {callingTodayLoans.map((l) => {
+                  const url = shapeLeadUrl(l.shape_record_id);
+                  const statusColor =
+                    ["Clear to Close", "Closing"].includes(l.status_raw ?? "") ? "#22C55E"
+                    : ["Conditions Out", "Approval Conditions"].includes(l.status_raw ?? "") ? "#F59E0B"
+                    : ["New Lead", "Not Contacted", "Attempting Contact"].includes(l.status_raw ?? "") ? "#FF4B4B"
+                    : "hsl(215 14% 60%)";
+                  return (
+                    <tr key={l.id}>
+                      <td className="font-medium">{borrowerName(l)}</td>
+                      <td><SourceBadge source={l.source} /></td>
+                      <td>
+                        <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                          style={{ background: "rgba(255,255,255,0.06)", color: statusColor }}>
+                          {l.status_raw ?? stageLabel(l.current_stage)}
+                        </span>
+                      </td>
+                      <td className="text-[12px] text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</td>
+                      <td className="text-[12px] text-mutedForeground">
+                        {l.borrower_phone ? (
+                          <a href={`tel:${l.borrower_phone}`} className="hover:underline">{l.borrower_phone}</a>
+                        ) : "—"}
+                      </td>
+                      <td className="r">
+                        {url ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer"
+                            className="rounded px-2 py-0.5 text-[11px] font-medium hover:opacity-80"
+                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
+                            Open ↗
+                          </a>
+                        ) : <span className="font-mono text-[11px] text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </ExpandableRows>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* ── Who Has What ─────────────────────────────────────────────────── */}
       <div className="dash-card anim-d3">
         <div className="dash-card-header">
@@ -987,26 +1159,28 @@ export default async function ManagerDashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {slaAlerts.map((row) => (
-                <tr key={row.loan_id} style={{ background: row.sla_color === "red" ? "rgba(255,75,75,0.04)" : "rgba(245,158,11,0.03)" }}>
-                  <td className="font-medium">{row.borrower_name || "—"}</td>
-                  <td className="text-mutedForeground">{row.lo_name || "Unassigned"}</td>
-                  <td className="text-mutedForeground">{row.current_stage?.replace(/_/g, " ") ?? "—"}</td>
-                  <td className="r font-mono text-[12px]">{row.hours_since_last_activity != null ? `${row.hours_since_last_activity}h` : "—"}</td>
-                  <td>
-                    {row.sla_color === "red" ? (
-                      <Badge variant="red">{row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "Critical"}</Badge>
-                    ) : (
-                      <Badge variant="yellow">{row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "At risk"}</Badge>
-                    )}
-                  </td>
-                  <td>
-                    {row.touched_today
-                      ? <span style={{ color: "#22C55E", fontSize: "12px", fontWeight: 500 }}>Yes</span>
-                      : <span style={{ color: "#FF4B4B", fontSize: "12px", fontWeight: 500 }}>No</span>}
-                  </td>
-                </tr>
-              ))}
+              <ExpandableRows max={6} label="alerts" colSpan={6}>
+                {slaAlerts.map((row) => (
+                  <tr key={row.loan_id} style={{ background: row.sla_color === "red" ? "rgba(255,75,75,0.04)" : "rgba(245,158,11,0.03)" }}>
+                    <td className="font-medium">{row.borrower_name || "—"}</td>
+                    <td className="text-mutedForeground">{row.lo_name || "Unassigned"}</td>
+                    <td className="text-mutedForeground">{row.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                    <td className="r font-mono text-[12px]">{row.hours_since_last_activity != null ? `${row.hours_since_last_activity}h` : "—"}</td>
+                    <td>
+                      {row.sla_color === "red" ? (
+                        <Badge variant="red">{row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "Critical"}</Badge>
+                      ) : (
+                        <Badge variant="yellow">{row.sla_breach_type ? SLA_BREACH_LABELS[row.sla_breach_type as keyof typeof SLA_BREACH_LABELS] ?? row.sla_breach_type : "At risk"}</Badge>
+                      )}
+                    </td>
+                    <td>
+                      {row.touched_today
+                        ? <span style={{ color: "#22C55E", fontSize: "12px", fontWeight: 500 }}>Yes</span>
+                        : <span style={{ color: "#FF4B4B", fontSize: "12px", fontWeight: 500 }}>No</span>}
+                    </td>
+                  </tr>
+                ))}
+              </ExpandableRows>
             </tbody>
           </table>
         </div>
@@ -1066,24 +1240,31 @@ export default async function ManagerDashboardPage() {
             <thead>
               <tr>
                 <th>Borrower</th>
+                <th>Source</th>
                 <th>Status</th>
                 <th>Stage</th>
                 <th>Created</th>
               </tr>
             </thead>
             <tbody>
-              {unassignedLoans.map((l) => (
-                <tr key={l.id} style={{ background: "rgba(255,75,75,0.03)" }}>
-                  <td className="font-medium">
-                    {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
-                  </td>
-                  <td className="text-[12px] text-mutedForeground">{l.status_raw || "—"}</td>
-                  <td className="text-[12px] text-mutedForeground">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
-                  <td className="font-mono text-[11px] text-mutedForeground">
-                    {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
-                  </td>
-                </tr>
-              ))}
+              <ExpandableRows max={5} label="leads" colSpan={5}>
+                {unassignedLoans.map((l) => (
+                  <tr key={l.id} style={{ background: "rgba(255,75,75,0.03)" }}>
+                    <td className="font-medium">
+                      {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
+                    </td>
+                    <td>
+                      {/* source not available in this sub-query; would need join */}
+                      <span className="text-[11px] text-mutedForeground">—</span>
+                    </td>
+                    <td className="text-[12px] text-mutedForeground">{l.status_raw || "—"}</td>
+                    <td className="text-[12px] text-mutedForeground">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                    <td className="font-mono text-[11px] text-mutedForeground">
+                      {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </ExpandableRows>
             </tbody>
           </table>
         </div>

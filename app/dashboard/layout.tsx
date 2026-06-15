@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { NavLink } from "@/components/NavLink";
+import { SyncButton } from "@/components/SyncButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SignOutButton } from "@/components/SignOutButton";
 import { requireCurrentUser } from "@/lib/current-user";
@@ -105,6 +106,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="hidden md:inline rounded-lg px-3 py-1.5 text-[13px] font-medium text-mutedForeground">
               {appUser.full_name ?? appUser.email}
             </span>
+            <SyncButton />
             <NotificationBell />
             <SignOutButton />
           </nav>

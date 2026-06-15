@@ -12,6 +12,8 @@ import { DocumentHealthCard } from "@/components/executive/DocumentHealthCard";
 import { LeadTierOverview, type TierBreakdownRow } from "@/components/executive/LeadTierOverview";
 import { AssignmentQueuePanel, type AssignmentQueueRow } from "@/components/executive/AssignmentQueuePanel";
 import { BlitzBuilder } from "@/components/executive/BlitzBuilder";
+import { SourceBadge } from "@/components/SourceBadge";
+import { ExpandableRows } from "@/components/ExpandableRows";
 import { loadOpportunitiesPanelData } from "@/lib/signals/load-for-panel";
 import { loadMlReadiness } from "@/lib/signals/load-ml-readiness";
 import { loadDocumentHealth } from "@/lib/documents/load-document-health";
@@ -351,7 +353,7 @@ export default async function ExecutiveDashboardPage() {
     admin
       .from("loans")
       .select(
-        "id,lead_tier,source,utm_campaign,property_state,status_raw,current_stage," +
+        "id,lead_tier,source,assigned_loan_officer_user_id,utm_campaign,property_state,status_raw,current_stage," +
         "loan_amount_cents,lead_created_at,credit_report_requested_at,appraisal_ordered_at," +
         "closed_at,closing_date,borrower_first_name,borrower_last_name,shape_record_id," +
         "assigned_loan_officer_name,loan_type,documentation_type,esign_returned_at," +
@@ -432,6 +434,34 @@ export default async function ExecutiveDashboardPage() {
 
   const loNames = (users ?? []).map((u) => u.full_name).filter(Boolean) as string[];
 
+  // ── Unassigned leads for the executive view ──────────────────────────────
+  const TERMINAL = new Set(["funded", "closed", "withdrawn", "denied", "duplicate", "bad_lead"]);
+  const TERMINAL_STATUS = new Set(["Funded", "Withdrawn", "Denied", "Duplicate", "Bad Lead", "Do Not Contact", "Long Term Nurture"]);
+  type UnassignedLoan = {
+    id: string;
+    shape_record_id: number | null;
+    borrower_first_name: string | null;
+    borrower_last_name: string | null;
+    source: string | null;
+    status_raw: string | null;
+    current_stage: string | null;
+    lead_created_at: string | null;
+    assigned_loan_officer_user_id: string | null;
+    assigned_loan_officer_name: string | null;
+  };
+  const unassignedExecLoans: UnassignedLoan[] = ((loans ?? []) as unknown as UnassignedLoan[])
+    .filter((l) =>
+      !l.assigned_loan_officer_user_id &&
+      !TERMINAL.has(l.current_stage ?? "") &&
+      !TERMINAL_STATUS.has(l.status_raw ?? "")
+    )
+    .sort((a, b) => {
+      const da = a.lead_created_at ? new Date(a.lead_created_at).getTime() : 0;
+      const db = b.lead_created_at ? new Date(b.lead_created_at).getTime() : 0;
+      return db - da;
+    })
+    .slice(0, 50);
+
   const notifications: ExecNotification[] = (notificationRows ?? []).map((r) => ({
     id: r.id as string,
     kind: r.kind as string,
@@ -458,6 +488,61 @@ export default async function ExecutiveDashboardPage() {
       </div>
 
       <LeadTierOverview stats={tierStats} />
+
+      {/* ── Unassigned Leads — need immediate attention ───────────────────── */}
+      {unassignedExecLoans.length > 0 && (
+        <div className="dash-card" style={{ borderColor: "rgba(255,75,75,0.25)" }}>
+          <div className="dash-card-header">
+            <div className="flex items-center gap-2">
+              <span className="dash-card-title">Unassigned Leads</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
+                {unassignedExecLoans.length}
+              </span>
+            </div>
+            <span className="text-[11px] text-mutedForeground">No LO assigned — needs routing</span>
+          </div>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Borrower</th>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Stage</th>
+                <th>Created</th>
+                <th className="r">Shape</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ExpandableRows max={5} label="leads" colSpan={6}>
+                {unassignedExecLoans.map((l) => {
+                  const name = [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—";
+                  const shapeUrl = l.shape_record_id ? `https://secure.setshape.com/leads/${l.shape_record_id}` : null;
+                  return (
+                    <tr key={l.id} style={{ background: "rgba(255,75,75,0.02)" }}>
+                      <td className="font-medium">{name}</td>
+                      <td><SourceBadge source={l.source} /></td>
+                      <td className="text-[12px] text-mutedForeground">{l.status_raw || "—"}</td>
+                      <td className="text-[12px] text-mutedForeground">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                      <td className="font-mono text-[11px] text-mutedForeground">
+                        {l.lead_created_at ? new Date(l.lead_created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                      </td>
+                      <td className="r">
+                        {shapeUrl ? (
+                          <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
+                            className="rounded px-2 py-0.5 text-[11px] font-medium hover:opacity-80"
+                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
+                            Open ↗
+                          </a>
+                        ) : <span className="font-mono text-[11px] text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </ExpandableRows>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <OpportunitiesPanel
         signals={opportunities.panelSignals}

@@ -12,6 +12,8 @@ import { SLA_BREACH_LABELS } from "@/lib/sla/compute";
 import { StatCard } from "@/components/StatCard";
 import { KpiCard } from "@/components/KpiCard";
 import { Badge } from "@/components/Badge";
+import { SourceBadge } from "@/components/SourceBadge";
+import { ExpandableRows } from "@/components/ExpandableRows";
 import { PrePipelineDashboard } from "@/components/dashboard/PrePipelineDashboard";
 import { PitchQueue } from "@/components/dashboard/PitchQueue";
 import { MacroTracker } from "@/components/dashboard/MacroTracker";
@@ -60,6 +62,8 @@ type LoanRow = {
   id: string;
   shape_record_id: number | null;
   record_type: string | null;
+  source: string | null;
+  borrower_phone: string | null;
   status_raw: string | null;
   borrower_first_name: string | null;
   borrower_last_name: string | null;
@@ -134,6 +138,8 @@ function fmtDaysLeft(days: number): string {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
+export const revalidate = 60;
+
 export default async function LoanOfficerDashboardPage({
   searchParams,
 }: {
@@ -170,7 +176,7 @@ export default async function LoanOfficerDashboardPage({
   /* ---------- data fetch ---------- */
 
   const LOAN_SELECT =
-    "id,shape_record_id,record_type,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,funded_at,loan_amount_cents,lead_created_at,application_completed_at,credit_report_requested_at,appraisal_ordered_at,appraisal_received_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,lendingpad_loan_uuid,lendingpad_status_raw,loan_stage_events(stage,entered_at),conditions(status)";
+    "id,shape_record_id,record_type,source,borrower_phone,status_raw,borrower_first_name,borrower_last_name,current_stage,closing_date,closed_at,funded_at,loan_amount_cents,lead_created_at,application_completed_at,credit_report_requested_at,appraisal_ordered_at,appraisal_received_at,loan_type,loan_purpose,track,is_brokered,is_restructure_hold,current_owner_role,esign_returned_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,lendingpad_loan_uuid,lendingpad_status_raw,loan_stage_events(stage,entered_at),conditions(status)";
 
   let loans: LoanRow[] | null = null;
   let loansError: { message: string } | null = null;
@@ -198,6 +204,8 @@ export default async function LoanOfficerDashboardPage({
       supabase
         .from("loans")
         .select(LOAN_SELECT)
+        // LOs only see loans assigned to them. Admins use the effectiveViewAsId path above.
+        .eq("assigned_loan_officer_user_id", appUser.id)
         .order("lead_created_at", { ascending: false, nullsFirst: true })
         .limit(2000),
     ]);
@@ -819,8 +827,12 @@ export default async function LoanOfficerDashboardPage({
                         </a>
                       ) : (lead.borrower_name || "—")}
                     </td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">—</td>
-                    <td className="px-4 py-3 text-xs text-mutedForeground">{lead.source || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-mutedForeground">
+                      {(lead as typeof lead & { borrower_phone?: string | null }).borrower_phone ? (
+                        <a href={`tel:${(lead as typeof lead & { borrower_phone?: string | null }).borrower_phone}`} className="hover:underline">{(lead as typeof lead & { borrower_phone?: string | null }).borrower_phone}</a>
+                      ) : "—"}
+                    </td>
+                    <td className="px-4 py-3"><SourceBadge source={lead.source ?? null} /></td>
                     <td className="px-4 py-3 text-xs text-mutedForeground">{lead.status_raw || "—"}</td>
                     <td className="px-4 py-3 text-xs font-mono text-mutedForeground">
                       {lead.lead_created_at
@@ -1175,39 +1187,50 @@ export default async function LoanOfficerDashboardPage({
                 style={{ border: "1px solid rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.03)" }}
               >
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr
-                      className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
-                      style={{ background: "rgba(255,255,255,0.03)" }}
-                    >
-                      <th className="px-4 py-2.5">Borrower</th>
-                      <th className="px-4 py-2.5">Current Status</th>
-                      <th className="px-4 py-2.5">Next Action</th>
-                      <th className="px-4 py-2.5 text-right">Shape #</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {criticalNextItems.map((item) => (
+                    <thead>
                       <tr
-                        key={item.loanId}
-                        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-                        className="transition-colors hover:bg-white/[0.02]"
+                        className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
+                        style={{ background: "rgba(255,255,255,0.03)" }}
                       >
-                        <td className="px-4 py-3 font-medium">{item.borrowerName}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                            style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
-                          >
-                            {item.statusRaw}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-mutedForeground">{item.nextAction}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-mutedForeground">
-                          {item.shapeRecordId ?? "—"}
-                        </td>
+                        <th className="px-4 py-2.5">Borrower</th>
+                        <th className="px-4 py-2.5">Current Status</th>
+                        <th className="px-4 py-2.5">Next Action</th>
+                        <th className="px-4 py-2.5 text-right">Shape</th>
                       </tr>
-                    ))}
+                    </thead>
+                    <tbody>
+                      <ExpandableRows max={5} label="items" colSpan={4}>
+                      {criticalNextItems.map((item) => {
+                        const shapeUrl = shapeLeadUrl(item.shapeRecordId);
+                        return (
+                        <tr
+                          key={item.loanId}
+                          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                          className="transition-colors hover:bg-white/[0.02]"
+                        >
+                          <td className="px-4 py-3 font-medium">{item.borrowerName}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                              style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
+                            >
+                              {item.statusRaw}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-mutedForeground">{item.nextAction}</td>
+                          <td className="px-4 py-3 text-right">
+                            {shapeUrl ? (
+                              <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
+                                className="rounded px-2 py-0.5 text-[11px] font-medium hover:opacity-80"
+                                style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
+                                Open ↗
+                              </a>
+                            ) : <span className="font-mono text-xs text-mutedForeground">{item.shapeRecordId ?? "—"}</span>}
+                          </td>
+                        </tr>
+                        );
+                      })}
+                      </ExpandableRows>
                   </tbody>
                 </table>
               </div>
@@ -1388,6 +1411,7 @@ export default async function LoanOfficerDashboardPage({
                   style={{ background: "rgba(255,255,255,0.03)" }}
                 >
                   <th className="px-4 py-2.5">Borrower</th>
+                  <th className="px-4 py-2.5">Source</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Loan Type</th>
                   <th className="px-4 py-2.5 text-right">Amount</th>
@@ -1396,18 +1420,17 @@ export default async function LoanOfficerDashboardPage({
                 </tr>
               </thead>
               <tbody>
+                <ExpandableRows max={7} label="leads" colSpan={7}>
                 {shapeOnlyRows
-                  .filter(
-                    (l) =>
-                      !isTerminalRetailStatus(l.status_raw, l.current_stage)
-                  )
+                  .filter((l) => !isTerminalRetailStatus(l.status_raw, l.current_stage))
                   .sort((a, b) => {
                     const da = a.lead_created_at ? new Date(a.lead_created_at).getTime() : 0;
                     const db = b.lead_created_at ? new Date(b.lead_created_at).getTime() : 0;
                     return db - da;
                   })
-                  .slice(0, 50)
-                  .map((l) => (
+                  .map((l) => {
+                    const shapeUrl = shapeLeadUrl(l.shape_record_id);
+                    return (
                     <tr
                       key={l.id}
                       className="transition-colors hover:bg-white/[0.02]"
@@ -1416,6 +1439,7 @@ export default async function LoanOfficerDashboardPage({
                       <td className="px-4 py-3 font-medium text-foreground">
                         {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
                       </td>
+                      <td className="px-4 py-3"><SourceBadge source={l.source} /></td>
                       <td className="px-4 py-3">
                         <span
                           className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
@@ -1424,28 +1448,28 @@ export default async function LoanOfficerDashboardPage({
                           {l.status_raw ?? l.current_stage ?? "—"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-mutedForeground">
-                        {l.loan_type ?? "—"}
-                      </td>
+                      <td className="px-4 py-3 text-xs text-mutedForeground">{l.loan_type ?? "—"}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-mutedForeground">
-                        {l.loan_amount_cents
-                          ? formatCurrency(l.loan_amount_cents)
-                          : "—"}
+                        {l.loan_amount_cents ? formatCurrency(l.loan_amount_cents) : "—"}
                       </td>
                       <td className="px-4 py-3 text-xs text-mutedForeground">
                         {l.lead_created_at
-                          ? new Date(l.lead_created_at).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })
+                          ? new Date(l.lead_created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                           : "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-xs text-mutedForeground">
-                        {l.shape_record_id ?? "—"}
+                        {shapeUrl ? (
+                          <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
+                            className="rounded px-2 py-0.5 text-[11px] font-medium hover:opacity-80"
+                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
+                            Open ↗
+                          </a>
+                        ) : (l.shape_record_id ?? "—")}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
+                </ExpandableRows>
               </tbody>
             </table>
           </div>
