@@ -270,8 +270,8 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
       if (existingError) {
         console.error("[sync] Failed to fetch existing rows for change detection:", existingError);
       } else {
-        (existingRows ?? []).forEach((r) => {
-          existingByRecordId.set(r.shape_record_id as number, r as ExistingLoanRow);
+        ((existingRows ?? []) as unknown as ExistingLoanRow[]).forEach((r) => {
+          existingByRecordId.set(r.shape_record_id as number, r);
         });
       }
     }

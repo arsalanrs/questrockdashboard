@@ -49,6 +49,20 @@ const TERMINAL_STATUSES = new Set([
   "Long Term Nurture", "Withdrawn", "Denied", "Dead",
 ]);
 
+type MonthlyLoanRow = {
+  id: string;
+  borrower_first_name: string | null;
+  borrower_last_name: string | null;
+  assigned_loan_officer_name: string | null;
+  current_stage: string | null;
+  status_raw: string | null;
+  loan_amount_cents: number | null;
+  lead_created_at: string | null;
+  application_completed_at: string | null;
+  closed_at: string | null;
+  funded_at: string | null;
+};
+
 export async function buildMonthlyReport(admin: SupabaseClient): Promise<MonthlyReportData> {
   const mStart = monthStart();
   const now = new Date();
@@ -64,39 +78,39 @@ export async function buildMonthlyReport(admin: SupabaseClient): Promise<Monthly
     .order("lead_created_at", { ascending: false })
     .limit(500);
 
-  const rows = loans ?? [];
+  const rows = (loans ?? []) as unknown as MonthlyLoanRow[];
 
   const fundedRows = rows.filter((l) => l.closed_at || l.funded_at || l.status_raw === "Funded");
-  const terminalRows = rows.filter((l) => TERMINAL_STATUSES.has(l.status_raw as string ?? ""));
-  const activeRows = rows.filter((l) => !TERMINAL_STATUSES.has(l.status_raw as string ?? "") && !(l.closed_at || l.funded_at));
+  const terminalRows = rows.filter((l) => TERMINAL_STATUSES.has(l.status_raw ?? ""));
+  const activeRows = rows.filter((l) => !TERMINAL_STATUSES.has(l.status_raw ?? "") && !(l.closed_at || l.funded_at));
 
-  const fundedVolumeCents = fundedRows.reduce((acc, l) => acc + ((l.loan_amount_cents as number | null) ?? 0), 0);
+  const fundedVolumeCents = fundedRows.reduce((acc, l) => acc + (l.loan_amount_cents ?? 0), 0);
 
   const avgDaysLeadToApplication = avg(
-    rows.map((l) => daysBetween(l.lead_created_at as string | null, l.application_completed_at as string | null)),
+    rows.map((l) => daysBetween(l.lead_created_at, l.application_completed_at)),
   );
   const avgDaysApplicationToFunded = avg(
     fundedRows.map((l) => {
-      const end = (l.closed_at ?? l.funded_at) as string | null;
-      return daysBetween(l.application_completed_at as string | null, end);
+      const end = l.closed_at ?? l.funded_at;
+      return daysBetween(l.application_completed_at, end);
     }),
   );
   const avgDaysLeadToFunded = avg(
     fundedRows.map((l) => {
-      const end = (l.closed_at ?? l.funded_at) as string | null;
-      return daysBetween(l.lead_created_at as string | null, end);
+      const end = l.closed_at ?? l.funded_at;
+      return daysBetween(l.lead_created_at, end);
     }),
   );
 
   // Per-LO breakdown
   const byLoMap = new Map<string, { newLeads: number; funded: number; fundedVolumeCents: number }>();
   for (const l of rows) {
-    const name = (l.assigned_loan_officer_name as string | null) ?? "Unassigned";
+    const name = l.assigned_loan_officer_name ?? "Unassigned";
     const entry = byLoMap.get(name) ?? { newLeads: 0, funded: 0, fundedVolumeCents: 0 };
     entry.newLeads += 1;
     if (l.closed_at || l.funded_at || l.status_raw === "Funded") {
       entry.funded += 1;
-      entry.fundedVolumeCents += (l.loan_amount_cents as number | null) ?? 0;
+      entry.fundedVolumeCents += l.loan_amount_cents ?? 0;
     }
     byLoMap.set(name, entry);
   }
