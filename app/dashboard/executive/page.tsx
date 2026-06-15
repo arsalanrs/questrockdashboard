@@ -182,7 +182,7 @@ type ManagerScorecardData = {
 async function ManagerScorecardsSection() {
   const admin = createSupabaseAdminClient();
   try {
-    const [{ data: teams }, { data: slaRows }, { data: mStart }] = await Promise.all([
+    const [{ data: teams }, { data: slaRows }] = await Promise.all([
       admin
         .from("teams")
         .select("id,name,manager_user_id,users!team_members(id)")
@@ -190,7 +190,6 @@ async function ManagerScorecardsSection() {
       admin
         .from("v_lead_sla_status")
         .select("loan_id,assigned_loan_officer_user_id,sla_color"),
-      Promise.resolve(null),
     ]);
 
     const today = new Date();
