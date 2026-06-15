@@ -499,10 +499,8 @@ export default async function LoanOfficerDashboardPage({
       .limit(50);
 
     if (effectiveViewAsId) {
-      slaQuery = (slaQuery as ReturnType<typeof adminClient.from>).eq(
-        "assigned_loan_officer_user_id",
-        effectiveViewAsId,
-      ) as typeof slaQuery;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      slaQuery = (slaQuery as any).eq("assigned_loan_officer_user_id", effectiveViewAsId);
     }
 
     const { data: slaData } = await slaQuery;
@@ -520,10 +518,8 @@ export default async function LoanOfficerDashboardPage({
       .limit(20);
 
     if (effectiveViewAsId) {
-      newLeadsQuery = (newLeadsQuery as ReturnType<typeof adminClient.from>).eq(
-        "assigned_loan_officer_user_id",
-        effectiveViewAsId,
-      ) as typeof newLeadsQuery;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      newLeadsQuery = (newLeadsQuery as any).eq("assigned_loan_officer_user_id", effectiveViewAsId);
     }
 
     const { data: newLeadsData } = await newLeadsQuery;
@@ -658,10 +654,8 @@ export default async function LoanOfficerDashboardPage({
       .limit(20);
 
     if (effectiveViewAsId) {
-      reminderQuery = (reminderQuery as ReturnType<typeof adminClient.from>).eq(
-        "assigned_loan_officer_user_id",
-        effectiveViewAsId,
-      ) as typeof reminderQuery;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      reminderQuery = (reminderQuery as any).eq("assigned_loan_officer_user_id", effectiveViewAsId);
     }
 
     const { data: reminderData } = await reminderQuery;
