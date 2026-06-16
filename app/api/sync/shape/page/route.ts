@@ -115,6 +115,19 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Shape returns 400 "Record's not found" when a date range has no leads.
+    // Treat it as an empty/done page rather than a fatal error.
+    if (msg.includes("Record") && msg.includes("not found") || msg.includes("400")) {
+      return NextResponse.json({
+        done: true,
+        nextPage: pageNumber,
+        importBatchId,
+        loansUpserted: 0,
+        recordsProcessed: 0,
+        recordsSkipped: 0,
+        duplicatePage: false,
+      });
+    }
     return NextResponse.json({ error: `Shape API error: ${msg}` }, { status: 502 });
   }
 

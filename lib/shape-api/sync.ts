@@ -188,11 +188,22 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
   let stoppedEarlyReason: string | undefined;
 
   for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber++) {
-    const res: ShapeBulkExportResponse = await shapeBulkExport({
-      ...dateRange,
-      fields: SHAPE_BULK_EXPORT_FIELDS,
-      pageNumber,
-    });
+    let res: ShapeBulkExportResponse;
+    try {
+      res = await shapeBulkExport({
+        ...dateRange,
+        fields: SHAPE_BULK_EXPORT_FIELDS,
+        pageNumber,
+      });
+    } catch (err) {
+      // Shape returns 400 "Record's not found" when a date range has no leads.
+      // Treat it as end-of-data rather than a fatal error.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Record") && msg.includes("not found") || msg.includes("400 Bad Request")) {
+        break;
+      }
+      throw err;
+    }
 
     if (res.fields_not_found?.length) {
       fieldsNotFound = res.fields_not_found;
