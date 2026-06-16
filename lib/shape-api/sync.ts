@@ -12,7 +12,8 @@ const EXCLUDED_RECORD_TYPES = new Set(["Referral Partner", "Referral Partners", 
 const EXCLUDED_SOURCES = new Set(["zWebLead - VISIT"]);
 
 const PAGE_SIZE = 50;
-const PAGE_DELAY_MS = 1500;
+// 500ms is safe for Shape's API — was 1500ms which caused 504s on large syncs
+const PAGE_DELAY_MS = Number(process.env.SHAPE_PAGE_DELAY_MS ?? 500);
 const MAX_PAGES = 1000;
 
 /** First incremental run when no watermark: pull this many days of updates. */
