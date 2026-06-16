@@ -12,13 +12,14 @@ export type LendingPadConditionsSyncResult = {
   errors: string[];
 };
 
-function syncMaxLoans(): number {
+function syncMaxLoans(override?: number): number {
+  if (override != null) return override;
   const raw = process.env.LENDINGPAD_SYNC_MAX_LOANS?.trim();
-  const n = raw ? Number(raw) : 150;
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 2000) : 150;
+  const n = raw ? Number(raw) : 1000;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 5000) : 1000;
 }
 
-export async function runLendingPadConditionsSync(): Promise<LendingPadConditionsSyncResult> {
+export async function runLendingPadConditionsSync(options?: { maxLoans?: number }): Promise<LendingPadConditionsSyncResult> {
   const result: LendingPadConditionsSyncResult = {
     loansConsidered: 0,
     loansSynced: 0,
@@ -32,20 +33,44 @@ export async function runLendingPadConditionsSync(): Promise<LendingPadCondition
   }
 
   const admin = createSupabaseAdminClient();
-  const max = syncMaxLoans();
+  const max = syncMaxLoans(options?.maxLoans);
 
-  const { data: rows, error } = await admin
+  // Prioritise active pipeline stages so most actionable loans are refreshed first
+  const PIPELINE_PRIORITY = ["processing", "underwriting", "conditions", "approval_conditions", "submission", "clear_to_close"];
+  const { data: priorityRows, error: prioErr } = await admin
     .from("loans")
     .select("id,lendingpad_loan_uuid")
     .not("lendingpad_loan_uuid", "is", null)
+    .in("current_stage", PIPELINE_PRIORITY)
+    .order("lp_last_synced_at", { ascending: true, nullsFirst: true })
     .limit(max);
+  if (prioErr) {
+    result.errors.push(prioErr.message);
+    return result;
+  }
+
+  // Fill remaining budget with other loans sorted by most recently synced
+  const priorityIds = new Set((priorityRows ?? []).map((r) => (r as { id: string }).id));
+  const remaining = Math.max(0, max - priorityIds.size);
+  const { data: otherRows, error } = remaining > 0
+    ? await admin
+        .from("loans")
+        .select("id,lendingpad_loan_uuid")
+        .not("lendingpad_loan_uuid", "is", null)
+        .not("id", "in", `(${[...priorityIds].join(",") || "null"})`)
+        .order("lead_created_at", { ascending: false })
+        .limit(remaining)
+    : { data: [], error: null };
 
   if (error) {
     result.errors.push(error.message);
     return result;
   }
 
-  const loans = (rows ?? []) as { id: string; lendingpad_loan_uuid: string | null }[];
+  const loans = [
+    ...((priorityRows ?? []) as { id: string; lendingpad_loan_uuid: string | null }[]),
+    ...((otherRows ?? []) as { id: string; lendingpad_loan_uuid: string | null }[]),
+  ];
   result.loansConsidered = loans.length;
 
   for (const row of loans) {

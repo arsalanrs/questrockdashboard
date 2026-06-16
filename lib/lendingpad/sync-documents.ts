@@ -17,13 +17,14 @@ export type LendingPadDocumentsSyncResult = {
   errors: string[];
 };
 
-function syncMaxLoans(): number {
+function syncMaxLoans(override?: number): number {
+  if (override != null) return override;
   const raw = process.env.LENDINGPAD_SYNC_MAX_LOANS?.trim();
-  const n = raw ? Number(raw) : 150;
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 2000) : 150;
+  const n = raw ? Number(raw) : 500;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 5000) : 500;
 }
 
-export async function runLendingPadDocumentsSync(): Promise<LendingPadDocumentsSyncResult> {
+export async function runLendingPadDocumentsSync(options?: { maxLoans?: number }): Promise<LendingPadDocumentsSyncResult> {
   const result: LendingPadDocumentsSyncResult = {
     loansConsidered: 0,
     loansSynced: 0,
@@ -37,12 +38,13 @@ export async function runLendingPadDocumentsSync(): Promise<LendingPadDocumentsS
   }
 
   const admin = createSupabaseAdminClient();
-  const max = syncMaxLoans();
+  const max = syncMaxLoans(options?.maxLoans);
 
   const { data: rows, error } = await admin
     .from("loans")
     .select("id,lendingpad_loan_uuid")
     .not("lendingpad_loan_uuid", "is", null)
+    .order("lead_created_at", { ascending: false })
     .limit(max);
 
   if (error) {

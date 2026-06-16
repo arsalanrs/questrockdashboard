@@ -16,6 +16,10 @@ import { hasShapeApiConfig } from "@/lib/shape-api/config";
 import { runShapeApiSync } from "@/lib/shape-api/sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { evaluateIntradayRules, INTRADAY_BREACH_LABELS } from "@/lib/sla/time-rules";
+import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
+import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
+import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
+import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -231,6 +235,24 @@ async function handle(request: Request) {
   results.intradaySla = await step("intradaySla", async () => {
     const admin = createSupabaseAdminClient();
     return await scanIntradaySla(admin);
+  });
+
+  // Step 4 — LP loans sync (100 loan cap — pipeline-priority order handled in sync-loans)
+  results.lpLoans = await step("lpLoans", async () => {
+    if (!hasLendingPadReadConfig()) return { skipped: true, reason: "LendingPad not configured" };
+    return await runLendingPadLoansSync();
+  });
+
+  // Step 5 — LP conditions sync (200 loan cap, pipeline stages first)
+  results.lpConditions = await step("lpConditions", async () => {
+    if (!hasLendingPadReadConfig()) return { skipped: true, reason: "LendingPad not configured" };
+    return await runLendingPadConditionsSync({ maxLoans: 200 });
+  });
+
+  // Step 6 — LP documents sync (100 loan cap, most recent first)
+  results.lpDocuments = await step("lpDocuments", async () => {
+    if (!hasLendingPadReadConfig()) return { skipped: true, reason: "LendingPad not configured" };
+    return await runLendingPadDocumentsSync({ maxLoans: 100 });
   });
 
   const anyFailures = Object.values(results).some((r) => !r.ok);

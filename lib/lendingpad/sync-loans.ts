@@ -385,11 +385,11 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
         const stage = lpStage(item);
         const enteredAt = item.statusAt ?? new Date().toISOString();
 
-        // Phase 2: optionally enrich with rate/LTV/FICO/ARM from loan-detail.
-        // Gated by env flag to avoid N+1 calls on every sync — opt in by setting
-        // LENDINGPAD_FETCH_LOAN_DETAIL=1.
+        // Enrich with rate/LTV/FICO/ARM from loan-detail.
+        // Defaults to ON when LP is configured; opt out by setting LENDINGPAD_FETCH_LOAN_DETAIL=0.
+        const fetchDetail = process.env.LENDINGPAD_FETCH_LOAN_DETAIL !== "0";
         let detail: NormalizedLpLoanDetail | null = null;
-        if (process.env.LENDINGPAD_FETCH_LOAN_DETAIL === "1") {
+        if (fetchDetail) {
           try {
             detail = await getLendingPadLoanDetail(item.id);
           } catch (e) {
@@ -398,6 +398,7 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
           }
         }
 
+        const lpSyncedAt = new Date().toISOString();
         if (ex?.id) {
           const basePayload = buildUpdatePayload(
             item,
@@ -406,7 +407,7 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
             ex,
             fixedAssignedLoName,
           );
-          const payload = mergeLoanDetail(basePayload, detail);
+          const payload = { ...mergeLoanDetail(basePayload, detail), lp_last_synced_at: lpSyncedAt };
           const { error: upErr } = await admin.from("loans").update(payload).eq("id", ex.id);
           if (upErr) {
             result.errors.push(`update ${item.id}: ${upErr.message}`);
@@ -428,7 +429,7 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
             assignedLoUserId,
             fixedAssignedLoName,
           );
-          const payload = mergeLoanDetail(basePayload, detail);
+          const payload = { ...mergeLoanDetail(basePayload, detail), lp_last_synced_at: lpSyncedAt };
           const { data: ins, error: insErr } = await admin.from("loans").insert(payload).select("id").single();
           if (insErr) {
             result.errors.push(`insert ${item.id}: ${insErr.message}`);

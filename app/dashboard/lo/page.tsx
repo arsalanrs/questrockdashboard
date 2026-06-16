@@ -226,18 +226,16 @@ export default async function LoanOfficerDashboardPage({
   const rows = (loans ?? []) as unknown as LoanRow[];
 
   // ── LP-synced vs Shape-only split ─────────────────────────────────────────
-  // Pipeline sections (Command Center, Action Queue, etc.) only show loans
-  // that are confirmed in LendingPad. Shape-only leads appear in their own
-  // section so the LO knows what's missing from LP.
+  // All assigned loans are shown in the pipeline. Shape-only leads get a badge.
   const lpSyncedRows = rows.filter((l) => !!l.lendingpad_loan_uuid);
   const shapeOnlyRows = rows.filter((l) => !l.lendingpad_loan_uuid);
 
   const fundedOrClosedAt = (l: Pick<LoanRow, "closed_at" | "funded_at">) =>
     l.closed_at ?? l.funded_at ?? null;
 
-  /* ---------- computed loan data (LP-synced only) ---------- */
+  /* ---------- computed loan data (all assigned loans) ---------- */
 
-  const loanWithComputed = lpSyncedRows.map((l) => {
+  const loanWithComputed = rows.map((l) => {
     const openConditions = (l.conditions ?? []).filter((c) => c.status === "open").length;
     const stageEntered = latestStageEntry(l.loan_stage_events, l.current_stage);
     const hoursInStage = stageEntered ? differenceInHours(now, stageEntered) : null;
@@ -404,34 +402,7 @@ export default async function LoanOfficerDashboardPage({
   const mtdAvgLoanSize = mtdLoansClosed ? Math.round(mtdVolumeCents / mtdLoansClosed) : null;
   const upcomingClosingsCount = commandCenterLoans.filter((l) => l.closingDate && l.closingDate >= today).length;
 
-  /* ---------- Speed Metrics ---------- */
-
-  const leadToCredit = avg(
-    loanWithComputed.map((l) => {
-      if (!l.lead_created_at || !l.credit_report_requested_at) return null;
-      return differenceInCalendarDays(new Date(l.credit_report_requested_at), new Date(l.lead_created_at));
-    }),
-  );
-  const creditToPiped = avg(
-    loanWithComputed.map((l) => {
-      if (!l.credit_report_requested_at || !l.appraisal_ordered_at) return null;
-      return differenceInCalendarDays(new Date(l.appraisal_ordered_at), new Date(l.credit_report_requested_at));
-    }),
-  );
-  const pipedToClosed = avg(
-    loanWithComputed.map((l) => {
-      const end = fundedOrClosedAt(l);
-      if (!l.appraisal_ordered_at || !end) return null;
-      return differenceInCalendarDays(new Date(end), new Date(l.appraisal_ordered_at));
-    }),
-  );
-  const totalDaysToClose = avg(
-    loanWithComputed.map((l) => {
-      const end = fundedOrClosedAt(l);
-      if (!l.lead_created_at || !end) return null;
-      return differenceInCalendarDays(new Date(end), new Date(l.lead_created_at));
-    }),
-  );
+  // Speed metrics removed — dependent milestone timestamps not exported by Shape for this account.
 
   /* ---------- Leaderboard (all LOs via admin client) ---------- */
 
@@ -689,6 +660,24 @@ export default async function LoanOfficerDashboardPage({
     count: rows.filter((l) => l.status_raw && g.statuses.has(l.status_raw)).length,
   }));
 
+  /* ---------- Source breakdown for this LO -------------------------------- */
+
+  type LoSourceRow = { source: string; count: number; newToday: number };
+  const loSourceMap = new Map<string, { count: number; newToday: number }>();
+  const todayStartIso = today.toISOString();
+  for (const l of rows) {
+    const key = (l.source?.trim() || "Unattributed").slice(0, 60);
+    const entry = loSourceMap.get(key) ?? { count: 0, newToday: 0 };
+    entry.count += 1;
+    if (l.lead_created_at && l.lead_created_at >= todayStartIso) entry.newToday += 1;
+    loSourceMap.set(key, entry);
+  }
+  const loSourceRows: LoSourceRow[] = [...loSourceMap.entries()]
+    .map(([source, v]) => ({ source, count: v.count, newToday: v.newToday }))
+    .filter((r) => r.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
@@ -752,7 +741,7 @@ export default async function LoanOfficerDashboardPage({
         <KpiCard
           label="Active Pipeline"
           value={commandCenterLoans.length}
-          sub={`${lpSyncedRows.length} in LendingPad`}
+          sub={`${lpSyncedRows.length} LP · ${shapeOnlyRows.filter(l => !isTerminalRetailStatus(l.status_raw, l.current_stage)).length} Shape-only`}
           color="yellow"
         />
         <KpiCard
@@ -1124,22 +1113,7 @@ export default async function LoanOfficerDashboardPage({
 
       {leaderboardData.length > 0 && <Leaderboard data={leaderboardData} />}
 
-      {/* ================================================================ */}
-      {/*  Speed Metrics                                                   */}
-      {/* ================================================================ */}
-
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="h-1 w-4 rounded-full" style={{ background: "#E8FF00" }} />
-          <div className="text-sm font-semibold tracking-tight">Speed Metrics (avg days)</div>
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <StatCard label="Lead → Credit" value={leadToCredit?.toFixed(1) ?? "—"} />
-          <StatCard label="Credit → Piped" value={creditToPiped?.toFixed(1) ?? "—"} />
-          <StatCard label="Piped → Closed" value={pipedToClosed?.toFixed(1) ?? "—"} />
-          <StatCard label="Total Days to Close" value={totalDaysToClose?.toFixed(1) ?? "—"} />
-        </div>
-      </section>
+      {/* Speed Metrics section removed — milestone timestamps not available in this Shape account. */}
 
       {/* ================================================================ */}
       {/*  Pipeline Summary Counts                                         */}
@@ -1168,6 +1142,38 @@ export default async function LoanOfficerDashboardPage({
           ))}
         </div>
       </section>
+
+      {/* ================================================================ */}
+      {/*  Source Breakdown                                                */}
+      {/* ================================================================ */}
+
+      {loSourceRows.length > 0 && (
+        <section className="space-y-3">
+          <div className="text-sm font-semibold tracking-tight">Lead Sources</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {loSourceRows.map((r) => (
+              <div
+                key={r.source}
+                className="rounded-xl p-3"
+                style={{
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  background: "rgba(255,255,255,0.02)",
+                }}
+              >
+                <div className="text-xl font-bold tabular-nums" style={{ color: "#E8FF00" }}>
+                  {r.count}
+                </div>
+                {r.newToday > 0 && (
+                  <div className="mt-0.5 text-[10px] font-medium" style={{ color: "#22C55E" }}>
+                    +{r.newToday} today
+                  </div>
+                )}
+                <div className="mt-1 text-[10px] leading-tight text-mutedForeground">{r.source}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ================================================================ */}
       {/*  What's Next — Actionable guidance per loan                      */}

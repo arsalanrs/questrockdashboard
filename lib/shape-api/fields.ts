@@ -184,6 +184,12 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "Closing Scheduled Date",
   "Lock Expiration Date",
 
+  // ── Contingency dates ─────────────────────────────────────────────────────
+  "Finance Contingency Date",
+  "financeContingencyDate",
+  "Appraisal Contingency Date",
+  "appraisalContingencyDate",
+
   // ── Notes (three sources) ────────────────────────────────────────────────
   "notes_sidebar",
   "Notes Sidebar",

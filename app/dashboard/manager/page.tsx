@@ -670,6 +670,38 @@ export default async function ManagerDashboardPage() {
     daysStuck: l.daysStuck,
   }));
 
+  // ── Source attribution ────────────────────────────────────────────────────
+  type SourceRow = { source: string; total: number; newToday: number; touchedPct: number; slaRed: number };
+  const sourceMap = new Map<string, { total: number; newToday: number; touched: number; slaRed: number }>();
+  const todayStart = today.toISOString();
+  for (const l of loanRows) {
+    const key = (l.source?.trim() || "Unattributed").slice(0, 60);
+    const row = sourceMap.get(key) ?? { total: 0, newToday: 0, touched: 0, slaRed: 0 };
+    row.total += 1;
+    if (l.lead_created_at && l.lead_created_at >= todayStart) row.newToday += 1;
+    sourceMap.set(key, row);
+  }
+  // Merge SLA red counts from slaAlerts
+  for (const sa of slaAlerts) {
+    if (sa.sla_color !== "red") continue;
+    const matchLoan = loanRows.find((l) => l.id === sa.loan_id);
+    if (!matchLoan) continue;
+    const key = (matchLoan.source?.trim() || "Unattributed").slice(0, 60);
+    const row = sourceMap.get(key);
+    if (row) row.slaRed += 1;
+  }
+  const sourceRows: SourceRow[] = [...sourceMap.entries()]
+    .map(([source, v]) => ({
+      source,
+      total: v.total,
+      newToday: v.newToday,
+      touchedPct: v.total > 0 ? Math.round((v.touched / v.total) * 100) : 0,
+      slaRed: v.slaRed,
+    }))
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 15);
+
   // ── LO initials helper ───────────────────────────────────────────────────
   function loInitials(name: string): string {
     return name.split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
@@ -1265,6 +1297,39 @@ export default async function ManagerDashboardPage() {
                   </tr>
                 ))}
               </ExpandableRows>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Source Attribution ─────────────────────────────────────────────── */}
+      {sourceRows.length > 0 && (
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <span className="dash-card-title">Lead Sources</span>
+          </div>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th className="text-right">Total</th>
+                <th className="text-right">New Today</th>
+                <th className="text-right">SLA Red</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sourceRows.map((r) => (
+                <tr key={r.source}>
+                  <td className="font-medium">{r.source}</td>
+                  <td className="text-right font-mono text-[12px]">{r.total}</td>
+                  <td className="text-right font-mono text-[12px]" style={{ color: r.newToday > 0 ? "#22C55E" : undefined }}>
+                    {r.newToday > 0 ? `+${r.newToday}` : "—"}
+                  </td>
+                  <td className="text-right font-mono text-[12px]" style={{ color: r.slaRed > 0 ? "#FF4B4B" : undefined }}>
+                    {r.slaRed > 0 ? r.slaRed : "—"}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

@@ -99,7 +99,9 @@ export function buildLoanPayloadFromRow(
   r: ShapeKpiCsvRow,
   statusToStage: Map<string, string | null>,
   nameToUserId: Map<string, string>,
-  importBatchId: string
+  importBatchId: string,
+  /** Optional email→userId map built from users.email for fallback LO matching */
+  emailToUserId?: Map<string, string>
 ): Record<string, unknown> | null {
   const shapeRecordId = Number(String(r["recordId"] ?? "").trim());
   if (!Number.isFinite(shapeRecordId)) return null;
@@ -111,7 +113,11 @@ export function buildLoanPayloadFromRow(
   // in CSV Last,First order which creates duplicates in the loans table.
   const loNameRaw = String(r["Loan Officer User Name"] ?? "").trim();
   const loName = normalizeLoName(loNameRaw) || null;
-  const assignedLoUserId = loName ? nameToUserId.get(loName.toLowerCase()) ?? null : null;
+  // Primary match: normalized full name. Fallback: loan_officer_email field.
+  const loEmail = trimOrNull(r["Loan Officer Email"])?.toLowerCase();
+  const assignedLoUserId =
+    (loName ? nameToUserId.get(loName.toLowerCase()) ?? null : null) ??
+    (loEmail && emailToUserId ? emailToUserId.get(loEmail) ?? null : null);
 
   // Prefer "Loan Amount"; fall back to "Purchase Price" for purchase-money loans
   // where Shape stores the amount under borpurchasePrice instead of LoanAmount.
@@ -150,8 +156,18 @@ export function buildLoanPayloadFromRow(
   const insellerate_ref_id = trimOrNull(r["Insellerate Ref ID"]);
   const funded_at = parseMaybeTimestamp(r["Funded Date"]);
   const closing_scheduled_at = parseMaybeTimestamp(r["Closing Scheduled Date"]);
+  // closing_date (DATE) is used in Action Queue "Closing Soon" flags — derive from closing_scheduled_at
+  const closing_date = closing_scheduled_at ? closing_scheduled_at.slice(0, 10) : null;
   const lock_expiration_date = parseMaybeDate(r["Lock Expiration Date"]);
   const lendingpad_status_raw = trimOrNull(r["LendingPad Status"]);
+
+  // New Shape fields
+  const finance_contingency_date = parseMaybeDate(r["Finance Contingency Date"]);
+  const appraisal_contingency_date = parseMaybeDate(r["Appraisal Contingency Date"]);
+  const down_payment_cents = parseMoneyCents(r["Down Payment Amount"]);
+  const estimated_appraisal_value_cents = parseMoneyCents(r["Estimated Appraisal Value"]);
+  // shape_last_updated_at: "Date Loan Last Updated" is the mapped key for lastActivityDate
+  const shape_last_updated_at = parseMaybeTimestamp(r["Date Loan Last Updated"]);
 
   const payload = {
     import_batch_id: importBatchId,
@@ -222,6 +238,7 @@ export function buildLoanPayloadFromRow(
     pre_cd_approved_at: parseMaybeTimestamp(r["Pre CD Approved Date"]),
     ctc_at: parseMaybeTimestamp(r["CTC Date"]),
     closing_scheduled_at,
+    closing_date,
     lock_expiration_date,
     closed_at: parseMaybeTimestamp(r["Tracking Date Closed"]),
 
@@ -251,6 +268,13 @@ export function buildLoanPayloadFromRow(
     last_contacted_at,
     insellerate_ref_id,
     funded_at,
+
+    // New synced fields
+    finance_contingency_date,
+    appraisal_contingency_date,
+    down_payment_cents,
+    estimated_appraisal_value_cents,
+    shape_last_updated_at,
 
     // Notes — stored as-is (may be HTML); consumers strip tags as needed.
     notes_sidebar: trimOrNull(r["Notes Sidebar"]),

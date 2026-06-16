@@ -158,6 +158,12 @@ const API_TO_CSV: Record<string, string> = {
   "Closing Scheduled Date": "Closing Scheduled Date",
   "Lock Expiration Date": "Lock Expiration Date",
 
+  // Contingency dates
+  "Finance Contingency Date": "Finance Contingency Date",
+  financeContingencyDate: "Finance Contingency Date",
+  "Appraisal Contingency Date": "Appraisal Contingency Date",
+  appraisalContingencyDate: "Appraisal Contingency Date",
+
   // Notes fields
   "notes_sidebar": "Notes Sidebar",
   "Notes Sidebar": "Notes Sidebar",
