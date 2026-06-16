@@ -1,3 +1,5 @@
+export const maxDuration = 300; // Vercel Pro serverless ceiling; needed for full Shape sync
+
 import {
   clearSyncData,
   generateMockLoanData,

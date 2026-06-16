@@ -6,6 +6,11 @@
  * POST: JSON { "mode": "full" | "incremental", "dateFrom"?, "dateTo"? }; default mode full (legacy).
  */
 import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canAccessAdmin } from "@/lib/permissions";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
