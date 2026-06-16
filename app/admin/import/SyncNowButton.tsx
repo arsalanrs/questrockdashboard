@@ -1,24 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-// ── Chunk helpers ────────────────────────────────────────────────────────────
-
-/** Split a date range into N-month windows, newest first. */
-function buildChunks(fromIso: string, toIso: string, monthsPerChunk = 3): Array<{ from: string; to: string }> {
-  const chunks: Array<{ from: string; to: string }> = [];
-  let cursor = new Date(`${toIso}T12:00:00Z`);
-  const floor = new Date(`${fromIso}T12:00:00Z`);
-
-  while (cursor > floor) {
-    const chunkTo = cursor.toISOString().slice(0, 10);
-    cursor.setUTCMonth(cursor.getUTCMonth() - monthsPerChunk);
-    const chunkFrom = cursor < floor ? fromIso : cursor.toISOString().slice(0, 10);
-    chunks.push({ from: chunkFrom, to: chunkTo });
-    if (chunkFrom === fromIso) break;
-  }
-  return chunks;
-}
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -30,117 +14,167 @@ function nMonthsAgoIso(n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
+/** Split a date range into N-month windows, newest-first. */
+function buildDateChunks(fromIso: string, toIso: string, monthsPerChunk = 3): Array<{ from: string; to: string }> {
+  const chunks: Array<{ from: string; to: string }> = [];
+  let cursor = new Date(`${toIso}T12:00:00Z`);
+  const floor = new Date(`${fromIso}T12:00:00Z`);
+  while (cursor > floor) {
+    const chunkTo = cursor.toISOString().slice(0, 10);
+    cursor.setUTCMonth(cursor.getUTCMonth() - monthsPerChunk);
+    const chunkFrom = cursor < floor ? fromIso : cursor.toISOString().slice(0, 10);
+    chunks.push({ from: chunkFrom, to: chunkTo });
+    if (chunkFrom === fromIso) break;
+  }
+  return chunks;
+}
 
-type ChunkProgress = {
+// ── Per-page API call ─────────────────────────────────────────────────────────
+
+interface PageResult {
+  done: boolean;
+  nextPage: number;
+  importBatchId: string;
+  loansUpserted: number;
+  recordsProcessed: number;
+  recordsSkipped: number;
+  duplicatePage?: boolean;
+  unmappedStatuses?: string[];
+}
+
+async function syncOnePage(
+  pageNumber: number,
+  dateFrom: string,
+  dateTo: string,
+  importBatchId: string | null,
+): Promise<PageResult> {
+  const res = await fetch("/api/sync/shape/page", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pageNumber, dateFrom, dateTo, importBatchId }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json) throw new Error(json?.error ?? `Server returned ${res.status}`);
+  return json as PageResult;
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+type ChunkState = {
   label: string;
   status: "pending" | "running" | "done" | "error";
-  loans?: number;
+  loans: number;
+  pages: number;
   error?: string;
 };
 
 type SyncState =
   | { status: "idle" }
-  | { status: "running"; chunks: ChunkProgress[]; totalLoans: number; startMs: number }
-  | { status: "success"; totalLoans: number; totalRecords: number; elapsed: number; unmapped?: string[] }
+  | { status: "running"; chunks: ChunkState[]; totalLoans: number; totalPages: number; startMs: number }
+  | { status: "success"; totalLoans: number; totalPages: number; elapsed: number; unmapped?: string[] }
   | { status: "error"; message: string };
 
-// ── API call ─────────────────────────────────────────────────────────────────
-
-async function callShapeSync(from: string, to: string): Promise<{ loans: number; records: number; unmapped?: string[] }> {
-  const res = await fetch("/api/sync/shape", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "full", dateFrom: from, dateTo: to }),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json) throw new Error(json?.error ?? `Server returned ${res.status}`);
-  return {
-    loans: json.loansUpserted ?? 0,
-    records: json.recordsProcessed ?? 0,
-    unmapped: json.unmappedStatuses,
-  };
-}
-
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export function SyncNowButton() {
   const [state, setState] = useState<SyncState>({ status: "idle" });
   const [mode, setMode] = useState<"recent" | "full">("recent");
+  const abortRef = useRef(false);
 
   async function handleSync() {
     const today = todayIso();
+    abortRef.current = false;
 
-    // Build chunks based on selected mode
-    const chunks =
+    const dateChunks =
       mode === "recent"
         ? [{ from: nMonthsAgoIso(3), to: today }]
-        : buildChunks(nMonthsAgoIso(24), today, 3); // 8 chunks of 3 months each
+        : buildDateChunks(nMonthsAgoIso(24), today, 3);
 
-    const progress: ChunkProgress[] = chunks.map((c, i) => ({
-      label: `${c.from} → ${c.to}${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ""}`,
+    const initialChunks: ChunkState[] = dateChunks.map((c, i) => ({
+      label: `${c.from} → ${c.to}${dateChunks.length > 1 ? ` (${i + 1}/${dateChunks.length})` : ""}`,
       status: "pending",
+      loans: 0,
+      pages: 0,
     }));
 
-    setState({ status: "running", chunks: progress, totalLoans: 0, startMs: Date.now() });
+    const startMs = Date.now();
+    setState({ status: "running", chunks: initialChunks, totalLoans: 0, totalPages: 0, startMs });
 
     let totalLoans = 0;
-    let totalRecords = 0;
-    const allUnmapped: string[] = [];
+    let totalPages = 0;
+    const allUnmapped = new Set<string>();
 
-    for (let i = 0; i < chunks.length; i++) {
+    for (let ci = 0; ci < dateChunks.length; ci++) {
+      if (abortRef.current) break;
+
       setState((s) =>
         s.status === "running"
-          ? {
-              ...s,
-              chunks: s.chunks.map((c, ci) =>
-                ci === i ? { ...c, status: "running" } : c,
-              ),
-            }
+          ? { ...s, chunks: s.chunks.map((c, i) => (i === ci ? { ...c, status: "running" } : c)) }
           : s,
       );
 
-      try {
-        const result = await callShapeSync(chunks[i].from, chunks[i].to);
-        totalLoans += result.loans;
-        totalRecords += result.records;
-        if (result.unmapped?.length) allUnmapped.push(...result.unmapped);
+      const { from, to } = dateChunks[ci];
+      let page = 1;
+      let importBatchId: string | null = null;
+      let chunkLoans = 0;
+      let chunkPages = 0;
+      let chunkError: string | null = null;
 
+      while (!abortRef.current) {
+        try {
+          const result = await syncOnePage(page, from, to, importBatchId);
+          importBatchId = result.importBatchId;
+          chunkLoans += result.loansUpserted;
+          chunkPages++;
+          totalLoans += result.loansUpserted;
+          totalPages++;
+          result.unmappedStatuses?.forEach((s) => allUnmapped.add(s));
+
+          // Capture for closure
+          const cl = chunkLoans;
+          const cp = chunkPages;
+          setState((s) =>
+            s.status === "running"
+              ? {
+                  ...s,
+                  totalLoans,
+                  totalPages,
+                  chunks: s.chunks.map((c, i) => (i === ci ? { ...c, loans: cl, pages: cp } : c)),
+                }
+              : s,
+          );
+
+          if (result.done || result.duplicatePage) break;
+          page = result.nextPage;
+        } catch (err) {
+          chunkError = err instanceof Error ? err.message : "Page request failed";
+          break;
+        }
+      }
+
+      if (chunkError) {
         setState((s) =>
           s.status === "running"
-            ? {
-                ...s,
-                totalLoans,
-                chunks: s.chunks.map((c, ci) =>
-                  ci === i ? { ...c, status: "done", loans: result.loans } : c,
-                ),
-              }
+            ? { ...s, chunks: s.chunks.map((c, i) => (i === ci ? { ...c, status: "error", error: chunkError! } : c)) }
             : s,
         );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Chunk failed";
-        setState((s) =>
-          s.status === "running"
-            ? {
-                ...s,
-                chunks: s.chunks.map((c, ci) =>
-                  ci === i ? { ...c, status: "error", error: msg } : c,
-                ),
-              }
-            : s,
-        );
-        setState({ status: "error", message: `Chunk ${i + 1}/${chunks.length} failed: ${msg}` });
+        setState({ status: "error", message: `Chunk ${ci + 1}/${dateChunks.length} failed: ${chunkError}` });
         return;
       }
+
+      setState((s) =>
+        s.status === "running"
+          ? { ...s, chunks: s.chunks.map((c, i) => (i === ci ? { ...c, status: "done" } : c)) }
+          : s,
+      );
     }
 
-    const elapsed = state.status === "running" ? Math.floor((Date.now() - (state as Extract<SyncState, { status: "running" }>).startMs) / 1000) : 0;
     setState({
       status: "success",
       totalLoans,
-      totalRecords,
-      elapsed,
-      unmapped: allUnmapped.length ? [...new Set(allUnmapped)] : undefined,
+      totalPages,
+      elapsed: Math.floor((Date.now() - startMs) / 1000),
+      unmapped: allUnmapped.size ? Array.from(allUnmapped).sort() : undefined,
     });
   }
 
@@ -172,14 +206,14 @@ export function SyncNowButton() {
               : "border border-border bg-background text-foreground hover:bg-muted"
           } disabled:opacity-50`}
         >
-          Full historical (2 years · 8 chunks)
+          Full historical (2 years)
         </button>
       </div>
 
-      <p className="text-xs text-mutedForeground">
+      <p className="text-xs text-muted-foreground">
         {mode === "recent"
-          ? "Syncs leads created/updated in the last 90 days. Runs in ~30s."
-          : "Syncs all leads from the last 2 years in 8 sequential 3-month chunks. Takes ~3–5 min total but each request is small so it never times out."}
+          ? "Syncs leads from the last 90 days — one page at a time, never times out."
+          : "Syncs all leads from the last 2 years in 8 date chunks, one page (~50 leads) per request. Handles any database size — no timeouts possible."}
       </p>
 
       {/* Run button */}
@@ -199,30 +233,30 @@ export function SyncNowButton() {
         )}
       </button>
 
-      {/* Chunk progress */}
+      {/* Live progress */}
       {state.status === "running" && (
         <div className="flex flex-col gap-1.5">
           {state.chunks.map((c, i) => (
             <div key={i} className="flex items-center gap-2 text-xs">
-              {c.status === "pending" && <span className="text-mutedForeground">○</span>}
+              {c.status === "pending" && <span className="text-muted-foreground">○</span>}
               {c.status === "running" && (
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" />
               )}
               {c.status === "done" && <span className="text-green-500">✓</span>}
               {c.status === "error" && <span className="text-red-500">✗</span>}
-              <span className={c.status === "running" ? "text-foreground font-medium" : "text-mutedForeground"}>
+              <span className={c.status === "running" ? "font-medium text-foreground" : "text-muted-foreground"}>
                 {c.label}
               </span>
-              {c.status === "done" && c.loans !== undefined && (
-                <span className="text-green-600 dark:text-green-400">+{c.loans} loans</span>
+              {(c.status === "running" || c.status === "done") && (
+                <span className={c.status === "done" ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}>
+                  {c.loans} leads · {c.pages}p
+                </span>
               )}
-              {c.status === "error" && (
-                <span className="text-red-500">{c.error}</span>
-              )}
+              {c.status === "error" && <span className="text-red-500">{c.error}</span>}
             </div>
           ))}
-          <p className="mt-1 text-xs text-mutedForeground">
-            {state.totalLoans} loans upserted so far · do not close this tab
+          <p className="mt-1 text-xs text-muted-foreground">
+            {state.totalLoans} leads upserted · {state.totalPages} pages fetched — do not close this tab
           </p>
         </div>
       )}
@@ -230,10 +264,10 @@ export function SyncNowButton() {
       {/* Success */}
       {state.status === "success" && (
         <div className="rounded-md border border-green-600/50 bg-green-50 px-3 py-2 text-sm dark:bg-green-950/30">
-          <strong>Done</strong> — {state.totalLoans} loans upserted from {state.totalRecords} records
+          <strong>Done</strong> — {state.totalLoans} leads upserted across {state.totalPages} pages
           {state.elapsed ? ` in ${state.elapsed}s` : ""}.
           {state.unmapped?.length ? (
-            <p className="mt-2 text-mutedForeground">
+            <p className="mt-2 text-muted-foreground">
               Unmapped statuses (add to stage_mapping):{" "}
               {state.unmapped.slice(0, 15).join(", ")}
               {state.unmapped.length > 15 ? "…" : ""}
