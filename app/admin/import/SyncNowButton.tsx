@@ -29,7 +29,13 @@ function buildDateChunks(fromIso: string, toIso: string, monthsPerChunk = 3): Ar
   return chunks;
 }
 
-// ── Per-page API call ─────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+// ── Per-page API call (with 429 retry) ───────────────────────────────────────
 
 interface PageResult {
   done: boolean;
@@ -42,21 +48,40 @@ interface PageResult {
   unmappedStatuses?: string[];
 }
 
+/** Calls the per-page endpoint with up to 3 retries on 429 rate-limit. */
 async function syncOnePage(
   pageNumber: number,
   dateFrom: string,
   dateTo: string,
   importBatchId: string | null,
 ): Promise<PageResult> {
-  const res = await fetch("/api/sync/shape/page", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pageNumber, dateFrom, dateTo, importBatchId }),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json) throw new Error(json?.error ?? `Server returned ${res.status}`);
-  return json as PageResult;
+  const MAX_RETRIES = 3;
+  let delay = 12000; // 12s initial back-off on 429
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch("/api/sync/shape/page", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pageNumber, dateFrom, dateTo, importBatchId }),
+    });
+
+    if (res.status === 429) {
+      if (attempt === MAX_RETRIES) throw new Error("Rate limited by Shape API after 3 retries.");
+      await sleep(delay);
+      delay *= 2; // exponential back-off: 12s → 24s → 48s
+      continue;
+    }
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json) throw new Error(json?.error ?? `Server returned ${res.status}`);
+    return json as PageResult;
+  }
+
+  throw new Error("Unreachable");
 }
+
+/** Delay between pages to stay under Shape's rate limit (~1 req/s safe). */
+const PAGE_DELAY_MS = 1200;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -146,6 +171,8 @@ export function SyncNowButton() {
 
           if (result.done || result.duplicatePage) break;
           page = result.nextPage;
+          // Pause between pages to stay under Shape's rate limit
+          await sleep(PAGE_DELAY_MS);
         } catch (err) {
           chunkError = err instanceof Error ? err.message : "Page request failed";
           break;
@@ -212,8 +239,8 @@ export function SyncNowButton() {
 
       <p className="text-xs text-muted-foreground">
         {mode === "recent"
-          ? "Syncs leads from the last 90 days — one page at a time, never times out."
-          : "Syncs all leads from the last 2 years in 8 date chunks, one page (~50 leads) per request. Handles any database size — no timeouts possible."}
+          ? "Syncs leads from the last 90 days — one page (~50 leads) per request, paced to avoid Shape rate limits."
+          : "Syncs all leads from the last 2 years in 8 date chunks. One page per request with 1.2s pacing — handles any volume without timeouts or rate limits."}
       </p>
 
       {/* Run button */}

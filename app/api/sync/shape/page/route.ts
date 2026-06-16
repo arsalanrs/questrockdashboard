@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     const msg = err instanceof Error ? err.message : String(err);
     // Shape returns 400 "Record's not found" when a date range has no leads.
     // Treat it as an empty/done page rather than a fatal error.
-    if (msg.includes("Record") && msg.includes("not found") || msg.includes("400")) {
+    if (msg.includes("Record") && msg.includes("not found") || msg.includes("400 Bad Request")) {
       return NextResponse.json({
         done: true,
         nextPage: pageNumber,
@@ -127,6 +127,10 @@ export async function POST(request: Request) {
         recordsSkipped: 0,
         duplicatePage: false,
       });
+    }
+    // Surface 429 with a distinct status so the client can back off and retry
+    if (msg.includes("429")) {
+      return NextResponse.json({ error: "rate_limited", retryAfterMs: 10000 }, { status: 429 });
     }
     return NextResponse.json({ error: `Shape API error: ${msg}` }, { status: 502 });
   }
