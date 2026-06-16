@@ -22,6 +22,7 @@ import { shapeLeadUrl } from "@/lib/shape-link";
 import { EscalateButton, ResolveButton } from "@/components/monitor/EscalateButton";
 import { Badge } from "@/components/Badge";
 import { StatCard } from "@/components/StatCard";
+import { etMidnightIso, etTodayDate } from "@/lib/date-utils";
 
 export const revalidate = 30;
 
@@ -135,7 +136,10 @@ export default async function MonitorPage() {
   const supabase = await createSupabaseServerClient();
   const admin = createSupabaseAdminClient();
   const now = new Date();
-  const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  // ET midnight — correct "today" boundary for the business timezone
+  const todayIso = etMidnightIso(now);
+  // 48-hour lookback — catches unassigned leads from yesterday that are still unassigned today
+  const fortyEightHoursAgoIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const et = nowET();
 
   // ── Parallel data fetches ──────────────────────────────────────────────────
@@ -158,15 +162,17 @@ export default async function MonitorPage() {
     // Daily activity summary for LO accountability grid
     admin.from("v_daily_activity_summary").select("lo_name,loans_touched_today,status_changes_today,notes_today,new_leads_today,last_activity_at"),
 
-    // Today's leads for intraday SLA checks
+    // Intraday SLA scan window — last 48h so Rule 1 (unassigned_15min) catches
+    // yesterday's new leads that are still unassigned today; Rules 2-4 are
+    // self-gated to same-ET-day by evaluateIntradayRules()
     admin
       .from("loans")
       .select(
         "id,shape_record_id,shape_lead_id,borrower_first_name,borrower_last_name,borrower_phone,source,assigned_loan_officer_user_id,assigned_loan_officer_name,lead_created_at",
       )
-      .gte("lead_created_at", todayIso)
+      .gte("lead_created_at", fortyEightHoursAgoIso)
       .order("lead_created_at", { ascending: false })
-      .limit(200),
+      .limit(300),
 
     // Open escalations
     supabase
@@ -181,12 +187,15 @@ export default async function MonitorPage() {
   const { data: touchRows } = await admin
     .from("lead_touch_log")
     .select("loan_id,touch_count")
-    .eq("touch_date", now.toLocaleDateString("en-CA")); // YYYY-MM-DD format
+    .eq("touch_date", etTodayDate(now)); // YYYY-MM-DD in ET
 
   const touchMap = new Map<string, number>();
   for (const t of touchRows ?? []) {
     touchMap.set(t.loan_id as string, (t.touch_count as number) ?? 0);
   }
+
+  // "New Leads Today" = only ET-today leads (todayIso boundary), not the 48h window
+  const todayOnlyLoans = (todayLoans ?? []).filter((l) => (l.lead_created_at as string) >= todayIso);
 
   // ── Intraday SLA evaluation ───────────────────────────────────────────────
   type IntradayLead = {
@@ -231,7 +240,7 @@ export default async function MonitorPage() {
 
   // ── EOD Zero-Touch (visible after 3 PM ET) ────────────────────────────────
   const eodZeroTouch = et.past3PM
-    ? (todayLoans ?? []).filter((l) => (touchMap.get(l.id as string) ?? 0) === 0)
+    ? todayOnlyLoans.filter((l) => (touchMap.get(l.id as string) ?? 0) === 0)
     : [];
 
   // ── SLA Red/Yellow split ──────────────────────────────────────────────────
@@ -249,9 +258,9 @@ export default async function MonitorPage() {
     touchPct: number;
   };
 
-  // Build a set of LO names who have new leads today for denominator
+  // Build a set of LO names who have new leads today for denominator (ET-today only)
   const loNewLeads = new Map<string, number>();
-  for (const l of todayLoans ?? []) {
+  for (const l of todayOnlyLoans) {
     const name = (l.assigned_loan_officer_name as string | null) ?? "Unassigned";
     loNewLeads.set(name, (loNewLeads.get(name) ?? 0) + 1);
   }
@@ -274,8 +283,8 @@ export default async function MonitorPage() {
   loRows.sort((a, b) => a.touchPct - b.touchPct); // lowest contact rate first
 
   // ── Summary counts ────────────────────────────────────────────────────────
-  const totalNewToday = todayLoans?.length ?? 0;
-  const totalUntouched = [...(todayLoans ?? [])].filter((l) => (touchMap.get(l.id as string) ?? 0) === 0).length;
+  const totalNewToday = todayOnlyLoans.length;
+  const totalUntouched = todayOnlyLoans.filter((l) => (touchMap.get(l.id as string) ?? 0) === 0).length;
 
   return (
     <div className="space-y-8">

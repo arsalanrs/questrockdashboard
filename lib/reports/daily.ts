@@ -8,6 +8,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { etMidnightIso } from "@/lib/date-utils";
 
 export type DailyReportData = {
   date: string;
@@ -37,8 +38,7 @@ function formatDate(d: Date): string {
 
 export async function buildDailyReport(admin: SupabaseClient): Promise<DailyReportData> {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayIso = today.toISOString();
+  const todayIso = etMidnightIso(today);
 
   const [newLeadsRes, slaRes, activityRes] = await Promise.all([
     admin

@@ -20,6 +20,8 @@ import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
 import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
+import { buildDailyReport, renderDailyReportMarkdown } from "@/lib/reports/daily";
+import { etMidnightIso, etTodayDate } from "@/lib/date-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,22 +128,23 @@ async function scanIntradaySla(admin: ReturnType<typeof createSupabaseAdminClien
   notificationsWritten: number;
 }> {
   const now = new Date();
-  const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  // 48-hour window: Rule 1 (unassigned) fires for recent leads that slipped through overnight
+  const windowIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
-  // Fetch today's new leads with assignment info
+  // Fetch last-48h leads with assignment info
   const { data: todayLoans, error: loansErr } = await admin
     .from("loans")
     .select("id,borrower_first_name,borrower_last_name,assigned_loan_officer_user_id,assigned_loan_officer_name,lead_created_at")
-    .gte("lead_created_at", todayIso)
+    .gte("lead_created_at", windowIso)
     .limit(300);
   if (loansErr) throw loansErr;
   if (!todayLoans?.length) return { evaluated: 0, breachesFound: 0, notificationsWritten: 0 };
 
-  // Touch counts for today
+  // Touch counts for today (ET date)
   const { data: touchRows } = await admin
     .from("lead_touch_log")
     .select("loan_id,touch_count")
-    .eq("touch_date", now.toLocaleDateString("en-CA"));
+    .eq("touch_date", etTodayDate(now));
   const touchMap = new Map<string, number>();
   for (const t of touchRows ?? []) touchMap.set(t.loan_id as string, (t.touch_count as number) ?? 0);
 
@@ -253,6 +256,59 @@ async function handle(request: Request) {
   results.lpDocuments = await step("lpDocuments", async () => {
     if (!hasLendingPadReadConfig()) return { skipped: true, reason: "LendingPad not configured" };
     return await runLendingPadDocumentsSync({ maxLoans: 100 });
+  });
+
+  // Step 7 — Refresh live daily report snapshot for the Monitor page.
+  // Replaces any existing report_daily_live row for today so executives
+  // always see a snapshot that's at most 15 minutes stale.
+  results.dailySnapshot = await step("dailySnapshot", async () => {
+    const admin7 = createSupabaseAdminClient();
+    const now7 = new Date();
+    const todayEt = etTodayDate(now7);
+
+    // Build fresh report
+    const data = await buildDailyReport(admin7);
+    const body = renderDailyReportMarkdown(data);
+    const title = `Daily Report — ${data.date}`;
+
+    // Fetch all exec + admin + manager user IDs
+    const { data: execUsers, error: execErr } = await admin7
+      .from("users")
+      .select("id")
+      .in("role", ["executive", "admin", "manager"]);
+    if (execErr) throw execErr;
+    const execIds = (execUsers ?? []).map((u) => u.id as string);
+    if (execIds.length === 0) return { skipped: true, reason: "No exec/admin/manager users" };
+
+    // Delete stale live-snapshot rows for today (keeps only 1 per day)
+    await admin7
+      .from("executive_notifications")
+      .delete()
+      .eq("kind", "report_daily_live")
+      .gte("created_at", etMidnightIso(now7));
+
+    // Insert fresh snapshot for every exec/manager user
+    const rows = execIds.map((userId) => ({
+      user_id: userId,
+      kind: "report_daily_live",
+      title,
+      body,
+      payload: {
+        report_type: "daily",
+        snapshot_date: todayEt,
+        generated_at: now7.toISOString(),
+      },
+    }));
+
+    const { error: insErr } = await admin7.from("executive_notifications").insert(rows);
+    if (insErr) throw insErr;
+
+    return {
+      snapshotDate: todayEt,
+      deliveredTo: execIds.length,
+      newLeadsCount: data.newLeadsCount,
+      slaRedCount: data.slaRedCount,
+    };
   });
 
   const anyFailures = Object.values(results).some((r) => !r.ok);
