@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canAccessDashboard } from "@/lib/dashboard-access";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -17,6 +18,17 @@ export async function GET(request: Request) {
       access_token: accessToken,
       refresh_token: refreshToken,
     });
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user && !canAccessDashboard(user.email)) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent("QR Dashboard access is limited to authorized users.")}`
+    );
   }
 
   return NextResponse.redirect(`${origin}${redirectTo}`);

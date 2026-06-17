@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
+import { canAccessDashboard } from "@/lib/dashboard-access";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/admin"];
 
@@ -46,6 +47,30 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
+  }
+
+  if (!canAccessDashboard(user.email)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set(
+      "error",
+      "QR Dashboard access is limited to authorized users."
+    );
+    const denied = NextResponse.redirect(url);
+    const signOutClient = createServerClient(env.url, env.key, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            denied.cookies.set(name, value, options)
+          );
+        },
+      },
+    });
+    await signOutClient.auth.signOut();
+    return denied;
   }
 
   return response;
