@@ -1,5 +1,10 @@
-/** Who can use QR Dashboard at all (hub SSO or direct login). */
-const DEFAULT_ALLOWED = ['arashid@questrock.com'];
+/** QuestRock executives — full QR Dashboard access (hub SSO + direct login). */
+const DEFAULT_ALLOWED = [
+  'arashid@questrock.com',
+  'nikksmith@questrock.com',
+  'bmedley@questrock.com',
+  'rayconway@questrock.com',
+];
 
 export function getDashboardAllowedEmails(): Set<string> {
   const fromEnv = process.env.QR_DASHBOARD_ALLOWED_EMAILS?.trim();
