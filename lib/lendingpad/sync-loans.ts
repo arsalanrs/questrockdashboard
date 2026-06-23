@@ -16,6 +16,7 @@ import { getLendingPadLoanDetail, listLendingPadLoansWithAuth } from "./client";
 import type { LendingPadAuthContext } from "./auth-fetch";
 import { mapLendingPadStatusToStage } from "./map-lp-status-to-stage";
 import type { NormalizedLpLoanDetail, NormalizedLpLoanListItem } from "./parse-response";
+import { upsertRichLoanDataFromSync } from "./upsert-rich-loan-data";
 
 const PAGE_SIZE = 25;
 const MAX_PAGES = 500;
@@ -414,6 +415,14 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
             continue;
           }
           upserted += 1;
+          if (detail) {
+            try {
+              await upsertRichLoanDataFromSync(admin, ex.id, detail, item);
+            } catch (e) {
+              const m = e instanceof Error ? e.message : String(e);
+              result.errors.push(`rich_data ${item.id}: ${m}`);
+            }
+          }
           if (item.statusRaw && item.statusRaw !== prevLpStatus && stage) {
             try {
               await recordLoanStageEventIfChanged(admin, ex.id, stage, enteredAt);
@@ -436,6 +445,14 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
             continue;
           }
           upserted += 1;
+          if (detail && ins?.id) {
+            try {
+              await upsertRichLoanDataFromSync(admin, ins.id as string, detail, item);
+            } catch (e) {
+              const m = e instanceof Error ? e.message : String(e);
+              result.errors.push(`rich_data ${item.id}: ${m}`);
+            }
+          }
           if (stage && ins?.id) {
             try {
               await recordLoanStageEventIfChanged(admin, ins.id as string, stage, enteredAt);

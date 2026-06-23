@@ -26,8 +26,12 @@ Secrets belong in **Vercel Project → Settings → Environment Variables** for 
 | `LENDINGPAD_COMPANY_ID` | UUID from Postman / LendingPad setup. |
 | `LENDINGPAD_LIST_USER_ID` | UUID for `GET /integrations/list/loans` and admin **list-loans** route. |
 | `LENDINGPAD_SYNC_MAX_LOANS` | Optional; default 150 loans per conditions sync. |
+| `LENDINGPAD_WEBHOOK_USERNAME` | Optional Basic auth for **`POST /api/webhooks/lendingpad`** (LP export push). Falls back to `LENDINGPAD_USERNAME` / `LENDINGPAD_PASSWORD` if unset. |
+| `LENDINGPAD_WEBHOOK_PASSWORD` | Pair with `LENDINGPAD_WEBHOOK_USERNAME` for webhook auth. |
 
 Same values can be pasted into `.env.local` for local testing of `/api/sync/lendingpad` and LendingPad routes.
+
+**LendingPad export webhook:** Register with LendingPad support — URL `https://your-domain/api/webhooks/lendingpad`, HTTP Basic auth. LP sends a connection test with header **`X-TEST`** (app returns 200). Full loan export batches (up to 25 loans) upsert `loans`, `rich_loan_data`, `loan_notes`, and conditions.
 
 **`/api/sync/lendingpad` behavior:** Calls **`GET /integrations/list/loans`** (batch size 1–25 per LendingPad guide) for each credential source, then **conditions** sync. Sources: (1) rows in **`public.lendingpad_user_credentials`** (per LO: `api_username`, `api_password`, `list_user_id` — insert via SQL; **service role only**, not exposed to the browser), or (2) env **`LENDINGPAD_LIST_USER_ID`** if no credential rows exist. **Shape** continues to populate `status_raw` / `current_stage` from **`stage_mapping`**; **LendingPad** fills **`lendingpad_status_raw`**, **`lendingpad_status_at`**, and (for loans without `shape_record_id`) updates `current_stage` from the LP map. When **`lendingpad_status_raw`** changes, a **`loan_stage_events`** row may be appended for pipeline metrics. Enable **inbound API** for the integration contact in LendingPad. Local one-shot: `npm run lendingpad:sync` (requires `npm run dev` and `CRON_SECRET`). See also **[lendingpadtxt](../lendingpadtxt)** (LendingPad Web API guide in-repo).
 
@@ -53,3 +57,9 @@ If `CRON_SECRET` is unset, only a **signed-in admin** can trigger sync (cron can
 ## Shape / Supabase / OpenAI
 
 See comments in [`.env.local.example`](../.env.local.example) for `SHAPE_*`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, etc. Use the same names in Vercel.
+
+### Shape write-back (Concierge + LO dashboard)
+
+| Variable | Notes |
+|----------|--------|
+| `SHAPE_UPDATE_LEAD_URL` | Optional. Default `https://secure-api.setshape.com/api/update/lead/info`. Used by Concierge phone save, LO Shape status updates. |

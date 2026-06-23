@@ -95,24 +95,176 @@ type ChunkState = {
 
 type SyncState =
   | { status: "idle" }
-  | { status: "running"; chunks: ChunkState[]; totalLoans: number; totalPages: number; startMs: number }
-  | { status: "success"; totalLoans: number; totalPages: number; elapsed: number; unmapped?: string[] }
+  | { status: "running"; chunks: ChunkState[]; totalLoans: number; totalPages: number; startMs: number; phase?: string }
+  | { status: "success"; totalLoans: number; totalPages: number; elapsed: number; unmapped?: string[]; rebuilt?: boolean }
   | { status: "error"; message: string };
+
+function nDaysAgoIso(n: number) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SyncNowButton() {
   const [state, setState] = useState<SyncState>({ status: "idle" });
-  const [mode, setMode] = useState<"recent" | "full">("recent");
+  const [mode, setMode] = useState<"recent" | "full" | "rebuild">("recent");
   const abortRef = useRef(false);
 
   async function handleSync() {
     const today = todayIso();
     abortRef.current = false;
 
+    if (mode === "rebuild") {
+      const startMs = Date.now();
+      setState({
+        status: "running",
+        chunks: [{ label: "Reset operational loans", status: "running", loans: 0, pages: 0 }],
+        totalLoans: 0,
+        totalPages: 0,
+        startMs,
+        phase: "reset",
+      });
+
+      const resetRes = await fetch("/api/admin/reset-loans", { method: "POST" });
+      const resetJson = await resetRes.json().catch(() => null);
+      if (!resetRes.ok) {
+        setState({ status: "error", message: resetJson?.error ?? "Reset failed" });
+        return;
+      }
+
+      const dateChunks = [{ from: nDaysAgoIso(90), to: today }];
+      const initialChunks: ChunkState[] = [
+        { label: "Reset complete", status: "done", loans: 0, pages: 0 },
+        ...dateChunks.map((c) => ({
+          label: `Shape sync ${c.from} → ${c.to}`,
+          status: "pending" as const,
+          loans: 0,
+          pages: 0,
+        })),
+        { label: "LendingPad sync", status: "pending", loans: 0, pages: 0 },
+      ];
+
+      setState({
+        status: "running",
+        chunks: initialChunks,
+        totalLoans: 0,
+        totalPages: 0,
+        startMs,
+        phase: "sync",
+      });
+
+      let totalLoans = 0;
+      let totalPages = 0;
+      const allUnmapped = new Set<string>();
+
+      for (let ci = 1; ci < dateChunks.length + 1; ci++) {
+        if (abortRef.current) break;
+        const chunkIdx = ci;
+        setState((s) =>
+          s.status === "running"
+            ? {
+                ...s,
+                chunks: s.chunks.map((c, i) => (i === chunkIdx ? { ...c, status: "running" } : c)),
+              }
+            : s,
+        );
+
+        const { from, to } = dateChunks[ci - 1];
+        let page = 1;
+        let importBatchId: string | null = null;
+        let chunkLoans = 0;
+        let chunkPages = 0;
+
+        while (!abortRef.current) {
+          try {
+            const result = await syncOnePage(page, from, to, importBatchId);
+            importBatchId = result.importBatchId;
+            chunkLoans += result.loansUpserted;
+            chunkPages++;
+            totalLoans += result.loansUpserted;
+            totalPages++;
+            result.unmappedStatuses?.forEach((s) => allUnmapped.add(s));
+
+            setState((s) =>
+              s.status === "running"
+                ? {
+                    ...s,
+                    totalLoans,
+                    totalPages,
+                    chunks: s.chunks.map((c, i) =>
+                      i === chunkIdx ? { ...c, loans: chunkLoans, pages: chunkPages } : c,
+                    ),
+                  }
+                : s,
+            );
+
+            if (result.done || result.duplicatePage) break;
+            page = result.nextPage;
+            await sleep(PAGE_DELAY_MS);
+          } catch (err) {
+            setState({
+              status: "error",
+              message: err instanceof Error ? err.message : "Shape sync failed during rebuild",
+            });
+            return;
+          }
+        }
+
+        setState((s) =>
+          s.status === "running"
+            ? {
+                ...s,
+                chunks: s.chunks.map((c, i) => (i === chunkIdx ? { ...c, status: "done" } : c)),
+              }
+            : s,
+        );
+      }
+
+      const lpIdx = dateChunks.length + 1;
+      setState((s) =>
+        s.status === "running"
+          ? {
+              ...s,
+              chunks: s.chunks.map((c, i) => (i === lpIdx ? { ...c, status: "running" } : c)),
+            }
+          : s,
+      );
+
+      const lpRes = await fetch("/api/sync/lendingpad", { method: "POST" });
+      if (!lpRes.ok) {
+        const lpJson = await lpRes.json().catch(() => null);
+        setState({
+          status: "error",
+          message: lpJson?.error ?? "LendingPad sync failed after rebuild",
+        });
+        return;
+      }
+
+      setState((s) =>
+        s.status === "running"
+          ? {
+              ...s,
+              chunks: s.chunks.map((c, i) => (i === lpIdx ? { ...c, status: "done" } : c)),
+            }
+          : s,
+      );
+
+      setState({
+        status: "success",
+        totalLoans,
+        totalPages,
+        elapsed: Math.floor((Date.now() - startMs) / 1000),
+        unmapped: allUnmapped.size ? Array.from(allUnmapped).sort() : undefined,
+        rebuilt: true,
+      });
+      return;
+    }
+
     const dateChunks =
       mode === "recent"
-        ? [{ from: nMonthsAgoIso(3), to: today }]
+        ? [{ from: nDaysAgoIso(90), to: today }]
         : buildDateChunks(nMonthsAgoIso(24), today, 3);
 
     const initialChunks: ChunkState[] = dateChunks.map((c, i) => ({
@@ -235,12 +387,26 @@ export function SyncNowButton() {
         >
           Full historical (2 years)
         </button>
+        <button
+          type="button"
+          onClick={() => setMode("rebuild")}
+          disabled={isRunning}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            mode === "rebuild"
+              ? "bg-red-600 text-white"
+              : "border border-red-600/40 bg-background text-red-600 hover:bg-red-950/20"
+          } disabled:opacity-50`}
+        >
+          Clean 90-day rebuild
+        </button>
       </div>
 
       <p className="text-xs text-muted-foreground">
         {mode === "recent"
           ? "Syncs leads from the last 90 days — one page (~50 leads) per request, paced to avoid Shape rate limits."
-          : "Syncs all leads from the last 2 years in 8 date chunks. One page per request with 1.2s pacing — handles any volume without timeouts or rate limits."}
+          : mode === "full"
+            ? "Syncs all leads from the last 2 years in 8 date chunks. One page per request with 1.2s pacing — handles any volume without timeouts or rate limits."
+            : "Wipes all operational loan data, then re-syncs Shape (90 days) and LendingPad. Keeps users, teams, and stage_mapping."}
       </p>
 
       {/* Run button */}
@@ -255,6 +421,8 @@ export function SyncNowButton() {
             <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-background/30 border-t-background" />
             Syncing…
           </>
+        ) : mode === "rebuild" ? (
+          "Clean rebuild…"
         ) : (
           "Sync now"
         )}
@@ -291,7 +459,7 @@ export function SyncNowButton() {
       {/* Success */}
       {state.status === "success" && (
         <div className="rounded-md border border-green-600/50 bg-green-50 px-3 py-2 text-sm dark:bg-green-950/30">
-          <strong>Done</strong> — {state.totalLoans} leads upserted across {state.totalPages} pages
+          <strong>{state.rebuilt ? "Rebuild complete" : "Done"}</strong> — {state.totalLoans} leads upserted across {state.totalPages} pages
           {state.elapsed ? ` in ${state.elapsed}s` : ""}.
           {state.unmapped?.length ? (
             <p className="mt-2 text-muted-foreground">

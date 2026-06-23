@@ -9,7 +9,13 @@ import type { ShapeBulkExportResponse } from "@/lib/shape-api/types";
 // Shape API returns "Referral Partners" (with 's'); CSV exports use "Referral Partner" (no 's').
 // Both are excluded. "Contact" is also excluded.
 const EXCLUDED_RECORD_TYPES = new Set(["Referral Partner", "Referral Partners", "Contact"]);
-const EXCLUDED_SOURCES = new Set(["zWebLead - VISIT"]);
+const EXCLUDED_SOURCES = new Set([
+  "zWebLead - VISIT",
+  "zWebLead - Visit",
+  "zCRM Import",
+  "Test Lead",
+  "Inbound Shape Call",
+]);
 
 const PAGE_SIZE = 50;
 // 500ms is safe for Shape's API — was 1500ms which caused 504s on large syncs

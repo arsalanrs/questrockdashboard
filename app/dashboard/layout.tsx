@@ -2,6 +2,7 @@ import Image from "next/image";
 import { NavLink } from "@/components/NavLink";
 import { SyncButton } from "@/components/SyncButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { DashboardRealtime } from "@/components/DashboardRealtime";
 import { SignOutButton } from "@/components/SignOutButton";
 import { requireCurrentUser } from "@/lib/current-user";
 import {
@@ -76,7 +77,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="relative mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           {/* Brand */}
           <div className="flex items-center gap-3">
-            <div className="relative h-11 w-[180px] shrink-0 rounded-lg overflow-hidden bg-white/90 px-2 flex items-center">
+            <div className="relative h-11 w-[180px] shrink-0">
               <Image
                 src="/questrock-logo.png"
                 alt="QuestRock"
@@ -88,7 +89,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               />
             </div>
             <div className="leading-tight hidden sm:block">
-              <div className="text-[13px] font-semibold tracking-tight text-foreground">LO Command Center</div>
+              <div className="text-[13px] font-semibold tracking-tight text-white">LO Command Center</div>
               <div className="text-[11px]" style={{ color: "#E8FF00", opacity: 0.8 }}>Questrock Mortgage</div>
             </div>
           </div>
@@ -96,6 +97,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {/* Nav */}
           <nav className="flex items-center gap-0.5">
             <NavLink href="/dashboard/lo">Loan Officer</NavLink>
+            <NavLink href="/dashboard/concierge">Concierge</NavLink>
             {canViewManagerDashboard(appUser.role) ? <NavLink href="/dashboard/manager">Manager</NavLink> : null}
             {canViewMonitor(appUser.role) ? <NavLink href="/dashboard/monitor">Monitor</NavLink> : null}
             {canViewProcessorDashboard(appUser.role) ? <NavLink href="/dashboard/processor">Processor</NavLink> : null}
@@ -103,7 +105,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {canViewExecutiveDashboard(appUser.role) ? <NavLink href="/dashboard/executive">Executive</NavLink> : null}
             {canAccessAdmin(appUser.role) ? <NavLink href="/dashboard/admin-view">Team View</NavLink> : null}
             {canAccessAdmin(appUser.role) ? <NavLink href="/admin/import">Admin</NavLink> : null}
-            <span className="hidden md:inline rounded-lg px-3 py-1.5 text-[13px] font-medium text-mutedForeground">
+            <span className="hidden md:inline rounded-lg px-3 py-1.5 text-[13px] font-medium text-gray-300">
               {appUser.full_name ?? appUser.email}
             </span>
             <SyncButton />
@@ -114,7 +116,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </header>
 
       {/* ── Page content ─────────────────────────────────────────────── */}
-      <main className="relative z-10 mx-auto max-w-[1360px] px-6 py-6">{children}</main>
+      <main className="relative z-10 mx-auto max-w-[1360px] px-6 py-6">
+        <DashboardRealtime userId={appUser.id} />
+        {children}
+      </main>
     </div>
   );
 }

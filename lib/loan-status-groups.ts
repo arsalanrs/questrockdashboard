@@ -114,7 +114,9 @@ export const PITCH_QUEUE_SET = new Set<string>(PITCH_QUEUE_STATUSES);
 
 export type MicroStageKey =
   | "verification"
+  | "pitches"
   | "esign_out"
+  | "pre_pipe"
   | "processing"
   | "underwriting"
   | "approval"
@@ -138,15 +140,25 @@ export const MICRO_STAGES: Array<{
       "App Completed",
       "Verification Docs Requested",
       "Verification Docs Received",
-      "Pitch Appointment Scheduled",
-      "Pitched - Follow Up",
-      "Pitched & Waiting",
-      "Pre-Qualified",
-      "Pre-Approved",
     ],
     instructions:
       "Review borrower's verification documents. Confirm income, assets, and identity. Ensure all required docs are collected before pitching.",
-    nextAction: "Complete verification and send eSign package to borrower.",
+    nextAction: "Complete verification and schedule pitch or send eSign package.",
+  },
+  {
+    key: "pitches",
+    label: "Pitches",
+    turnTime: "Up to 48 hrs",
+    subStatuses: [
+      "Pitch Appointment Scheduled",
+      "Pitched - Follow Up",
+      "Pitched & Waiting",
+      "Pitched - Advance",
+      "Did Not Advance",
+    ],
+    instructions:
+      "Borrower is in pitch stage. Present loan options, follow up on decisions, and advance qualified borrowers.",
+    nextAction: "Pitch loan options and move to eSign or pre-pipe when ready.",
   },
   {
     key: "esign_out",
@@ -154,14 +166,25 @@ export const MICRO_STAGES: Array<{
     turnTime: "3 hrs / 24 hrs",
     subStatuses: [
       "Pitched - Prep Package Out",
-      "Pitched - Advance",
       "Contract Received",
       "Package Out",
-      "Package Signed Not Piped",
     ],
     instructions:
       "eSign package has been sent. Follow up with borrower to sign within 3 hours if during business hours, 24 hours otherwise.",
     nextAction: "Confirm signed package received and move to Processing.",
+  },
+  {
+    key: "pre_pipe",
+    label: "Pre-Pipe",
+    turnTime: "LO: 48 hrs",
+    subStatuses: [
+      "Pre-Qualified",
+      "Pre-Approved",
+      "Package Signed Not Piped",
+    ],
+    instructions:
+      "Borrower is pre-qualified or pre-approved. Monitor house hunting progress and send package when under contract.",
+    nextAction: "Follow up on contract or send full loan package when ready.",
   },
   {
     key: "processing",
@@ -273,7 +296,7 @@ export const MACRO_STAGES: Array<{
   label: string;
   microKeys: MicroStageKey[];
 }> = [
-  { key: "verification_macro", label: "VERIFICATION", microKeys: ["verification", "esign_out"] },
+  { key: "verification_macro", label: "VERIFICATION", microKeys: ["verification", "pitches", "esign_out", "pre_pipe"] },
   { key: "validation", label: "VALIDATION", microKeys: ["processing", "underwriting"] },
   { key: "final_approval", label: "FINAL APPROVAL", microKeys: ["approval"] },
   { key: "closing_macro", label: "CLOSING", microKeys: ["ctc"] },
@@ -347,6 +370,26 @@ export const DOC_CHECKLISTS: Record<string, { title: string; items: string[] }> 
       "Title commitment / preliminary title report",
       "Purchase contract (if purchase)",
       "Appraisal order confirmation",
+    ],
+  },
+  pitches: {
+    title: "Pitch Preparation",
+    items: [
+      "Rate sheet / loan options prepared",
+      "Credit report reviewed",
+      "Income and assets verified",
+      "Pitch appointment confirmed on calendar",
+      "Follow-up date scheduled if borrower needs time",
+    ],
+  },
+  pre_pipe: {
+    title: "Pre-Pipe Documents",
+    items: [
+      "Pre-qualification or pre-approval letter issued",
+      "Intent to proceed signed",
+      "House hunting guidance sent (if purchase)",
+      "Package ready for when contract is received",
+      "Appraisal payment instructions sent",
     ],
   },
 };

@@ -168,6 +168,10 @@ export function buildLoanPayloadFromRow(
   const estimated_appraisal_value_cents = parseMoneyCents(r["Estimated Appraisal Value"]);
   // shape_last_updated_at: "Date Loan Last Updated" is the mapped key for lastActivityDate
   const shape_last_updated_at = parseMaybeTimestamp(r["Date Loan Last Updated"]);
+  const portal_status_raw = trimOrNull(r["Portal Status"]);
+  const conversion_date = parseMaybeTimestamp(r["Conversion Date"]);
+  const last_status_change_at =
+    parseMaybeTimestamp(r["Last Status Change Date"]) ?? shape_last_updated_at;
 
   const payload = {
     import_batch_id: importBatchId,
@@ -205,6 +209,7 @@ export function buildLoanPayloadFromRow(
     loan_amount_cents,
 
     status_raw: statusRaw,
+    portal_status_raw,
     current_stage: currentStage,
 
     source: trimOrNull(r["Source"]),
@@ -219,6 +224,7 @@ export function buildLoanPayloadFromRow(
 
     // Milestone timestamps — every Shape tracker we request in fields.ts.
     application_completed_at: parseMaybeTimestamp(r["Application Completed Date"]),
+    conversion_date,
     credit_report_requested_at: parseMaybeTimestamp(r["Credit Report Request Date"]),
     appraisal_requested_at: appraisalTs,
     appraisal_ordered_at: appraisalTs,
@@ -275,6 +281,7 @@ export function buildLoanPayloadFromRow(
     down_payment_cents,
     estimated_appraisal_value_cents,
     shape_last_updated_at,
+    last_status_change_at,
 
     // Notes — stored as-is (may be HTML); consumers strip tags as needed.
     notes_sidebar: trimOrNull(r["Notes Sidebar"]),

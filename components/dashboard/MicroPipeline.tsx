@@ -4,8 +4,9 @@ import { useMemo, useState, useCallback } from "react";
 import { cn } from "@/lib/cn";
 import { MICRO_STAGES, DOC_CHECKLISTS, type MicroStageKey } from "@/lib/loan-status-groups";
 
+import { LoanDetailPanel, type LoanDetailData } from "@/components/LoanDetailPanel";
+
 const SHAPE_BASE = "https://secure.setshape.com/prospects/";
-const LENDING_PAD_URL = "https://prod.lendingpad.com/questrock-llc/login";
 const TEAMS_URL = "https://teams.microsoft.com";
 
 export type MicroLoan = {
@@ -40,10 +41,16 @@ function fmt$(cents: number | null) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 }
 
-export function MicroPipeline({ loansByMicro }: { loansByMicro: Map<MicroStageKey, MicroLoan[]> }) {
+export function MicroPipeline({
+  loansByMicro,
+  loanDetails = {},
+}: {
+  loansByMicro: Map<MicroStageKey, MicroLoan[]>;
+  loanDetails?: Record<string, LoanDetailData>;
+}) {
   const [expandedStage, setExpandedStage] = useState<MicroStageKey | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelLoan, setPanelLoan] = useState<MicroLoan | null>(null);
+  const [panelLoan, setPanelLoan] = useState<LoanDetailData | null>(null);
 
   const stageData: StageData[] = useMemo(
     () =>
@@ -68,9 +75,12 @@ export function MicroPipeline({ loansByMicro }: { loansByMicro: Map<MicroStageKe
   }, []);
 
   const openLoanPanel = useCallback((loan: MicroLoan) => {
-    setPanelLoan(loan);
-    setPanelOpen(true);
-  }, []);
+    const detail = loanDetails[loan.id];
+    if (detail) {
+      setPanelLoan(detail);
+      setPanelOpen(true);
+    }
+  }, [loanDetails]);
 
   const closePanel = useCallback(() => {
     setPanelOpen(false);
@@ -159,7 +169,11 @@ export function MicroPipeline({ loansByMicro }: { loansByMicro: Map<MicroStageKe
                   <tbody className="divide-y divide-border/30">
                     {expandedData.loans.map((l) => (
                       <tr key={l.id} className="transition-colors hover:bg-muted/20">
-                        <td className="px-3 py-2 font-medium">{borrowerName(l)}</td>
+                        <td className="px-3 py-2 font-medium">
+                          <button type="button" className="hover:text-[#E8FF00]" onClick={() => openLoanPanel(l)}>
+                            {borrowerName(l)}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 text-xs text-mutedForeground">{l.status_raw}</td>
                         <td className="px-3 py-2 text-xs text-mutedForeground">{l.loan_type ?? "—"}</td>
                         <td className="px-3 py-2 tabular-nums">{fmt$(l.loan_amount_cents)}</td>
@@ -169,7 +183,7 @@ export function MicroPipeline({ loansByMicro }: { loansByMicro: Map<MicroStageKe
                               <a href={`${SHAPE_BASE}${l.shape_record_id}/edit`} target="_blank" rel="noopener noreferrer"
                                 className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition-colors hover:border-[#E8FF00]/40 hover:text-[#E8FF00]">Shape</a>
                             )}
-                            <a href={LENDING_PAD_URL} target="_blank" rel="noopener noreferrer"
+                            <a href={loanDetails[l.id]?.lendingpad_loan_uuid ? `https://app.lendingpad.com/loans/${loanDetails[l.id]?.lendingpad_loan_uuid}` : "https://prod.lendingpad.com/questrock-llc/login"} target="_blank" rel="noopener noreferrer"
                               className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition-colors hover:border-[#E8FF00]/40 hover:text-[#E8FF00]">LP</a>
                             <a href={TEAMS_URL} target="_blank" rel="noopener noreferrer"
                               className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] transition-colors hover:border-[#E8FF00]/40 hover:text-[#E8FF00]">Teams</a>
@@ -197,38 +211,7 @@ export function MicroPipeline({ loansByMicro }: { loansByMicro: Map<MicroStageKe
         aria-hidden={!panelOpen}
       >
         {panelLoan && (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b px-4 py-3"
-              style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)" }}>
-              <h2 className="text-sm font-semibold" style={{ color: "#E8FF00" }}>{borrowerName(panelLoan)}</h2>
-              <button type="button" onClick={closePanel} className="rounded-lg p-1.5 transition-colors hover:bg-muted/50">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 text-sm space-y-3">
-              <div className="text-mutedForeground">Status: <span className="font-medium text-foreground">{panelLoan.status_raw}</span></div>
-              <div className="text-mutedForeground">Loan Type: <span className="font-medium text-foreground">{panelLoan.loan_type ?? "—"}</span></div>
-              <div className="text-mutedForeground">Amount: <span className="font-semibold" style={{ color: "#E8FF00" }}>{fmt$(panelLoan.loan_amount_cents)}</span></div>
-              <div className="flex flex-wrap gap-2 pt-2">
-                {panelLoan.shape_record_id && (
-                  <a href={`${SHAPE_BASE}${panelLoan.shape_record_id}/edit`} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium transition-all hover:border-[#E8FF00]/40 hover:text-[#E8FF00]">
-                    Open in Shape
-                  </a>
-                )}
-                <a href={LENDING_PAD_URL} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium transition-all hover:border-[#E8FF00]/40 hover:text-[#E8FF00]">
-                  LendingPad
-                </a>
-                <a href={TEAMS_URL} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-medium transition-all hover:border-[#E8FF00]/40 hover:text-[#E8FF00]">
-                  Teams
-                </a>
-              </div>
-            </div>
-          </div>
+          <LoanDetailPanel loan={panelLoan} onClose={closePanel} />
         )}
       </div>
       {panelOpen && (

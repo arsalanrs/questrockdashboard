@@ -107,6 +107,14 @@ const API_TO_CSV: Record<string, string> = {
   "Custom Field - LendingPad Loan ID": "Custom Field - LendingPad Loan ID",
   "LendingPad Status": "LendingPad Status",
   lendingPadStatus: "LendingPad Status",
+  "Portal Status": "Portal Status",
+  "POS Status": "Portal Status",
+  portalStatus: "Portal Status",
+  posStatus: "Portal Status",
+  "Conversion Date": "Conversion Date",
+  conversionDate: "Conversion Date",
+  "Last Status Change Date": "Last Status Change Date",
+  "Status Change Date": "Last Status Change Date",
   "E-Sign Returned Date": "E-Sign Returned Date",
   "Appraisal Payment Collected Date": "Appraisal Payment Collected Date",
 
@@ -184,6 +192,13 @@ const STATUS_FIELD_NAMES = [
   "Status",
 ];
 
+const PORTAL_STATUS_FIELD_NAMES = [
+  "Portal Status",
+  "POS Status",
+  "portalStatus",
+  "posStatus",
+];
+
 function str(value: unknown): string | undefined {
   if (value == null) return undefined;
   const s = String(value).trim();
@@ -210,6 +225,16 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
       const v = str(record[statusKey]);
       if (v !== undefined) {
         out["Status"] = v;
+        break;
+      }
+    }
+  }
+
+  for (const portalKey of PORTAL_STATUS_FIELD_NAMES) {
+    if (portalKey in record) {
+      const v = str(record[portalKey]);
+      if (v !== undefined) {
+        out["Portal Status"] = v;
         break;
       }
     }

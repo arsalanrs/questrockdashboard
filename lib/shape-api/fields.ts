@@ -75,6 +75,13 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "Shape File Status",
   "Lead Status",
   "LendingPad Status",
+  "Portal Status",
+  "POS Status",
+  "portalStatus",
+  "posStatus",
+  "Last Status Change Date",
+  "Status Change Date",
+  "Conversion Date",
 
   // ── Loan terms ────────────────────────────────────────────────────────────
   // Loan amount — request both the correct camelCase ID and display label variants.

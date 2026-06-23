@@ -1,16 +1,28 @@
 import { differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { Badge } from "@/components/Badge";
 import { KpiCard } from "@/components/KpiCard";
 import { SourceBadge } from "@/components/SourceBadge";
 import { ExpandableRows } from "@/components/ExpandableRows";
 import { NotMovingTabs, type StuckLoan, type BasicLoan } from "@/components/dashboard/NotMovingTabs";
+import { ShapePipelineNav } from "@/components/dashboard/ShapePipelineNav";
+import { ShapeViewTable } from "@/components/dashboard/ShapeViewTable";
+import { LoFilterSelector } from "@/components/dashboard/LoFilterSelector";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewManagerDashboard } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatCurrency, monthStart, sum } from "@/lib/metrics";
 import { SLA_BREACH_LABELS } from "@/lib/sla/compute";
 import { shapeLeadUrl } from "@/lib/shape-link";
+import { getViewById } from "@/lib/shape-views";
+import { parseShapePipelineSearchParams } from "@/lib/shape-views/parse-params";
+import {
+  countLoansByView,
+  fetchShapeLoansWindow,
+  filterLoansForView,
+  windowStartIso,
+} from "@/lib/shape-views/query-loans";
 
 export const revalidate = 60;
 
@@ -248,11 +260,25 @@ function LoCard({
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default async function ManagerDashboardPage() {
+export default async function ManagerDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string; view?: string; lo?: string }>;
+}) {
   const { appUser } = await requireCurrentUser();
   if (!canViewManagerDashboard(appUser.role)) notFound();
 
+  const params = await searchParams;
+  const now = new Date();
+  const { category, viewId } = parseShapePipelineSearchParams(params, now);
+  const selectedLoId = params.lo?.trim() || null;
+  const activeShapeView = getViewById(viewId, now);
+
   const supabase = await createSupabaseServerClient();
+  const today = startOfDay(new Date());
+  const ninetyDaysAgo = new Date(today);
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const ninetyDaysIso = ninetyDaysAgo.toISOString();
 
   const [{ data: slaRows, error: slaError }, { data: teamRows, error: teamErr }, { data: loans, error: loansErr }, { data: activeLoUsers }] =
     await Promise.all([
@@ -263,6 +289,7 @@ export default async function ManagerDashboardPage() {
         .select(
           "id,shape_record_id,borrower_first_name,borrower_last_name,borrower_phone,source,current_stage,status_raw,closing_date,closed_at,funded_at,loan_amount_cents,lead_created_at,assigned_loan_officer_user_id,assigned_loan_officer_name,lendingpad_loan_uuid,appraisal_payment_collected_at,loan_stage_events(entered_at),conditions(status)"
         )
+        .gte("lead_created_at", ninetyDaysIso)
         .limit(1000),
       // Only LOs and managers who are active — used to filter the "Who Has What" grid.
       // Executives (Bill, Ray, Nikk) are excluded; they don't work the pipeline as LOs.
@@ -277,6 +304,16 @@ export default async function ManagerDashboardPage() {
   if (teamErr) throw teamErr;
   if (loansErr) throw loansErr;
 
+  const shapeWindowStart = windowStartIso();
+  const { loans: shapeLoans } = await fetchShapeLoansWindow(supabase, {
+    windowStartIso: shapeWindowStart,
+    assignedLoUserId: selectedLoId ?? undefined,
+  });
+  const shapeViewCounts = countLoansByView(shapeLoans, now);
+  const shapeViewRows = filterLoansForView(shapeLoans, viewId, now);
+  const shapeExtraParams: Record<string, string | undefined> = {};
+  if (selectedLoId) shapeExtraParams.lo = selectedLoId;
+
   const teams = (teamRows ?? []).filter((t) => t.manager_user_id === appUser.id);
   if (!teams.length && appUser.role === "manager") {
     return (
@@ -290,7 +327,6 @@ export default async function ManagerDashboardPage() {
   const slaByStage = new Map<string, number>();
   (slaRows ?? []).forEach((r) => slaByStage.set(r.stage, r.max_days));
 
-  const today = startOfDay(new Date());
   const mStart = monthStart();
   const sevenDaysOut = new Date(today);
   sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
@@ -744,6 +780,34 @@ export default async function ManagerDashboardPage() {
           {format(new Date(), "EEE MMM d, yyyy")}
         </div>
       </div>
+
+      {/* ── Shape Pipeline (Nikk views) ─────────────────────────────────── */}
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionHeading>Shape Pipeline</SectionHeading>
+          {(activeLoUsers ?? []).length > 0 && (
+            <Suspense fallback={null}>
+              <LoFilterSelector
+                users={(activeLoUsers ?? []) as Array<{ id: string; full_name: string | null }>}
+                selectedLoId={selectedLoId}
+              />
+            </Suspense>
+          )}
+        </div>
+        {activeShapeView && (
+          <p className="text-xs text-mutedForeground -mt-2">
+            {activeShapeView.label} · {shapeViewRows.length} records · 90-day window
+          </p>
+        )}
+        <ShapePipelineNav
+          basePath="/dashboard/manager"
+          category={category}
+          activeViewId={viewId}
+          viewCounts={shapeViewCounts}
+          extraParams={shapeExtraParams}
+        />
+        <ShapeViewTable rows={shapeViewRows} viewId={viewId} showLoColumn={!selectedLoId} />
+      </section>
 
       {/* ── KPI strip ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 anim-d1">

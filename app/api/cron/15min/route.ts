@@ -22,6 +22,7 @@ import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
 import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
 import { buildDailyReport, renderDailyReportMarkdown } from "@/lib/reports/daily";
 import { etMidnightIso, etTodayDate } from "@/lib/date-utils";
+import { syncLoanNotesFromLoans } from "@/lib/sync-loan-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -256,6 +257,11 @@ async function handle(request: Request) {
   results.lpDocuments = await step("lpDocuments", async () => {
     if (!hasLendingPadReadConfig()) return { skipped: true, reason: "LendingPad not configured" };
     return await runLendingPadDocumentsSync({ maxLoans: 100 });
+  });
+
+  // Step 6b — Unified notes from Shape fields
+  results.loanNotes = await step("loanNotes", async () => {
+    return await syncLoanNotesFromLoans(500);
   });
 
   // Step 7 — Refresh live daily report snapshot for the Monitor page.
