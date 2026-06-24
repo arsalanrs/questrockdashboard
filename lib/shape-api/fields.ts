@@ -65,6 +65,9 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
 
   // ── Loan officer ──────────────────────────────────────────────────────────
   "depursLo",
+  "depurLo",
+  "loanOfficerUserName",
+  "Loan Officer User Name",
   "LOA User Name",
   "Loan Officer Email",
 

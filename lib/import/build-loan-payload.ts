@@ -1,6 +1,7 @@
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
 import { parseLoanAmountCents, parseMaybeTimestamp } from "@/lib/import/shape-kpi";
 import { normalizeLendingPadLoanUuid } from "@/lib/lendingpad/parse-response";
+import { resolveLoUserId } from "@/lib/import/resolve-lo-user-id";
 import { normalizeRecordType } from "@/lib/shape-views/record-type-normalize";
 
 const SLOW_TRACK_TYPES = new Set(["Construction", "Fix & Flip", "Rehab"]);
@@ -113,12 +114,12 @@ export function buildLoanPayloadFromRow(
   // Normalize "Last, First" → "First Last" — Shape sometimes exports names
   // in CSV Last,First order which creates duplicates in the loans table.
   const loNameRaw = String(r["Loan Officer User Name"] ?? "").trim();
-  const loName = normalizeLoName(loNameRaw) || null;
-  // Primary match: normalized full name. Fallback: loan_officer_email field.
-  const loEmail = trimOrNull(r["Loan Officer Email"])?.toLowerCase();
-  const assignedLoUserId =
-    (loName ? nameToUserId.get(loName.toLowerCase()) ?? null : null) ??
-    (loEmail && emailToUserId ? emailToUserId.get(loEmail) ?? null : null);
+  const loName = normalizeLoName(loNameRaw) || loNameRaw || null;
+  const loEmail = trimOrNull(r["Loan Officer Email"]);
+  const assignedLoUserId = resolveLoUserId(loNameRaw || loName, loEmail, {
+    nameToUserId,
+    emailToUserId,
+  });
 
   // Prefer "Loan Amount"; fall back to "Purchase Price" for purchase-money loans
   // where Shape stores the amount under borpurchasePrice instead of LoanAmount.

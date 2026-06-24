@@ -3,6 +3,7 @@ import { shapeBulkExport } from "@/lib/shape-api/client";
 import { mapApiRecordToCsvLike } from "@/lib/shape-api/field-map";
 import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
+import { backfillLoUserIdsFromNames, buildLoUserIdLookup } from "@/lib/import/resolve-lo-user-id";
 import { detectChanges, type ActivityEvent, type ExistingLoanRow } from "@/lib/shape-api/change-detector";
 import type { ShapeBulkExportResponse } from "@/lib/shape-api/types";
 
@@ -172,14 +173,10 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     statusToStage.set(m.source_status, m.normalized_stage);
   });
 
-  const nameToUserId = new Map<string, string>();
-  const emailToUserId = new Map<string, string>();
   const { data: users, error: usersError } = await admin.from("users").select("id,full_name,email");
   if (usersError) throw usersError;
-  (users ?? []).forEach((u) => {
-    nameToUserId.set(String(u.full_name).trim().toLowerCase(), u.id);
-    if (u.email) emailToUserId.set(String(u.email).trim().toLowerCase(), u.id);
-  });
+  const appUsers = users ?? [];
+  const { nameToUserId, emailToUserId } = buildLoUserIdLookup(appUsers);
 
   let pages = 0;
   let recordsProcessed = 0;
@@ -471,6 +468,18 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
         console.error("[sync] Failed to upsert touch log:", error);
       }
     }
+  }
+
+  // ── Backfill LO user ids from names (comma order, nicknames, aliases) ───
+  try {
+    const loBackfill = await backfillLoUserIdsFromNames(admin);
+    if (loBackfill.updated > 0) {
+      console.log(
+        `[sync] LO assignment backfill: ${loBackfill.updated} updated, ${loBackfill.stillUnmatched} still unmatched`,
+      );
+    }
+  } catch (err) {
+    console.error("[sync] LO assignment backfill failed:", err);
   }
 
   // ── Update watermark ──────────────────────────────────────────────────────

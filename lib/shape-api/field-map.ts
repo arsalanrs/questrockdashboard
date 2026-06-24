@@ -298,7 +298,7 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
   // Loan Officer: if not set by API_TO_CSV, try any key that looks like LO name (API field names vary)
   if (out["Loan Officer User Name"] === undefined) {
     for (const key of Object.keys(record)) {
-      if (/loan\s*officer|depur|depurs|assigned\s*lo/i.test(key)) {
+      if (/loan\s*officer|depur|depurs|assigned\s*lo|loa/i.test(key)) {
         const v = str(record[key]);
         if (v !== undefined) {
           out["Loan Officer User Name"] = v;
