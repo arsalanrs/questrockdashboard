@@ -283,7 +283,16 @@ function buildUpdatePayload(
   return p;
 }
 
-export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResult> {
+export type LendingPadLoansSyncOptions = {
+  /** When false, skips GET loan-detail per row (much faster for bulk rebuild). Default true. */
+  fetchDetail?: boolean;
+};
+
+export async function runLendingPadLoansSync(
+  options?: LendingPadLoansSyncOptions,
+): Promise<LendingPadLoansSyncResult> {
+  const fetchDetail =
+    options?.fetchDetail ?? process.env.LENDINGPAD_FETCH_LOAN_DETAIL !== "0";
   const result: LendingPadLoansSyncResult = {
     importBatchId: "",
     sources: [],
@@ -386,9 +395,7 @@ export async function runLendingPadLoansSync(): Promise<LendingPadLoansSyncResul
         const stage = lpStage(item);
         const enteredAt = item.statusAt ?? new Date().toISOString();
 
-        // Enrich with rate/LTV/FICO/ARM from loan-detail.
-        // Defaults to ON when LP is configured; opt out by setting LENDINGPAD_FETCH_LOAN_DETAIL=0.
-        const fetchDetail = process.env.LENDINGPAD_FETCH_LOAN_DETAIL !== "0";
+        // Enrich with rate/LTV/FICO/ARM from loan-detail (optional — slow at scale).
         let detail: NormalizedLpLoanDetail | null = null;
         if (fetchDetail) {
           try {

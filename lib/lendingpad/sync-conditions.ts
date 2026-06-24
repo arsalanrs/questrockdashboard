@@ -52,24 +52,28 @@ export async function runLendingPadConditionsSync(options?: { maxLoans?: number 
   // Fill remaining budget with other loans sorted by most recently synced
   const priorityIds = new Set((priorityRows ?? []).map((r) => (r as { id: string }).id));
   const remaining = Math.max(0, max - priorityIds.size);
-  const { data: otherRows, error } = remaining > 0
-    ? await admin
-        .from("loans")
-        .select("id,lendingpad_loan_uuid")
-        .not("lendingpad_loan_uuid", "is", null)
-        .not("id", "in", `(${[...priorityIds].join(",") || "null"})`)
-        .order("lead_created_at", { ascending: false })
-        .limit(remaining)
-    : { data: [], error: null };
-
-  if (error) {
-    result.errors.push(error.message);
-    return result;
+  let otherRows: { id: string; lendingpad_loan_uuid: string | null }[] = [];
+  if (remaining > 0) {
+    let otherQuery = admin
+      .from("loans")
+      .select("id,lendingpad_loan_uuid")
+      .not("lendingpad_loan_uuid", "is", null)
+      .order("lead_created_at", { ascending: false })
+      .limit(remaining);
+    if (priorityIds.size > 0) {
+      otherQuery = otherQuery.not("id", "in", `(${[...priorityIds].join(",")})`);
+    }
+    const { data, error } = await otherQuery;
+    if (error) {
+      result.errors.push(error.message);
+      return result;
+    }
+    otherRows = (data ?? []) as { id: string; lendingpad_loan_uuid: string | null }[];
   }
 
   const loans = [
     ...((priorityRows ?? []) as { id: string; lendingpad_loan_uuid: string | null }[]),
-    ...((otherRows ?? []) as { id: string; lendingpad_loan_uuid: string | null }[]),
+    ...otherRows,
   ];
   result.loansConsidered = loans.length;
 

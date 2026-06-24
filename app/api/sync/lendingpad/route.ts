@@ -14,6 +14,11 @@ import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
 import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+/** LP list sync across many LOs can exceed the default 10s Vercel limit. */
+export const maxDuration = 300;
+
 async function authorize(request: Request): Promise<NextResponse | null> {
   if (isCronRequestAuthorized(request)) return null;
 
@@ -48,11 +53,29 @@ async function handle(request: Request) {
     );
   }
 
+  const { searchParams } = new URL(request.url);
+  /** rebuild flow: loans only, skip per-loan detail fetch for speed */
+  const scope = searchParams.get("scope") ?? "full";
+  const skipDetail = searchParams.get("skipDetail") === "1";
+
   try {
-    const loans = await runLendingPadLoansSync();
+    if (scope === "loans") {
+      const loans = await runLendingPadLoansSync({ fetchDetail: !skipDetail });
+      return NextResponse.json({ loans, conditions: null, documents: null, scope: "loans" });
+    }
+    if (scope === "conditions") {
+      const conditions = await runLendingPadConditionsSync();
+      return NextResponse.json({ loans: null, conditions, documents: null, scope: "conditions" });
+    }
+    if (scope === "documents") {
+      const documents = await runLendingPadDocumentsSync();
+      return NextResponse.json({ loans: null, conditions: null, documents, scope: "documents" });
+    }
+
+    const loans = await runLendingPadLoansSync({ fetchDetail: !skipDetail });
     const conditions = await runLendingPadConditionsSync();
     const documents = await runLendingPadDocumentsSync();
-    return NextResponse.json({ loans, conditions, documents });
+    return NextResponse.json({ loans, conditions, documents, scope: "full" });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "LendingPad sync failed";
     return NextResponse.json({ error: msg }, { status: 500 });

@@ -96,7 +96,7 @@ type ChunkState = {
 type SyncState =
   | { status: "idle" }
   | { status: "running"; chunks: ChunkState[]; totalLoans: number; totalPages: number; startMs: number; phase?: string }
-  | { status: "success"; totalLoans: number; totalPages: number; elapsed: number; unmapped?: string[]; rebuilt?: boolean }
+  | { status: "success"; totalLoans: number; totalPages: number; elapsed: number; unmapped?: string[]; rebuilt?: boolean; lpWarning?: string }
   | { status: "error"; message: string };
 
 function nDaysAgoIso(n: number) {
@@ -232,21 +232,47 @@ export function SyncNowButton() {
           : s,
       );
 
-      const lpRes = await fetch("/api/sync/lendingpad", { method: "POST" });
+      const lpRes = await fetch("/api/sync/lendingpad?scope=loans&skipDetail=1", { method: "POST" });
+      const lpJson = await lpRes.json().catch(() => null);
       if (!lpRes.ok) {
-        const lpJson = await lpRes.json().catch(() => null);
+        const lpErr =
+          lpJson?.error ??
+          (lpRes.status === 504
+            ? "LendingPad sync timed out on the server (Shape data is saved — retry LP sync separately)."
+            : lpRes.status === 503
+              ? "LendingPad is not configured on this deployment (set LENDINGPAD_* env vars on Vercel)."
+              : `LendingPad sync failed (HTTP ${lpRes.status})`);
+        setState((s) =>
+          s.status === "running"
+            ? {
+                ...s,
+                chunks: s.chunks.map((c, i) =>
+                  i === lpIdx ? { ...c, status: "error", error: lpErr } : c,
+                ),
+              }
+            : s,
+        );
         setState({
-          status: "error",
-          message: lpJson?.error ?? "LendingPad sync failed after rebuild",
+          status: "success",
+          totalLoans,
+          totalPages,
+          elapsed: Math.floor((Date.now() - startMs) / 1000),
+          unmapped: allUnmapped.size ? Array.from(allUnmapped).sort() : undefined,
+          rebuilt: true,
+          lpWarning: lpErr,
         });
         return;
       }
+
+      const lpUpserted = lpJson?.loans?.loansUpserted ?? 0;
 
       setState((s) =>
         s.status === "running"
           ? {
               ...s,
-              chunks: s.chunks.map((c, i) => (i === lpIdx ? { ...c, status: "done" } : c)),
+              chunks: s.chunks.map((c, i) =>
+                i === lpIdx ? { ...c, status: "done", loans: lpUpserted } : c,
+              ),
             }
           : s,
       );
@@ -466,6 +492,13 @@ export function SyncNowButton() {
               Unmapped statuses (add to stage_mapping):{" "}
               {state.unmapped.slice(0, 15).join(", ")}
               {state.unmapped.length > 15 ? "…" : ""}
+            </p>
+          ) : null}
+          {state.lpWarning ? (
+            <p className="mt-2 text-amber-700 dark:text-amber-400">
+              <strong>Shape rebuild OK.</strong> LendingPad step failed: {state.lpWarning}
+              {" "}You can retry with the main Sync button or run{" "}
+              <code className="text-xs">npm run lendingpad:sync</code> locally.
             </p>
           ) : null}
         </div>
