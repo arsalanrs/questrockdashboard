@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { startOfDay, subDays } from "date-fns";
 import { passesGlobalFilters } from "./global-filters";
+import { recordTypeMatches } from "./record-type-normalize";
 import {
   defaultViewIdForCategory,
   getShapeViews,
@@ -52,8 +53,7 @@ export function loanMatchesView(row: ShapeLoanRow, view: ShapeViewRule): boolean
   if (view.deferred) return false;
 
   if (view.recordTypes !== "all") {
-    const rt = row.record_type?.trim();
-    if (!rt || !view.recordTypes.includes(rt as "Leads" | "Applications" | "Loans")) {
+    if (!recordTypeMatches(row.record_type, view.recordTypes)) {
       return false;
     }
   }
@@ -95,27 +95,40 @@ export function windowStartIso(days = DEFAULT_WINDOW_DAYS): string {
   return subDays(today, days).toISOString();
 }
 
-/** Fetch loans in the default 90-day window (RLS applies via client). */
+/** Fetch loans in the default 90-day window (RLS applies via client). Paginates past Supabase 1k row cap. */
 export async function fetchShapeLoansWindow(
   supabase: SupabaseClient,
   options: FetchShapeLoansOptions,
 ): Promise<{ loans: ShapeLoanRow[]; error: string | null }> {
-  const limit = options.limit ?? 2000;
-  let q = supabase
-    .from("loans")
-    .select(SHAPE_LOAN_SELECT)
-    .or(`lead_created_at.gte.${options.windowStartIso},shape_last_updated_at.gte.${options.windowStartIso}`)
-    .limit(limit);
+  const maxRows = options.limit ?? 5000;
+  const pageSize = 1000;
+  const loans: ShapeLoanRow[] = [];
+  let offset = 0;
 
-  if (options.assignedLoUserId) {
-    q = q.eq("assigned_loan_officer_user_id", options.assignedLoUserId);
+  while (loans.length < maxRows) {
+    let q = supabase
+      .from("loans")
+      .select(SHAPE_LOAN_SELECT)
+      .or(`lead_created_at.gte.${options.windowStartIso},shape_last_updated_at.gte.${options.windowStartIso}`)
+      .order("shape_last_updated_at", { ascending: false, nullsFirst: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (options.assignedLoUserId) {
+      q = q.eq("assigned_loan_officer_user_id", options.assignedLoUserId);
+    }
+
+    const { data, error } = await q;
+    if (error) return { loans: [], error: error.message };
+
+    const batch = (data ?? []) as ShapeLoanRow[];
+    if (batch.length === 0) break;
+    loans.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
   }
 
-  const { data, error } = await q;
-  if (error) return { loans: [], error: error.message };
-
-  const loans = ((data ?? []) as ShapeLoanRow[]).filter(passesGlobalFilters);
-  return { loans, error: null };
+  const filtered = loans.slice(0, maxRows).filter(passesGlobalFilters);
+  return { loans: filtered, error: null };
 }
 
 export {

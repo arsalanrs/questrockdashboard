@@ -240,6 +240,18 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
     }
   }
 
+  if (out["Portal Status"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/portal\s*status|pos\s*status|portalregistration/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined) {
+          out["Portal Status"] = v;
+          break;
+        }
+      }
+    }
+  }
+
   // recordId must be set for the row to be used (used as shape_record_id)
   const leadIdRaw = record["Lead ID"] ?? record.leadid ?? record.leadId;
   if (out["recordId"] === undefined && leadIdRaw != null) {

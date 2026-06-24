@@ -1,12 +1,37 @@
 import type { ShapeViewRule } from "./types";
+import { isPreApplicationStatus } from "./record-type-normalize";
 
 export const APPLICATIONS_VIEWS: ShapeViewRule[] = [
+  {
+    id: "all-pre-applications-pos",
+    label: "All Pre-Applications (POS)",
+    category: "Applications",
+    recordTypes: ["Applications"],
+    statuses: [
+      "App Sent",
+      "App Started",
+      "App Completed",
+      "Portal Registration Complete",
+      "Verification Docs Requested",
+      "Verification Docs Received",
+      "Pre-Application Sent",
+      "Pre-Application Started",
+      "Pre-Application Completed",
+    ],
+    portalStatuses: [
+      "App Sent",
+      "App Started",
+      "App Completed",
+      "Portal Registration Complete",
+    ],
+    sort: { field: "conversion", dir: "desc" },
+  },
   {
     id: "pre-app-sent",
     label: "Pre-App Sent",
     category: "Applications",
     recordTypes: ["Applications"],
-    statuses: ["App Sent"],
+    statuses: ["App Sent", "Pre-Application Sent"],
     portalStatuses: ["App Sent"],
     sort: { field: "conversion", dir: "desc" },
   },
@@ -15,7 +40,7 @@ export const APPLICATIONS_VIEWS: ShapeViewRule[] = [
     label: "Pre-App Started",
     category: "Applications",
     recordTypes: ["Applications"],
-    statuses: ["App Started", "Portal Registration Complete"],
+    statuses: ["App Started", "Portal Registration Complete", "Pre-Application Started"],
     portalStatuses: ["App Started", "Portal Registration Complete"],
     sort: { field: "conversion", dir: "desc" },
   },
@@ -24,7 +49,7 @@ export const APPLICATIONS_VIEWS: ShapeViewRule[] = [
     label: "Pre-App Completed",
     category: "Applications",
     recordTypes: ["Applications"],
-    statuses: ["App Completed"],
+    statuses: ["App Completed", "Pre-Application Completed"],
     portalStatuses: ["App Completed"],
     sort: { field: "conversion", dir: "desc" },
   },
@@ -45,3 +70,14 @@ export const APPLICATIONS_VIEWS: ShapeViewRule[] = [
     sort: { field: "conversion", dir: "desc" },
   },
 ];
+
+/** Shape POS view also surfaces Leads with portal-style statuses — use for diagnostics. */
+export function matchesAllPreApplicationsPos(row: {
+  record_type?: string | null;
+  status_raw?: string | null;
+  portal_status_raw?: string | null;
+}): boolean {
+  const rt = row.record_type?.trim();
+  if (rt !== "Applications" && rt !== "Leads") return false;
+  return isPreApplicationStatus(row.status_raw, row.portal_status_raw);
+}

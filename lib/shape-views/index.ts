@@ -35,7 +35,7 @@ export function getViewById(viewId: string, now = new Date()): ShapeViewRule | u
 export function defaultViewIdForCategory(category: ShapeViewCategory): string {
   const map: Record<ShapeViewCategory, string> = {
     Leads: "new-leads-follow-up",
-    Applications: "pre-app-sent",
+    Applications: "all-pre-applications-pos",
     Loans: "verification-queue",
     all: "bb-help-requested",
   };

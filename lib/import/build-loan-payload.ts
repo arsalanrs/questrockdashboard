@@ -1,6 +1,7 @@
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
 import { parseLoanAmountCents, parseMaybeTimestamp } from "@/lib/import/shape-kpi";
 import { normalizeLendingPadLoanUuid } from "@/lib/lendingpad/parse-response";
+import { normalizeRecordType } from "@/lib/shape-views/record-type-normalize";
 
 const SLOW_TRACK_TYPES = new Set(["Construction", "Fix & Flip", "Rehab"]);
 
@@ -179,7 +180,7 @@ export function buildLoanPayloadFromRow(
     shape_lead_id: Number(String(r["Lead ID"] ?? "").trim()) || null,
     lead_created_at: parseMaybeTimestamp(r["Created Date"]),
 
-    record_type: trimOrNull(r["Record Type"]),
+    record_type: normalizeRecordType(r["Record Type"] ?? null),
     borrower_first_name: trimOrNull(r["First Name"]),
     borrower_last_name: trimOrNull(r["Last Name"]),
     borrower_email: trimOrNull(r["Email"]),

@@ -25,6 +25,8 @@ const STATUS_ALIASES: Record<string, string> = {
   "Launch File Help Requested": "Help Requested",
   "Pitched - Advance to eSign": "Pitched - Advance to eSign",
   "Pitched - Advance To eSign": "Pitched - Advance to eSign",
+  "Pre Approval": "Pre-Approved",
+  "Application Taken": "App Completed",
 };
 
 export function normalizeStatus(raw: string | null | undefined): string | null {
