@@ -1,0 +1,43 @@
+{
+  "company": {
+    "identifier": "f057cdfc-5dcd-471f-bb2c-dcac3e90499f",
+    "note": "LENDINGPAD_CONTACT_ID and LENDINGPAD_COMPANY_ID"
+  },
+  "branch": {
+    "questRockLlc": "903cb271-cca5-41e9-bf31-802d0fcf1567"
+  },
+  "campaigns": {
+    "shape": "86aeb89f-f5ec-452d-8bc5-abe6386fd739",
+    "teamTRex": "314d9a21-f7ce-4050-b2a8-04910c956d0c"
+  },
+  "loanOfficers": [
+    { "officerName": "Bastian Johnston", "listUserId": "4bf96b45-2692-4b6b-b635-f606b73e92bc" },
+    { "officerName": "Gregory Bethea", "listUserId": "203a55ef-8b7e-4d97-a5dc-d7c6fe7c73d2" },
+    { "officerName": "Harrison Johnson", "listUserId": "2a1a8a1a-4ef3-4543-bc0f-321ddec8ae7f" },
+    { "officerName": "Jason Friday", "listUserId": "6e115fc4-1c9d-47cf-ab80-0cd60ec69951" },
+    { "officerName": "Nikkolas Smith", "listUserId": "b23876fa-155c-40cb-bd88-2d54fe43b703" },
+    { "officerName": "Tashawna Chisholm", "listUserId": "246847f1-66cf-4168-a9ca-55be743b177f" },
+    { "officerName": "Zachary Davis", "listUserId": "6c1f0653-89c4-46ad-9b43-1f6c2df3cfc2" }
+  ],
+  "loanAssistants": [
+    { "officerName": "Harrison Johnson", "listUserId": "3284b74b-c377-4512-8202-b89a166d025a" },
+    { "officerName": "Nikkolas Smith", "listUserId": "391d9677-9c06-4ae4-8bbb-2e5de0c89fc9" },
+    { "officerName": "Sam Peters", "listUserId": "a28d7795-b80e-4b3a-bd06-6732118721e8" }
+  ],
+  "loanProcessors": [
+    { "officerName": "Concierge", "listUserId": "54804d26-6660-46dc-8140-027379340e72" },
+    { "officerName": "Nikkolas Smith", "listUserId": "3df7d096-8e2f-43c2-b291-aedc11c68c31" }
+  ],
+  "syncOfficersJson": [
+    { "officerName": "Bastian Johnston", "listUserId": "4bf96b45-2692-4b6b-b635-f606b73e92bc" },
+    { "officerName": "Gregory Bethea", "listUserId": "203a55ef-8b7e-4d97-a5dc-d7c6fe7c73d2" },
+    { "officerName": "Harrison Johnson", "listUserId": "2a1a8a1a-4ef3-4543-bc0f-321ddec8ae7f" },
+    { "officerName": "Jason Friday", "listUserId": "6e115fc4-1c9d-47cf-ab80-0cd60ec69951" },
+    { "officerName": "Nikkolas Smith", "listUserId": "b23876fa-155c-40cb-bd88-2d54fe43b703" },
+    { "officerName": "Tashawna Chisholm", "listUserId": "246847f1-66cf-4168-a9ca-55be743b177f" },
+    { "officerName": "Zachary Davis", "listUserId": "6c1f0653-89c4-46ad-9b43-1f6c2df3cfc2" },
+    { "officerName": "Harrison Johnson", "listUserId": "3284b74b-c377-4512-8202-b89a166d025a" },
+    { "officerName": "Nikkolas Smith", "listUserId": "391d9677-9c06-4ae4-8bbb-2e5de0c89fc9" },
+    { "officerName": "Sam Peters", "listUserId": "a28d7795-b80e-4b3a-bd06-6732118721e8" }
+  ]
+}

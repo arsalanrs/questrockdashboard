@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { DEFAULT_LENDINGPAD_SYNC_OFFICERS } from "./default-officers";
 import { parseLendingPadOfficersJson, hasLendingPadListLoansConfig } from "./config";
 
 describe("parseLendingPadOfficersJson", () => {
@@ -11,10 +12,10 @@ describe("parseLendingPadOfficersJson", () => {
     delete process.env.LENDINGPAD_LIST_USER_ID;
   });
 
-  it("returns empty when unset", () => {
+  it("returns built-in roster when unset", () => {
     const r = parseLendingPadOfficersJson();
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.officers).toEqual([]);
+    if (r.ok) expect(r.officers).toEqual([...DEFAULT_LENDINGPAD_SYNC_OFFICERS]);
   });
 
   it("parses camelCase and snake_case", () => {

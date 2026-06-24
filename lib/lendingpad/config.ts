@@ -1,3 +1,5 @@
+import { DEFAULT_LENDINGPAD_SYNC_OFFICERS } from "./default-officers";
+
 const DEFAULT_BASE_URL = "https://testapi.lendingpad.com";
 
 /** One LP list/loans scope (`user=` query) + optional label for matching dashboard users by name. */
@@ -47,7 +49,9 @@ export function parseLendingPadOfficersJson():
   | { ok: true; officers: LendingPadOfficerListEntry[] }
   | { ok: false; error: string } {
   const raw = process.env.LENDINGPAD_OFFICERS_JSON?.trim();
-  if (!raw) return { ok: true, officers: [] };
+  if (!raw) {
+    return { ok: true, officers: [...DEFAULT_LENDINGPAD_SYNC_OFFICERS] };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
