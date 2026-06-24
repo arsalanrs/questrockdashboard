@@ -323,9 +323,13 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
 
   if (out["Loan Officer User Name"] === undefined) {
     for (const key of Object.keys(record)) {
-      if (/loan\s*officer|assigned\s*lo|loa/i.test(key) && !/depur|email|id$/i.test(key)) {
+      if (
+        (/loan\s*officer|assigned\s*lo/i.test(key) || /loa\s*user/i.test(key)) &&
+        !/amount|loanamount|loan\s*amount|balance/i.test(key) &&
+        !/depur|email|id$/i.test(key)
+      ) {
         const v = str(record[key]);
-        if (v !== undefined && !looksLikeShapeDepursLoId(v)) {
+        if (v !== undefined && !looksLikeShapeDepursLoId(v) && !/^\d{4,}$/.test(v.replace(/[,$]/g, ""))) {
           out["Loan Officer User Name"] = v;
           break;
         }

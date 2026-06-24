@@ -17,9 +17,9 @@ describe("lo-roster", () => {
     expect(resolveDepursLoIdToName(58)).toBe("Gregory Bethea Jr");
   });
 
-  it("parses numeric owner id strings", () => {
+  it("rejects loan amounts mistaken for depursLo ids", () => {
+    expect(parseShapeDepursLoId("295000")).toBeNull();
     expect(parseShapeDepursLoId("34")).toBe(34);
-    expect(parseShapeDepursLoId("Tyler Johnson")).toBeNull();
   });
 
   it("maps display name to depursLo id", () => {

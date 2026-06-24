@@ -69,13 +69,15 @@ function depursLoByIdMap(): Map<number, string> {
   return cachedById;
 }
 
-/** Parse Shape owner id from API/CSV (numeric string or number). */
+/** Parse Shape owner id from API/CSV (numeric string or number). Rejects loan amounts mistaken for ids. */
 export function parseShapeDepursLoId(raw: unknown): number | null {
   if (raw == null) return null;
   const s = String(raw).trim();
   if (!s || !/^\d+$/.test(s)) return null;
   const n = Number(s);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  // Shape depursLo ids are small integers (e.g. 34); loan amounts are 5–7 digits.
+  if (!Number.isFinite(n) || n <= 0 || n > 999) return null;
+  return n;
 }
 
 /** True when value looks like a Shape depursLo id, not a person name. */

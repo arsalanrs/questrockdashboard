@@ -20,6 +20,7 @@ const STATUS_ALIASES: Record<string, string> = {
   "Pitched and Waiting": "Pitched & Waiting",
   "Submitted to UW": "Submitted to UW",
   "Submitted To UW": "Submitted to UW",
+  "Submitted to Underwriting": "Submitted to Underwriting",
   "Clear To Close": "Clear to Close",
   "Package Signed - Not Piped": "Package Signed Not Piped",
   "Launch File Help Requested": "Help Requested",

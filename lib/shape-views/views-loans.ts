@@ -94,7 +94,7 @@ export const LOANS_VIEWS: ShapeViewRule[] = [
     label: "Underwriting",
     category: "Loans",
     recordTypes: ["Loans"],
-    statuses: ["Submitted to UW", "Submitted To UW", "Underwriting"],
+    statuses: ["Submitted to UW", "Submitted To UW", "Submitted to Underwriting", "Underwriting"],
     sort: { field: "last_status_change", dir: "desc" },
   },
   {
