@@ -1,7 +1,8 @@
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
 import { parseLoanAmountCents, parseMaybeTimestamp } from "@/lib/import/shape-kpi";
 import { normalizeLendingPadLoanUuid } from "@/lib/lendingpad/parse-response";
-import { resolveLoUserId } from "@/lib/import/resolve-lo-user-id";
+import { resolveLoUserId, type LoUserRow } from "@/lib/import/resolve-lo-user-id";
+import { resolveShapeLoAssignment } from "@/lib/import/resolve-shape-lo-assignment";
 import { normalizeRecordType } from "@/lib/shape-views/record-type-normalize";
 
 const SLOW_TRACK_TYPES = new Set(["Construction", "Fix & Flip", "Rehab"]);
@@ -103,7 +104,9 @@ export function buildLoanPayloadFromRow(
   nameToUserId: Map<string, string>,
   importBatchId: string,
   /** Optional email→userId map built from users.email for fallback LO matching */
-  emailToUserId?: Map<string, string>
+  emailToUserId?: Map<string, string>,
+  /** App users for fuzzy LO name matching */
+  appUsers?: LoUserRow[],
 ): Record<string, unknown> | null {
   const shapeRecordId = Number(String(r["recordId"] ?? "").trim());
   if (!Number.isFinite(shapeRecordId)) return null;
@@ -111,14 +114,10 @@ export function buildLoanPayloadFromRow(
   const statusRaw = String(r["Status"] ?? "").trim() || null;
   const currentStage = statusRaw ? (statusToStage.get(statusRaw) ?? null) : null;
 
-  // Normalize "Last, First" → "First Last" — Shape sometimes exports names
-  // in CSV Last,First order which creates duplicates in the loans table.
-  const loNameRaw = String(r["Loan Officer User Name"] ?? "").trim();
-  const loName = normalizeLoName(loNameRaw) || loNameRaw || null;
-  const loEmail = trimOrNull(r["Loan Officer Email"]);
-  const assignedLoUserId = resolveLoUserId(loNameRaw || loName, loEmail, {
+  const { loName, assignedLoUserId } = resolveShapeLoAssignment(r, {
     nameToUserId,
     emailToUserId,
+    users: appUsers,
   });
 
   // Prefer "Loan Amount"; fall back to "Purchase Price" for purchase-money loans

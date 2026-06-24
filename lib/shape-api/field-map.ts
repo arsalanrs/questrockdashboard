@@ -1,4 +1,5 @@
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
+import { looksLikeShapeDepursLoId, parseShapeDepursLoId } from "@/lib/shape-api/lo-roster";
 
 /** Map Shape API field names to the CSV-like keys used by the existing import pipeline. */
 const API_TO_CSV: Record<string, string> = {
@@ -80,8 +81,8 @@ const API_TO_CSV: Record<string, string> = {
   source: "Source",
   "Source": "Source",
   channel: "Channel",
-  depursLo: "Loan Officer User Name",
-  depurLo: "Loan Officer User Name",
+  depursLo: "Shape Depurs LO Id",
+  depurLo: "Shape Depurs LO Id",
   loanOfficerUserName: "Loan Officer User Name",
   // Shape returns the LO field as "LOA User Name" (confirmed from account Preview)
   "LOA User Name": "Loan Officer User Name",
@@ -295,13 +296,49 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
     }
   }
 
-  // Loan Officer: if not set by API_TO_CSV, try any key that looks like LO name (API field names vary)
+  // Loan Officer: depursLo is a numeric Shape owner id; LOA/loanOfficerUserName is display name.
+  if (out["Shape Depurs LO Id"] === undefined) {
+    for (const key of ["depursLo", "depurLo", "lead_owner_id", "leadOwnerId"]) {
+      if (key in record) {
+        const id = parseShapeDepursLoId(record[key]);
+        if (id != null) {
+          out["Shape Depurs LO Id"] = String(id);
+          break;
+        }
+      }
+    }
+  }
+
   if (out["Loan Officer User Name"] === undefined) {
     for (const key of Object.keys(record)) {
-      if (/loan\s*officer|depur|depurs|assigned\s*lo|loa/i.test(key)) {
+      if (/^loa\s*user\s*name|loanofficerusername|loan\s*officer\s*user\s*name$/i.test(key)) {
         const v = str(record[key]);
-        if (v !== undefined) {
+        if (v !== undefined && !looksLikeShapeDepursLoId(v)) {
           out["Loan Officer User Name"] = v;
+          break;
+        }
+      }
+    }
+  }
+
+  if (out["Loan Officer User Name"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/loan\s*officer|assigned\s*lo|loa/i.test(key) && !/depur|email|id$/i.test(key)) {
+        const v = str(record[key]);
+        if (v !== undefined && !looksLikeShapeDepursLoId(v)) {
+          out["Loan Officer User Name"] = v;
+          break;
+        }
+      }
+    }
+  }
+
+  if (out["Shape Depurs LO Id"] === undefined) {
+    for (const key of Object.keys(record)) {
+      if (/depur|lead_owner|owner_id/i.test(key)) {
+        const id = parseShapeDepursLoId(record[key]);
+        if (id != null) {
+          out["Shape Depurs LO Id"] = String(id);
           break;
         }
       }

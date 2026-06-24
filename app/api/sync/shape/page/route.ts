@@ -22,6 +22,7 @@ import { shapeBulkExport } from "@/lib/shape-api/client";
 import { mapApiRecordToCsvLike } from "@/lib/shape-api/field-map";
 import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
+import { buildLoUserIdLookup } from "@/lib/import/resolve-lo-user-id";
 import { detectChanges } from "@/lib/shape-api/change-detector";
 
 export const runtime = "nodejs";
@@ -87,12 +88,8 @@ export async function POST(request: Request) {
   const statusToStage = new Map<string, string | null>();
   (mappingRes.data ?? []).forEach((m) => statusToStage.set(m.source_status, m.normalized_stage));
 
-  const nameToUserId = new Map<string, string>();
-  const emailToUserId = new Map<string, string>();
-  (usersRes.data ?? []).forEach((u) => {
-    nameToUserId.set(String(u.full_name).trim().toLowerCase(), u.id);
-    if (u.email) emailToUserId.set(String(u.email).trim().toLowerCase(), u.id);
-  });
+  const appUsers = usersRes.data ?? [];
+  const { nameToUserId, emailToUserId } = buildLoUserIdLookup(appUsers);
 
   // ── Create import batch on first page ──────────────────────────────────────
   if (!importBatchId) {
@@ -176,7 +173,14 @@ export async function POST(request: Request) {
     const statusRaw = String(row["Status"] ?? "").trim();
     if (statusRaw && !statusToStage.has(statusRaw)) unmappedStatuses.add(statusRaw);
 
-    const loan = buildLoanPayloadFromRow(row, statusToStage, nameToUserId, importBatchId, emailToUserId);
+    const loan = buildLoanPayloadFromRow(
+      row,
+      statusToStage,
+      nameToUserId,
+      importBatchId,
+      emailToUserId,
+      appUsers,
+    );
     if (loan) {
       loansPayload.push(loan);
       incomingByRecordId.set(recordId, loan);

@@ -240,7 +240,14 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
         unmappedStatuses.add(statusRaw);
       }
 
-      const loan = buildLoanPayloadFromRow(row, statusToStage, nameToUserId, importBatchId, emailToUserId);
+      const loan = buildLoanPayloadFromRow(
+        row,
+        statusToStage,
+        nameToUserId,
+        importBatchId,
+        emailToUserId,
+        appUsers,
+      );
       if (loan) {
         allLoansPayload.push(loan);
         incomingByRecordId.set(recordId, loan);

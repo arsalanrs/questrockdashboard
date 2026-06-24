@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { parseShapeKpiCsv } from "@/lib/import/shape-kpi";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
+import { buildLoUserIdLookup } from "@/lib/import/resolve-lo-user-id";
 
 export async function runShapeKpiImport(params: { csvText: string; filename?: string | null; importedByUserId?: string }) {
   const rows = parseShapeKpiCsv(params.csvText);
@@ -37,13 +38,15 @@ export async function runShapeKpiImport(params: { csvText: string; filename?: st
   const statusToStage = new Map<string, string | null>();
   (mappingRows ?? []).forEach((m) => statusToStage.set(m.source_status, m.normalized_stage));
 
-  const { data: users, error: usersError } = await admin.from("users").select("id,full_name");
+  const { data: users, error: usersError } = await admin.from("users").select("id,full_name,email");
   if (usersError) throw usersError;
-  const nameToUserId = new Map<string, string>();
-  (users ?? []).forEach((u) => nameToUserId.set(String(u.full_name).trim().toLowerCase(), u.id));
+  const appUsers = users ?? [];
+  const { nameToUserId, emailToUserId } = buildLoUserIdLookup(appUsers);
 
   const loansPayload = rows
-    .map((r) => buildLoanPayloadFromRow(r, statusToStage, nameToUserId, importBatchId))
+    .map((r) =>
+      buildLoanPayloadFromRow(r, statusToStage, nameToUserId, importBatchId, emailToUserId, appUsers),
+    )
     .filter(Boolean) as Record<string, unknown>[];
 
   for (let i = 0; i < loansPayload.length; i += 500) {

@@ -1,4 +1,5 @@
 import { normalizeLoName } from "@/lib/import/build-loan-payload";
+import { resolveShapeLoAssignment } from "@/lib/import/resolve-shape-lo-assignment";
 
 export type LoUserRow = {
   id: string;
@@ -199,24 +200,32 @@ export async function backfillLoUserIdsFromNames(
     if (error) throw error;
     if (!rows?.length) break;
 
+    let batchUpdated = 0;
     for (const row of rows) {
-      const userId = resolveLoUserId(
-        row.assigned_loan_officer_name,
-        row.loan_officer_email,
+      const resolved = resolveShapeLoAssignment(
+        {
+          "Loan Officer User Name": row.assigned_loan_officer_name ?? undefined,
+          "Loan Officer Email": row.loan_officer_email ?? undefined,
+        },
         lookupWithUsers,
       );
+      const userId = resolved.assignedLoUserId;
       if (!userId) {
         stillUnmatched += 1;
         continue;
       }
-      const { error: upErr } = await admin
-        .from("loans")
-        .update({ assigned_loan_officer_user_id: userId })
-        .eq("id", row.id);
-      if (!upErr) updated += 1;
+      const patch: Record<string, unknown> = { assigned_loan_officer_user_id: userId };
+      if (resolved.loName && resolved.loName !== row.assigned_loan_officer_name) {
+        patch.assigned_loan_officer_name = resolved.loName;
+      }
+      const { error: upErr } = await admin.from("loans").update(patch).eq("id", row.id);
+      if (!upErr) {
+        updated += 1;
+        batchUpdated += 1;
+      }
     }
 
-    if (rows.length < 500) break;
+    if (batchUpdated === 0) break;
   }
 
   return { updated, stillUnmatched };
