@@ -4,6 +4,10 @@ import { mapApiRecordToCsvLike } from "@/lib/shape-api/field-map";
 import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
 import { backfillLoUserIdsFromNames, buildLoUserIdLookup } from "@/lib/import/resolve-lo-user-id";
+import { scrubInvalidLoAssignments } from "@/lib/import/scrub-lo-assignment";
+import { backfillLoFromCsvText } from "@/lib/import/backfill-lo-from-csv";
+import fs from "fs";
+import path from "path";
 import { detectChanges, type ActivityEvent, type ExistingLoanRow } from "@/lib/shape-api/change-detector";
 import type { ShapeBulkExportResponse } from "@/lib/shape-api/types";
 
@@ -477,6 +481,18 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     }
   }
 
+  // ── Scrub junk LO names (loan amounts/types mistaken for officer) ─────────
+  try {
+    const scrub = await scrubInvalidLoAssignments(admin);
+    if (scrub.cleared > 0 || scrub.repairedNames > 0) {
+      console.log(
+        `[sync] LO scrub: cleared ${scrub.cleared} junk rows, repaired ${scrub.repairedNames} names`,
+      );
+    }
+  } catch (err) {
+    console.error("[sync] LO scrub failed:", err);
+  }
+
   // ── Backfill LO user ids from names (comma order, nicknames, aliases) ───
   try {
     const loBackfill = await backfillLoUserIdsFromNames(admin);
@@ -487,6 +503,26 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     }
   } catch (err) {
     console.error("[sync] LO assignment backfill failed:", err);
+  }
+
+  // Optional: Shape custom report CSV (bulk API omits LO assignment).
+  const csvPath = process.env.SHAPE_LO_REPORT_CSV?.trim();
+  if (csvPath) {
+    try {
+      const resolved = path.isAbsolute(csvPath) ? csvPath : path.join(process.cwd(), csvPath);
+      if (fs.existsSync(resolved)) {
+        const csvText = fs.readFileSync(resolved, "utf8");
+        const csvResult = await backfillLoFromCsvText(admin, csvText);
+        if (csvResult.updated > 0) {
+          console.log(`[sync] CSV LO backfill: ${csvResult.updated} updated from ${resolved}`);
+        }
+        if (csvResult.unmatchedNames.length) {
+          console.log(`[sync] CSV LO names without app user: ${csvResult.unmatchedNames.join(", ")}`);
+        }
+      }
+    } catch (err) {
+      console.error("[sync] CSV LO backfill failed:", err);
+    }
   }
 
   // ── Update watermark ──────────────────────────────────────────────────────

@@ -310,10 +310,14 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
   }
 
   if (out["Loan Officer User Name"] === undefined) {
-    for (const key of Object.keys(record)) {
-      if (/^loa\s*user\s*name|loanofficerusername|loan\s*officer\s*user\s*name$/i.test(key)) {
+    for (const key of [
+      "LOA User Name",
+      "loanOfficerUserName",
+      "Loan Officer User Name",
+    ]) {
+      if (key in record) {
         const v = str(record[key]);
-        if (v !== undefined && !looksLikeShapeDepursLoId(v)) {
+        if (v !== undefined) {
           out["Loan Officer User Name"] = v;
           break;
         }
@@ -321,21 +325,7 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
     }
   }
 
-  if (out["Loan Officer User Name"] === undefined) {
-    for (const key of Object.keys(record)) {
-      if (
-        (/loan\s*officer|assigned\s*lo/i.test(key) || /loa\s*user/i.test(key)) &&
-        !/amount|loanamount|loan\s*amount|balance/i.test(key) &&
-        !/depur|email|id$/i.test(key)
-      ) {
-        const v = str(record[key]);
-        if (v !== undefined && !looksLikeShapeDepursLoId(v) && !/^\d{4,}$/.test(v.replace(/[,$]/g, ""))) {
-          out["Loan Officer User Name"] = v;
-          break;
-        }
-      }
-    }
-  }
+  // Do not fuzzy-scan other keys — loanType/loanAmount matched /loa/ and polluted LO assignment.
 
   if (out["Shape Depurs LO Id"] === undefined) {
     for (const key of Object.keys(record)) {

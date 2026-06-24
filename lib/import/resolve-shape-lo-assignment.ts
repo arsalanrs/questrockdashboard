@@ -1,4 +1,5 @@
 import { normalizeLoName } from "@/lib/import/build-loan-payload";
+import { isPlausibleLoName } from "@/lib/import/plausible-lo-name";
 import { resolveLoUserId, type LoUserRow } from "@/lib/import/resolve-lo-user-id";
 import {
   looksLikeShapeDepursLoId,
@@ -44,8 +45,12 @@ export function resolveShapeLoAssignment(
   if (shapeDepursLoId != null) {
     loName = resolveDepursLoIdToName(shapeDepursLoId);
   }
-  if (!loName && loFieldRaw && !looksLikeShapeDepursLoId(loFieldRaw)) {
+  if (!loName && loFieldRaw && !looksLikeShapeDepursLoId(loFieldRaw) && isPlausibleLoName(loFieldRaw)) {
     loName = normalizeLoName(loFieldRaw) || loFieldRaw;
+  }
+
+  if (loName && !isPlausibleLoName(loName)) {
+    loName = null;
   }
 
   if (isConciergeLoName(loName)) {

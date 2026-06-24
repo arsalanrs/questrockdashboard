@@ -14,6 +14,7 @@
     "shape:sync": "node scripts/sync-shape-to-supabase.js",
     "backfill:lo": "node scripts/backfill-lo-assignment-from-csv.js",
     "backfill:lo-roster": "node scripts/backfill-lo-from-shape-roster.mjs",
+    "scrub:lo": "node scripts/scrub-lo-assignment.mjs",
     "report:shape-by-lo": "node scripts/report-shape-by-lo.js",
     "sync:direct": "node scripts/direct-shape-sync.js",
     "lendingpad:sync": "node scripts/lendingpad-sync-to-supabase.js",
