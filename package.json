@@ -17,6 +17,7 @@
     "scrub:lo": "node scripts/scrub-lo-assignment.mjs",
     "report:shape-by-lo": "node scripts/report-shape-by-lo.js",
     "sync:direct": "node scripts/direct-shape-sync.js",
+    "rebuild:shape": "vitest run scripts/rebuild-shape-sync.vitest.ts",
     "lendingpad:sync": "node scripts/lendingpad-sync-to-supabase.js",
     "signals:dry-run": "node scripts/signals-dry-run.js",
     "signals:run": "node scripts/signals-dry-run.js --persist",

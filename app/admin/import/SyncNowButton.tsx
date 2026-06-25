@@ -72,6 +72,17 @@ async function syncOnePage(
       continue;
     }
 
+    if (res.status === 504 || res.status === 502) {
+      if (attempt === MAX_RETRIES) {
+        throw new Error(
+          `Shape sync timed out on page ${pageNumber} (HTTP ${res.status}). ` +
+            "The server may need more time per page — retry, or run `node scripts/rebuild-shape-sync.mjs` locally.",
+        );
+      }
+      await sleep(3000);
+      continue;
+    }
+
     const json = await res.json().catch(() => null);
     if (!res.ok || !json) throw new Error(json?.error ?? `Server returned ${res.status}`);
     return json as PageResult;

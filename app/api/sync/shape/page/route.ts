@@ -20,14 +20,14 @@ import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { hasShapeApiConfig } from "@/lib/shape-api/config";
 import { shapeBulkExport } from "@/lib/shape-api/client";
 import { mapApiRecordToCsvLike } from "@/lib/shape-api/field-map";
-import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
+import { SHAPE_BULK_EXPORT_FIELDS_SYNC } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
 import { buildLoUserIdLookup } from "@/lib/import/resolve-lo-user-id";
 import { detectChanges } from "@/lib/shape-api/change-detector";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const PAGE_SIZE = 50;
 const EXCLUDED_RECORD_TYPES = new Set(["Referral Partner", "Referral Partners", "Contact"]);
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   try {
     res = await shapeBulkExport({
       createdDateRange: { from: dateFrom, to: dateTo },
-      fields: SHAPE_BULK_EXPORT_FIELDS,
+      fields: SHAPE_BULK_EXPORT_FIELDS_SYNC,
       pageNumber,
     });
   } catch (err) {

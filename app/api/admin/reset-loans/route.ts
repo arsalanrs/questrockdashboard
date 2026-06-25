@@ -7,6 +7,8 @@ import { resetOperationalLoans } from "@/lib/admin/reset-operational-loans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Large deletes can exceed default 10s on Vercel Hobby. */
+export const maxDuration = 120;
 
 /**
  * POST /api/admin/reset-loans

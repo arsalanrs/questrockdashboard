@@ -1,7 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shapeBulkExport } from "@/lib/shape-api/client";
 import { mapApiRecordToCsvLike } from "@/lib/shape-api/field-map";
-import { SHAPE_BULK_EXPORT_FIELDS } from "@/lib/shape-api/fields";
+import { SHAPE_BULK_EXPORT_FIELDS_SYNC } from "@/lib/shape-api/fields";
 import { buildLoanPayloadFromRow } from "@/lib/import/build-loan-payload";
 import { backfillLoUserIdsFromNames, buildLoUserIdLookup } from "@/lib/import/resolve-lo-user-id";
 import { scrubInvalidLoAssignments } from "@/lib/import/scrub-lo-assignment";
@@ -199,7 +199,7 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
     try {
       res = await shapeBulkExport({
         ...dateRange,
-        fields: SHAPE_BULK_EXPORT_FIELDS,
+        fields: SHAPE_BULK_EXPORT_FIELDS_SYNC,
         pageNumber,
       });
     } catch (err) {

@@ -80,9 +80,9 @@ export function resolveShapeLoAssignment(
     return { loName, assignedLoUserId: null, shapeDepursLoId };
   }
 
-  const assignedLoUserId = loName
-    ? resolveLoUserId(loName, loEmail, lookup)
-    : resolveLoUserId(loFieldRaw, loEmail, lookup);
+  const matchName =
+    loFieldRaw && !looksLikeShapeDepursLoId(loFieldRaw) ? loFieldRaw : loName;
+  const assignedLoUserId = resolveLoUserId(matchName, loEmail, lookup);
 
   return { loName, assignedLoUserId, shapeDepursLoId };
 }
