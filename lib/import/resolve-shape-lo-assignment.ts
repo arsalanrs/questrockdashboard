@@ -4,8 +4,10 @@ import { resolveLoUserId, type LoUserRow } from "@/lib/import/resolve-lo-user-id
 import {
   looksLikeShapeDepursLoId,
   parseShapeDepursLoId,
+  resolveDepursLoEmailToName,
   resolveDepursLoIdToName,
 } from "@/lib/shape-api/lo-roster";
+import { SHAPE_ASSIGNMENT_ID_COLUMNS } from "@/lib/shape-api/shape-dept-fields";
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
 
 export type ShapeLoAssignment = {
@@ -22,12 +24,16 @@ function isConciergeLoName(name: string | null): boolean {
   return CONCIERGE_NAMES.has(n) || n.startsWith("concierge ");
 }
 
+type LoAssignmentRow = Partial<
+  Pick<ShapeKpiCsvRow, "Loan Officer User Name" | "Loan Officer Email"> & Record<string, string | undefined>
+>;
+
 /**
- * Resolve Shape owner from depursLo id and/or LO name field → app user id.
- * Bulk API often returns numeric depursLo instead of "Tyler Johnson".
+ * Resolve primary contact from Shape assignment departments → app LO user.
+ * Priority: depursLo → depursLi → depursLp → depursPo → depursCl → display name.
  */
 export function resolveShapeLoAssignment(
-  row: Partial<Pick<ShapeKpiCsvRow, "Loan Officer User Name" | "Shape Depurs LO Id" | "Loan Officer Email">>,
+  row: LoAssignmentRow,
   lookup: {
     nameToUserId: Map<string, string>;
     emailToUserId?: Map<string, string>;
@@ -35,15 +41,32 @@ export function resolveShapeLoAssignment(
   },
 ): ShapeLoAssignment {
   const loFieldRaw = String(row["Loan Officer User Name"] ?? "").trim() || null;
-  const depursFromField = parseShapeDepursLoId(row["Shape Depurs LO Id"]);
+  const loEmail = String(row["Loan Officer Email"] ?? "").trim().toLowerCase() || null;
+
+  const deptIds = SHAPE_ASSIGNMENT_ID_COLUMNS.map((col) => parseShapeDepursLoId(row[col]));
   const depursFromLoField = looksLikeShapeDepursLoId(loFieldRaw)
     ? parseShapeDepursLoId(loFieldRaw)
     : null;
-  const shapeDepursLoId = depursFromField ?? depursFromLoField;
 
+  let shapeDepursLoId: number | null = null;
   let loName: string | null = null;
-  if (shapeDepursLoId != null) {
-    loName = resolveDepursLoIdToName(shapeDepursLoId);
+
+  for (const id of [...deptIds, depursFromLoField]) {
+    if (id == null) continue;
+    if (shapeDepursLoId == null) shapeDepursLoId = id;
+    if (!loName) loName = resolveDepursLoIdToName(id);
+    if (loName) break;
+  }
+
+  if (!loName && loEmail) {
+    loName = resolveDepursLoEmailToName(loEmail);
+  }
+  if (!loName && loEmail && lookup.users?.length) {
+    const uid = lookup.emailToUserId?.get(loEmail);
+    if (uid) {
+      const user = lookup.users.find((u) => u.id === uid);
+      loName = user?.full_name?.trim() || null;
+    }
   }
   if (!loName && loFieldRaw && !looksLikeShapeDepursLoId(loFieldRaw) && isPlausibleLoName(loFieldRaw)) {
     loName = normalizeLoName(loFieldRaw) || loFieldRaw;
@@ -58,8 +81,8 @@ export function resolveShapeLoAssignment(
   }
 
   const assignedLoUserId = loName
-    ? resolveLoUserId(loName, row["Loan Officer Email"] ?? null, lookup)
-    : resolveLoUserId(loFieldRaw, row["Loan Officer Email"] ?? null, lookup);
+    ? resolveLoUserId(loName, loEmail, lookup)
+    : resolveLoUserId(loFieldRaw, loEmail, lookup);
 
   return { loName, assignedLoUserId, shapeDepursLoId };
 }

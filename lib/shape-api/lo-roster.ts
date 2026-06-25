@@ -5,24 +5,26 @@
 export type ShapeLoRosterEntry = {
   name: string;
   depursLo: number;
+  email?: string;
 };
 
 export const DEFAULT_SHAPE_LO_ROSTER: ShapeLoRosterEntry[] = [
-  { name: "Tashawna Chisholm", depursLo: 49 },
-  { name: "Tyler Johnson", depursLo: 34 },
-  { name: "Bastian Johnston", depursLo: 13 },
-  { name: "Nikk Smith", depursLo: 3 },
-  { name: "Stephen Curry", depursLo: 40 },
-  { name: "Jessica Sherard", depursLo: 37 },
-  { name: "Ray Conway", depursLo: 16 },
-  { name: "Gregory Bethea Jr", depursLo: 58 },
-  { name: "Zachary Davis", depursLo: 55 },
-  { name: "Jason Friday", depursLo: 52 },
+  { name: "Tashawna Chisholm", depursLo: 49, email: "tchisholm@questrock.com" },
+  { name: "Tyler Johnson", depursLo: 34, email: "tjohnson@questrock.com" },
+  { name: "Bastian Johnston", depursLo: 13, email: "bastianjohnston@questrock.com" },
+  { name: "Nikk Smith", depursLo: 3, email: "nikksmith@questrock.com" },
+  { name: "Stephen Curry", depursLo: 40, email: "scurry@questrock.com" },
+  { name: "Jessica Sherard", depursLo: 37, email: "jsherard@questrock.com" },
+  { name: "Ray Conway", depursLo: 16, email: "rconway@questrock.com" },
+  { name: "Gregory Bethea Jr", depursLo: 58, email: "gbethea@questrock.com" },
+  { name: "Zachary Davis", depursLo: 55, email: "zdavis@questrock.com" },
+  { name: "Jason Friday", depursLo: 52, email: "jfriday@questrock.com" },
   { name: "Concierge", depursLo: 31 },
 ];
 
 let cachedRoster: ShapeLoRosterEntry[] | null = null;
 let cachedById: Map<number, string> | null = null;
+let cachedByEmail: Map<string, string> | null = null;
 
 function normalizeLoName(value: string | null | undefined): string {
   return String(value ?? "")
@@ -41,12 +43,15 @@ export function getShapeLoRoster(): ShapeLoRosterEntry[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         cachedRoster = parsed.map((entry) => {
           const o = entry as Record<string, unknown>;
+          const email = String(o.email ?? "").trim().toLowerCase();
           return {
             name: String(o.name ?? "").trim(),
             depursLo: Number(o.depursLo ?? o.id),
+            ...(email ? { email } : {}),
           };
         });
         cachedById = null;
+        cachedByEmail = null;
         return cachedRoster;
       }
     } catch {
@@ -67,6 +72,18 @@ function depursLoByIdMap(): Map<number, string> {
     }
   }
   return cachedById;
+}
+
+function depursLoByEmailMap(): Map<string, string> {
+  if (cachedByEmail) return cachedByEmail;
+  cachedByEmail = new Map();
+  for (const entry of getShapeLoRoster()) {
+    const email = String(entry.email ?? "").trim().toLowerCase();
+    if (email && entry.name) {
+      cachedByEmail.set(email, entry.name);
+    }
+  }
+  return cachedByEmail;
 }
 
 /** Parse Shape owner id from API/CSV (numeric string or number). Rejects loan amounts mistaken for ids. */
@@ -90,6 +107,13 @@ export function looksLikeShapeDepursLoId(raw: string | null | undefined): boolea
 export function resolveDepursLoIdToName(depursLoId: number | null | undefined): string | null {
   if (depursLoId == null || !Number.isFinite(depursLoId)) return null;
   return depursLoByIdMap().get(depursLoId) ?? null;
+}
+
+/** When bulk export returns depursLo as an email, map to roster display name. */
+export function resolveDepursLoEmailToName(email: string | null | undefined): string | null {
+  const key = String(email ?? "").trim().toLowerCase();
+  if (!key) return null;
+  return depursLoByEmailMap().get(key) ?? null;
 }
 
 /** Display name → Shape depursLo id (for outbound assign API). */
@@ -118,4 +142,5 @@ export function resolveNameToDepursLoId(loName: string | null | undefined): numb
 export function resetShapeLoRosterCacheForTests(): void {
   cachedRoster = null;
   cachedById = null;
+  cachedByEmail = null;
 }

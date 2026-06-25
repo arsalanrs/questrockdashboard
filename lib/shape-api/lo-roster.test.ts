@@ -1,6 +1,7 @@
 import { describe, expect, it, afterEach } from "vitest";
 import {
   parseShapeDepursLoId,
+  resolveDepursLoEmailToName,
   resolveDepursLoIdToName,
   resolveNameToDepursLoId,
   resetShapeLoRosterCacheForTests,
@@ -25,5 +26,10 @@ describe("lo-roster", () => {
   it("maps display name to depursLo id", () => {
     expect(resolveNameToDepursLoId("Tyler Johnson")).toBe(34);
     expect(resolveNameToDepursLoId("Gregory Bethea Jr")).toBe(58);
+  });
+
+  it("maps depursLo email to display name", () => {
+    expect(resolveDepursLoEmailToName("tjohnson@questrock.com")).toBe("Tyler Johnson");
+    expect(resolveDepursLoEmailToName("nikksmith@questrock.com")).toBe("Nikk Smith");
   });
 });

@@ -1,5 +1,6 @@
 import type { ShapeKpiCsvRow } from "@/lib/import/shape-kpi";
-import { looksLikeShapeDepursLoId, parseShapeDepursLoId } from "@/lib/shape-api/lo-roster";
+import { applyShapeAssignmentFields } from "@/lib/shape-api/apply-shape-assignments";
+import { parseShapeDepursLoId } from "@/lib/shape-api/lo-roster";
 
 /** Map Shape API field names to the CSV-like keys used by the existing import pipeline. */
 const API_TO_CSV: Record<string, string> = {
@@ -81,11 +82,12 @@ const API_TO_CSV: Record<string, string> = {
   source: "Source",
   "Source": "Source",
   channel: "Channel",
-  depursLo: "Shape Depurs LO Id",
-  depurLo: "Shape Depurs LO Id",
+  // depursLo / depursLi handled separately — value may be id, email, or display name.
   loanOfficerUserName: "Loan Officer User Name",
-  // Shape returns the LO field as "LOA User Name" (confirmed from account Preview)
   "LOA User Name": "Loan Officer User Name",
+  "Loan Officer User Name": "Loan Officer User Name",
+  "Loan Interviewer User Name": "Loan Officer User Name",
+  "LI User Name": "Loan Officer User Name",
   "Loan Officer Email": "Loan Officer Email",
   loanOfficerEmail: "Loan Officer Email",
   utmCampaign: "Custom Field - UTM Campaign",
@@ -296,9 +298,11 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
     }
   }
 
-  // Loan Officer: depursLo is a numeric Shape owner id; LOA/loanOfficerUserName is display name.
+  // User assignment departments (LO → LI → LP → PO → Closer); Shape may return display-name keys.
+  applyShapeAssignmentFields(record, out);
+
   if (out["Shape Depurs LO Id"] === undefined) {
-    for (const key of ["depursLo", "depurLo", "lead_owner_id", "leadOwnerId"]) {
+    for (const key of ["lead_owner_id", "leadOwnerId"]) {
       if (key in record) {
         const id = parseShapeDepursLoId(record[key]);
         if (id != null) {
@@ -310,11 +314,7 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
   }
 
   if (out["Loan Officer User Name"] === undefined) {
-    for (const key of [
-      "LOA User Name",
-      "loanOfficerUserName",
-      "Loan Officer User Name",
-    ]) {
+    for (const key of ["LOA User Name", "loanOfficerUserName", "Loan Officer User Name"]) {
       if (key in record) {
         const v = str(record[key]);
         if (v !== undefined) {
@@ -325,19 +325,7 @@ export function mapApiRecordToCsvLike(record: Record<string, unknown>): ShapeKpi
     }
   }
 
-  // Do not fuzzy-scan other keys — loanType/loanAmount matched /loa/ and polluted LO assignment.
-
-  if (out["Shape Depurs LO Id"] === undefined) {
-    for (const key of Object.keys(record)) {
-      if (/depur|lead_owner|owner_id/i.test(key)) {
-        const id = parseShapeDepursLoId(record[key]);
-        if (id != null) {
-          out["Shape Depurs LO Id"] = String(id);
-          break;
-        }
-      }
-    }
-  }
+  // Do not fuzzy-scan depurs* keys — loanType/loanAmount matched /loa/ and polluted LO assignment.
 
   if (out["E-Sign Returned Date"] === undefined) {
     for (const key of Object.keys(record)) {

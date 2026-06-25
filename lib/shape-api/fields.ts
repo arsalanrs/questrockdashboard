@@ -63,13 +63,23 @@ export const SHAPE_BULK_EXPORT_FIELDS = [
   "Channel",
   "utmCampaign",
 
-  // ── Loan officer ──────────────────────────────────────────────────────────
+  // ── User assignment departments (LO → LI → LP → PO → Closer) ───────────────
+  // Shape maps API keys to display columns (e.g. depursLo → Loan Officer User Name).
   "depursLo",
-  "depurLo",
-  "loanOfficerUserName",
+  "depursLi",
+  "depursLp",
+  "depursPo",
+  "depursCl",
   "Loan Officer User Name",
+  "loanOfficerUserName",
   "LOA User Name",
-  "Loan Officer Email",
+  "Loan Interviewer User Name",
+  "LI User Name",
+  "Loan Processor User Name",
+  "LP User Name",
+  "Processor User Name",
+  "PO User Name",
+  "Closer User Name",
 
   // ── Status / pipeline ─────────────────────────────────────────────────────
   "mstrstatus1",
