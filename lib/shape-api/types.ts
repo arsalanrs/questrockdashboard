@@ -6,7 +6,7 @@ export type ShapeDateRange = {
 export type ShapeBulkExportRequest = {
   createdDateRange?: ShapeDateRange;
   updatedDateRange?: ShapeDateRange;
-  fields: string[];
+  fields: readonly string[];
   pageNumber: number;
 };
 
