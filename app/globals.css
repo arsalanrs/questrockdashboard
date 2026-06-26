@@ -172,3 +172,54 @@ body {
 .anim-d2 { animation-delay: 0.10s; }
 .anim-d3 { animation-delay: 0.15s; }
 .anim-d4 { animation-delay: 0.20s; }
+
+/* ---- LO Command Center: action links + chevrons ---- */
+.action-link.shape {
+  background: linear-gradient(135deg, #ff8b2a, #ffffff 46%, #f36b12);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+.action-link.lendingpad {
+  background: linear-gradient(135deg, #2568d8, #21b66f 72%, #0c5b48);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+.action-link.outlook {
+  background: linear-gradient(135deg, #0f6ed8, #36c1ff 58%, #064a98);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+.action-link.teams {
+  background: linear-gradient(135deg, #7152d9, #4f2da8 50%, #174c3e);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+.chevron-step {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 10px 50%);
+}
+.chevron-complete {
+  color: #fff;
+  background: linear-gradient(135deg, #22a86a, #0f6d49 65%, #174c3e);
+  border-color: rgba(23, 132, 82, 0.3);
+}
+.chevron-complete span,
+.chevron-complete em {
+  color: inherit;
+}
+.chevron-progress {
+  background: linear-gradient(135deg, #ffe89a, #f3b33d 70%, #cf850d);
+  border-color: rgba(243, 179, 61, 0.45);
+}
+.chevron-progress em {
+  color: #5f2500;
+}
+.chevron-stalled {
+  color: #fff;
+  background: linear-gradient(135deg, #f47a68, #c83c31 70%, #78251f);
+  border-color: rgba(200, 60, 49, 0.45);
+}
+.chevron-stalled span,
+.chevron-stalled em {
+  color: inherit;
+}
+.chevron-open {
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  border-color: rgba(255,255,255,0.08);
+}
