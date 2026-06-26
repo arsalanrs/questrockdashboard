@@ -1,5 +1,4 @@
 import { differenceInDays, differenceInHours, differenceInMinutes, parseISO } from "date-fns";
-import { mapLendingPadStatusToStage } from "@/lib/lendingpad/map-lp-status-to-stage";
 import { normalizeStatus } from "./status-normalize";
 import { normalizeRecordType } from "./record-type-normalize";
 import {
@@ -71,15 +70,18 @@ const GREEN_STATUSES = new Set(["App Completed", "Advanced"]);
 
 const CLOSED_FAMILY = new Set(["Closed", "Funded", "Purchased"]);
 
-/** LP statuses before Application Taken — excluded from pipeline table. */
-const PRE_PIPELINE_LP_STATUSES = new Set([
-  "Pre-Approved",
-  "Pre Approval",
-  "Pre Qualify",
-  "Registered",
-  "Lead",
-  "Prospect",
+/** Shape CRM statuses that are pre-pipeline (not yet Application Taken). */
+const PRE_APP_LEAD_STATUSES = new Set([
+  "New Lead",
+  "Not Contacted",
+  "Attempting Contact",
+  "Contacted",
+  "App Sent",
+  "App Started",
 ]);
+
+/** LP list statuses before Application Taken when no pipeline dates exist. */
+const PRE_APP_LP_STATUSES = new Set(["Lead", "Prospect", "Pre-Approved", "Pre Approval", "Pre Qualify"]);
 
 const VERIFICATION_B_LOAN_TYPES = new Set([
   "Commercial",
@@ -211,24 +213,39 @@ export function isShapeCrmFile(row: LoDashboardLoanRow): boolean {
 
 export function isActiveLpPipeline(row: LoDashboardLoanRow): boolean {
   if (!row.lendingpad_loan_uuid) return false;
-  const status = normalizeStatus(row.lendingpad_status_raw) ?? normalizeStatus(row.status_raw);
-  if (status && TERMINAL_PIPELINE_STATUSES.has(status)) return false;
   return isPipelineEligible(row);
 }
 
+function isTerminalPipelineStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return TERMINAL_PIPELINE_STATUSES.has(status);
+}
+
 export function isPipelineEligible(row: LoDashboardLoanRow): boolean {
-  if (!row.lendingpad_loan_uuid) return false;
-
   const status = normalizeStatus(row.lendingpad_status_raw) ?? normalizeStatus(row.status_raw);
-  if (status && TERMINAL_PIPELINE_STATUSES.has(status)) return false;
-  if (status && PRE_PIPELINE_LP_STATUSES.has(status)) return false;
 
-  if (row.conversion_date || row.submitted_to_processing_at || row.processing_completed_at) return true;
+  if (isTerminalPipelineStatus(status)) return false;
 
-  const stage = mapLendingPadStatusToStage(row.lendingpad_status_raw ?? row.status_raw);
-  if (!stage || stage === "lead") return false;
+  if (row.lendingpad_loan_uuid) {
+    const hasPipelineActivity =
+      Boolean(row.conversion_date) ||
+      Boolean(row.application_completed_at) ||
+      Boolean(row.submitted_to_processing_at) ||
+      Boolean(row.processing_completed_at) ||
+      Boolean(row.verification_started_at) ||
+      Boolean(row.submitted_to_uw_at);
 
-  return stage !== "funded";
+    if (status && PRE_APP_LP_STATUSES.has(status) && !hasPipelineActivity) return false;
+    if (status && PRE_APP_LEAD_STATUSES.has(status) && !hasPipelineActivity) return false;
+
+    return true;
+  }
+
+  const rt = normalizeRecordType(row.record_type);
+  if (rt !== "Loans") return false;
+  if (status && PRE_APP_LEAD_STATUSES.has(status)) return false;
+
+  return true;
 }
 
 export function isHotLead(row: LoDashboardLoanRow, now = new Date()): boolean {

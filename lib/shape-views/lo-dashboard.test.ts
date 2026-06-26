@@ -8,6 +8,8 @@ import {
   getVerificationTrack,
   isGreenLead,
   isHotLead,
+  isLoanWorkspaceRow,
+  isPipelineEligible,
   isUncontactedLead,
   leadPhaseLabelFor,
 } from "./lo-dashboard";
@@ -112,6 +114,25 @@ describe("lo-dashboard", () => {
     });
     expect(getHotTouchpointLabel(row, now)).toBe("6 month touchpoint");
     expect(isHotLead(row, now)).toBe(true);
+  });
+
+  it("includes LP pipeline rows with uuid even without conversion date", () => {
+    const row = baseRow({
+      lendingpad_loan_uuid: "lp-99",
+      lendingpad_status_raw: "Processing",
+      status_raw: "Processing",
+    });
+    expect(isPipelineEligible(row)).toBe(true);
+    expect(isLoanWorkspaceRow(row)).toBe(true);
+  });
+
+  it("excludes pre-app LP rows without pipeline activity", () => {
+    const row = baseRow({
+      lendingpad_loan_uuid: "lp-99",
+      status_raw: "Pre-Approved",
+      lendingpad_status_raw: "Pre-Approved",
+    });
+    expect(isPipelineEligible(row)).toBe(false);
   });
 
   it("computes alert SLA when underwriting is overdue", () => {

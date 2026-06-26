@@ -21,6 +21,7 @@ import { LeadsWorkspace } from "./LeadsWorkspace";
 import { LoanDetailSlideOver } from "./LoanDetailSlideOver";
 import { LoansWorkspace } from "./LoansWorkspace";
 import { SummaryStrip, type SummaryFocus } from "./SummaryStrip";
+import { ShapeViewsPanel } from "./ShapeViewsPanel";
 import { TurntimesSection } from "./TurntimesSection";
 import type { LeadViewTab } from "./types";
 
@@ -139,6 +140,8 @@ export function LoCommandCenter({
       </div>
 
       <TurntimesSection activePhase={activePhase} onPhaseClick={handlePhaseClick} />
+
+      <ShapeViewsPanel loans={filteredLoans} showLoColumn={showOwnerFilter || effectiveOwnerFilter === "all"} />
 
       <SummaryStrip
         hotCount={classified.hot.length}
