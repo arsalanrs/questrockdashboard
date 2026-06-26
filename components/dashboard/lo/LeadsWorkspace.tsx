@@ -178,7 +178,7 @@ export function LeadsWorkspace({
                   <td className="px-3">{lead.displayStatus}</td>
                   <td className="lo-muted px-3">{lead.leadPhaseLabel}</td>
                   <td className="px-3">{formatMoney(lead.loan_amount_cents)}</td>
-                  <td className="lo-muted px-3">{lead.source ?? "—"}</td>
+                  <td className="lo-source-text px-3 font-semibold">{lead.source ?? "—"}</td>
                   <td className="lo-muted px-3">{lead.verificationTrack}</td>
                   <td className="lo-muted px-3">
                     {fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}

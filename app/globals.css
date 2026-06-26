@@ -66,6 +66,7 @@ html[data-theme="dark"] {
   --lo-chip-text: #e8ecef;
   --lo-value-accent: #8ee0d4;
   --lo-value-number: #e8ff00;
+  --lo-source-text: #8ee0d4;
 
   --font-sans: var(
     --font-geist,
@@ -127,6 +128,7 @@ html[data-theme="light"] {
   --lo-chip-text: #14201c;
   --lo-value-accent: #087f7a;
   --lo-value-number: #174c3e;
+  --lo-source-text: #0a4a3c;
 }
 
 /* ---- Base ---- */
@@ -546,8 +548,10 @@ html[data-theme="dark"] .lo-detail-dialog {
   color: var(--lo-text);
 }
 
-.lo-detail-value.is-source {
-  color: var(--lo-value-accent);
+.lo-detail-value.is-source,
+.lo-source-text {
+  color: var(--lo-source-text);
+  font-weight: 700;
 }
 
 .lo-detail-value.is-number {
@@ -578,6 +582,88 @@ html[data-theme="light"] .action-link.lendingpad,
 html[data-theme="light"] .action-link.outlook,
 html[data-theme="light"] .action-link.teams {
   color: #fff;
+}
+
+/* ---- Source badges (theme-aware) ---- */
+.source-badge {
+  border: 1px solid transparent;
+}
+
+.source-badge-default {
+  background: rgba(255, 255, 255, 0.06);
+  color: hsl(215 14% 60%);
+}
+
+.source-badge-zoom {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.source-badge-shape {
+  background: rgba(99, 102, 241, 0.14);
+  color: #818cf8;
+}
+
+.source-badge-questmail {
+  background: rgba(232, 255, 0, 0.1);
+  color: #e8ff00;
+}
+
+.source-badge-dscr {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+}
+
+.source-badge-web {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+}
+
+.source-badge-referral {
+  background: rgba(34, 197, 94, 0.08);
+  color: #4ade80;
+}
+
+html[data-theme="light"] .source-badge-default {
+  background: #edf3f0;
+  color: #3d4f48;
+  border-color: #d8e1dc;
+}
+
+html[data-theme="light"] .source-badge-zoom {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+html[data-theme="light"] .source-badge-shape {
+  background: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+html[data-theme="light"] .source-badge-questmail {
+  background: #dff5ea;
+  color: #0a4a3c;
+  border-color: #b8e6cf;
+}
+
+html[data-theme="light"] .source-badge-dscr {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-color: #e9d5ff;
+}
+
+html[data-theme="light"] .source-badge-web {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+html[data-theme="light"] .source-badge-referral {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
 }
 
 .lo-note-panel {

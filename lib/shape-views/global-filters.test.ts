@@ -38,4 +38,17 @@ describe("global-filters sample records", () => {
     expect(passesGlobalFilters(row({ borrower_first_name: "Sample", borrower_last_name: "Lead" }))).toBe(false);
     expect(passesGlobalFilters(row({ borrower_first_name: "Jamie", borrower_last_name: "Alvarez" }))).toBe(true);
   });
+
+  it("excludes QuestMail assigned to Concierge Desk", () => {
+    expect(
+      passesGlobalFilters(
+        row({ source: "QuestMail", assigned_loan_officer_name: "Concierge Desk" }),
+      ),
+    ).toBe(false);
+    expect(
+      passesGlobalFilters(
+        row({ source: "QuestMail", assigned_loan_officer_name: "Zack Smith" }),
+      ),
+    ).toBe(true);
+  });
 });
