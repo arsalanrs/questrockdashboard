@@ -74,15 +74,13 @@ export function LoanDetailSlideOver({
             <h2 className="lo-heading text-2xl font-bold">{borrowerDisplayName(loan)}</h2>
             <div className="mt-2 flex flex-wrap gap-2 text-[13px]">
               {email ? (
-                <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">{email}</span>
+                <span className="lo-contact-chip rounded-md px-2 py-1 text-[13px]">{email}</span>
               ) : null}
               {phone ? (
-                <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">{phone}</span>
+                <span className="lo-contact-chip rounded-md px-2 py-1 text-[13px]">{phone}</span>
               ) : null}
               {loan.assigned_loan_officer_name ? (
-                <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
-                  {loan.assigned_loan_officer_name}
-                </span>
+                <span className="lo-contact-chip rounded-md px-2 py-1 text-[13px]">{loan.assigned_loan_officer_name}</span>
               ) : null}
             </div>
           </div>
@@ -129,7 +127,7 @@ export function LoanDetailSlideOver({
         <ProcessingChecklist data={rich?.processing_checklist_json} />
         <NotesFeed loanId={loan.id} />
 
-        <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+        <div className="lo-note-panel rounded-lg px-4 py-3">
           <strong className="lo-muted block text-[11px] font-black uppercase">Pipeline Notes</strong>
           <p className="lo-heading mt-2 text-sm leading-relaxed">{loan.notesPreview}</p>
         </div>
@@ -171,7 +169,7 @@ function LiveConditions({ loanId }: { loanId: string }) {
   if (!conditions.length) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+    <div className="rounded-lg border border-[var(--lo-border)] bg-[var(--lo-surface-muted)] px-4 py-3">
       <h3 className="lo-muted text-xs font-black uppercase">Conditions ({open.length} open)</h3>
       <ul className="mt-2 space-y-1 text-sm">
         {open.slice(0, 8).map((c) => (
@@ -194,7 +192,7 @@ function ProcessingChecklist({
   if (!items.length) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+    <div className="lo-note-panel rounded-lg px-4 py-3">
       <h3 className="lo-muted text-xs font-black uppercase">Processing checklist</h3>
       <ul className="lo-muted mt-2 space-y-1 text-sm">
         {items.map(([key, v]) => (
@@ -220,11 +218,11 @@ function NotesFeed({ loanId }: { loanId: string }) {
   if (!notes.length) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+    <div className="lo-note-panel rounded-lg px-4 py-3">
       <h3 className="lo-muted text-xs font-black uppercase">Synced notes</h3>
       <ul className="mt-2 space-y-2 text-sm">
         {notes.slice(0, 8).map((n) => (
-          <li key={n.id} className="rounded border border-[var(--lo-border)] px-2 py-2">
+          <li key={n.id} className="rounded border border-[var(--lo-border)] bg-[var(--lo-chip-bg)] px-2 py-2">
             <div className="lo-muted text-xs">
               {new Date(n.noted_at).toLocaleString()} · {n.source}
             </div>

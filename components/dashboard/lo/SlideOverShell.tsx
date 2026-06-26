@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export function SlideOverShell({
   open,
@@ -30,20 +31,18 @@ export function SlideOverShell({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      className="lo-dialog-backdrop fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
       onClick={onClose}
       role="presentation"
     >
-      <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" />
-
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="detail-dialog-title"
         className={cn(
-          "lo-detail-dialog relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border shadow-2xl",
+          "lo-detail-dialog relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border",
           "max-h-[min(90vh,900px)] lo-detail-dialog-enter",
         )}
         onClick={(e) => e.stopPropagation()}
@@ -63,6 +62,7 @@ export function SlideOverShell({
         </div>
         <div className="flex-1 overflow-y-auto p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

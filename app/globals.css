@@ -59,6 +59,13 @@ html[data-theme="dark"] {
   --lo-accent: #174c3e;
   --lo-accent-soft: rgba(23, 132, 82, 0.15);
   --lo-teal: #8ee0d4;
+  --lo-dialog-backdrop: rgba(0, 0, 0, 0.18);
+  --lo-dialog-blur: blur(20px);
+  --lo-surface-muted: rgba(255, 255, 255, 0.05);
+  --lo-chip-bg: rgba(255, 255, 255, 0.07);
+  --lo-chip-text: #e8ecef;
+  --lo-value-accent: #8ee0d4;
+  --lo-value-number: #e8ff00;
 
   --font-sans: var(
     --font-geist,
@@ -113,6 +120,13 @@ html[data-theme="light"] {
   --lo-accent: #174c3e;
   --lo-accent-soft: #dff5ea;
   --lo-teal: #087f7a;
+  --lo-dialog-backdrop: rgba(247, 250, 245, 0.55);
+  --lo-dialog-blur: blur(18px);
+  --lo-surface-muted: #f3f7f5;
+  --lo-chip-bg: #edf3f0;
+  --lo-chip-text: #14201c;
+  --lo-value-accent: #087f7a;
+  --lo-value-number: #174c3e;
 }
 
 /* ---- Base ---- */
@@ -499,10 +513,76 @@ html[data-theme="light"] .chevron-open em {
   color: var(--lo-accent);
 }
 
+/* ---- Detail dialog backdrop + panel ---- */
+.lo-dialog-backdrop {
+  background: var(--lo-dialog-backdrop);
+  backdrop-filter: var(--lo-dialog-blur);
+  -webkit-backdrop-filter: var(--lo-dialog-blur);
+}
+
 .lo-detail-dialog {
   background: var(--lo-card);
   color: var(--lo-text);
   border-color: var(--lo-border);
+  box-shadow: 0 24px 64px rgba(20, 32, 28, 0.14);
+}
+
+html[data-theme="dark"] .lo-detail-dialog {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.lo-contact-chip {
+  background: var(--lo-chip-bg);
+  color: var(--lo-chip-text);
+  border: 1px solid var(--lo-border);
+}
+
+.lo-detail-cell {
+  background: var(--lo-surface-muted);
+  border: 1px solid var(--lo-border);
+}
+
+.lo-detail-value {
+  color: var(--lo-text);
+}
+
+.lo-detail-value.is-source {
+  color: var(--lo-value-accent);
+}
+
+.lo-detail-value.is-number {
+  color: var(--lo-value-number);
+}
+
+html[data-theme="light"] .chevron-complete {
+  color: #fff;
+}
+
+html[data-theme="light"] .chevron-progress {
+  color: #14201c;
+}
+
+html[data-theme="light"] .chevron-progress strong {
+  color: #14201c;
+}
+
+html[data-theme="light"] .chevron-stalled {
+  color: #fff;
+}
+
+html[data-theme="light"] .action-link.shape {
+  color: #5f2500;
+}
+
+html[data-theme="light"] .action-link.lendingpad,
+html[data-theme="light"] .action-link.outlook,
+html[data-theme="light"] .action-link.teams {
+  color: #fff;
+}
+
+.lo-note-panel {
+  background: var(--lo-surface-muted);
+  border: 1px solid var(--lo-border);
 }
 
 @keyframes lo-detail-dialog-in {

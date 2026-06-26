@@ -44,19 +44,13 @@ export function LeadDetailSlideOver({
           <h2 className="lo-heading text-2xl font-bold">{borrowerName(lead)}</h2>
             <div className="mt-2 flex flex-wrap gap-2 text-[13px]">
           {lead.borrower_email ? (
-            <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
-              {lead.borrower_email}
-            </span>
+            <span className="lo-contact-chip rounded-md px-2 py-1 text-[13px]">{lead.borrower_email}</span>
           ) : null}
           {lead.borrower_phone ? (
-            <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
-              {lead.borrower_phone}
-            </span>
+            <span className="lo-contact-chip rounded-md px-2 py-1 text-[13px]">{lead.borrower_phone}</span>
           ) : null}
           {lead.assigned_loan_officer_name ? (
-            <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
-              {lead.assigned_loan_officer_name}
-            </span>
+            <span className="lo-contact-chip rounded-md px-2 py-1 text-[13px]">{lead.assigned_loan_officer_name}</span>
           ) : null}
         </div>
           </div>
@@ -69,8 +63,8 @@ export function LeadDetailSlideOver({
 
         <div>
           <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-[var(--lo-border)] pb-2">
-            <h3 className="text-[13px] font-black uppercase tracking-wide">Turntimes</h3>
-            <span className="text-xs text-muted-foreground">
+            <h3 className="lo-heading text-[13px] font-black uppercase tracking-wide">Turntimes</h3>
+            <span className="lo-muted text-xs">
               Lead workspace files are unfilled until converted to loan pipeline
             </span>
           </div>
@@ -94,15 +88,13 @@ export function LeadDetailSlideOver({
         />
 
         {aiNotes ? (
-          <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+          <div className="lo-note-panel rounded-lg px-4 py-3">
             <strong className="lo-muted block text-[11px] font-black uppercase">AI Notes / Call Summary</strong>
             <p className="lo-heading mt-2 whitespace-pre-wrap text-sm leading-relaxed">{aiNotes}</p>
           </div>
         ) : null}
 
-        <div
-          className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3"
-        >
+        <div className="lo-note-panel rounded-lg px-4 py-3">
           <strong className="lo-muted block text-[11px] font-black uppercase">Shape Notes</strong>
           <p className="lo-heading mt-2 whitespace-pre-wrap text-sm leading-relaxed">
             {notes || "No notes synced from Shape yet."}
