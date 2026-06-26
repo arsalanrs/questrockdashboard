@@ -478,8 +478,23 @@ html[data-theme="light"] .chevron-open em {
   color: var(--lo-accent);
 }
 
-.lo-slide-over {
+.lo-detail-dialog {
   background: var(--lo-card);
   color: var(--lo-text);
   border-color: var(--lo-border);
+}
+
+@keyframes lo-detail-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.lo-detail-dialog-enter {
+  animation: lo-detail-dialog-in 0.2s ease-out;
 }

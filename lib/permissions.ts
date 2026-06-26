@@ -24,3 +24,8 @@ export function canViewMonitor(role: AppRole) {
   return role === "manager" || role === "executive" || role === "admin";
 }
 
+/** Managers and executives can impersonate an LO on the command center. */
+export function canViewAsLoanOfficer(role: AppRole) {
+  return role === "manager" || role === "executive" || role === "admin";
+}
+

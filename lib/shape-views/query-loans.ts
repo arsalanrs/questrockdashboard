@@ -21,6 +21,7 @@ export type FetchShapeLoansOptions = {
   /** ISO timestamp — rows with lead_created_at OR shape_last_updated_at >= this. */
   windowStartIso: string;
   assignedLoUserId?: string | null;
+  assignedLoName?: string | null;
   limit?: number;
 };
 

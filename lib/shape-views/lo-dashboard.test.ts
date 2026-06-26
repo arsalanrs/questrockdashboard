@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyLeads,
+  computeLeadSLA,
   computeLoanSLA,
   deriveMilestoneProgress,
   getHotTouchpointLabel,
   getVerificationTrack,
+  isGreenLead,
   isHotLead,
   isUncontactedLead,
+  leadPhaseLabelFor,
 } from "./lo-dashboard";
 import type { LoDashboardLoanRow } from "./lo-dashboard";
 
@@ -44,6 +47,7 @@ function baseRow(overrides: Partial<LoDashboardLoanRow> = {}): LoDashboardLoanRo
     documentation_type: "W2",
     is_brokered: false,
     notes_sidebar: null,
+    notes_sidebar_ai_note: null,
     recent_notes: null,
     game_plan_notes: null,
     initial_contact_attempted: false,
@@ -71,14 +75,31 @@ describe("lo-dashboard", () => {
     expect(classifyLeads([baseRow()], now).hot).toHaveLength(1);
   });
 
-  it("detects uncontacted leads", () => {
-    expect(isUncontactedLead(baseRow())).toBe(true);
-    expect(isUncontactedLead(baseRow({ last_contacted_at: "2026-06-25T12:00:00.000Z" }))).toBe(false);
+  it("detects uncontacted leads by Not Contacted status", () => {
+    expect(isUncontactedLead(baseRow())).toBe(false);
+    expect(isUncontactedLead(baseRow({ status_raw: "Not Contacted" }))).toBe(true);
+    expect(isUncontactedLead(baseRow({ status_raw: "Not Contacted", last_contacted_at: "2026-06-25T12:00:00.000Z" }))).toBe(true);
   });
 
-  it("maps verification track B for slow track", () => {
-    expect(getVerificationTrack(baseRow({ track: "slow" }))).toBe("Verification B");
-    expect(getVerificationTrack(baseRow())).toBe("Verification A");
+  it("limits green leads to Advanced and App Completed", () => {
+    expect(isGreenLead(baseRow({ status_raw: "App Sent" }))).toBe(false);
+    expect(isGreenLead(baseRow({ status_raw: "Advanced" }))).toBe(true);
+    expect(isGreenLead(baseRow({ status_raw: "App Completed" }))).toBe(true);
+  });
+
+  it("defers verification track until verification starts", () => {
+    expect(getVerificationTrack(baseRow())).toBe("Pending");
+    expect(getVerificationTrack(baseRow({ verification_started_at: "2026-06-25T12:00:00.000Z" }))).toBe("Verification A");
+    expect(getVerificationTrack(baseRow({ track: "slow", verification_started_at: "2026-06-25T12:00:00.000Z" }))).toBe("Verification B");
+  });
+
+  it("shows New Lead phase label before contact", () => {
+    expect(leadPhaseLabelFor(baseRow())).toBe("New Lead");
+  });
+
+  it("flags new lead SLA after 5 minutes without contact", () => {
+    const now = new Date("2026-06-20T12:06:00.000Z");
+    expect(computeLeadSLA(baseRow(), now)).toBe("ALERT");
   });
 
   it("labels funded touchpoints near 6 months", () => {
@@ -98,7 +119,9 @@ describe("lo-dashboard", () => {
     const row = baseRow({
       record_type: "Loans",
       lendingpad_loan_uuid: "lp-1",
+      lendingpad_status_raw: "Submitted to UW",
       status_raw: "Submitted to UW",
+      conversion_date: "2026-06-01T12:00:00.000Z",
       submitted_to_uw_at: "2026-06-20T12:00:00.000Z",
     });
     const { sla } = computeLoanSLA(row, now);

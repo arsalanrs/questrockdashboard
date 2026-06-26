@@ -29,11 +29,22 @@ type Props = {
   richByLoanId: Record<string, LoDashboardRichData>;
   loUsers: LoSelectOption[];
   pageTitle: string;
+  /** When set (loan officers), hide the LO picker and lock to this user. */
+  lockedOwnerId?: string | null;
+  /** Managers/executives can filter by LO; loan officers cannot. */
+  showOwnerFilter?: boolean;
 };
 
-export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Props) {
+export function LoCommandCenter({
+  loans,
+  richByLoanId,
+  loUsers,
+  pageTitle,
+  lockedOwnerId = null,
+  showOwnerFilter = false,
+}: Props) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState(lockedOwnerId ?? "all");
   const [leadTab, setLeadTab] = useState<LeadViewTab>("all");
   const [activePhase, setActivePhase] = useState<TurntimePhaseKey | "all">("all");
   const [summaryFocus, setSummaryFocus] = useState<SummaryFocus>(null);
@@ -42,10 +53,12 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
 
   const loOptions = useMemo(() => buildLoSelectOptions(loUsers, loans), [loUsers, loans]);
 
+  const effectiveOwnerFilter = lockedOwnerId ?? ownerFilter;
+
   const filteredLoans = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return loans.filter((loan) => {
-      if (!loanMatchesLoFilter(loan, ownerFilter, loOptions)) return false;
+      if (!loanMatchesLoFilter(loan, effectiveOwnerFilter, loOptions)) return false;
       if (!q) return true;
       const haystack = [
         borrowerDisplayName(loan),
@@ -62,7 +75,7 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [loans, ownerFilter, loOptions, searchQuery]);
+  }, [loans, effectiveOwnerFilter, loOptions, searchQuery]);
 
   const classified = useMemo(() => classifyLeads(filteredLoans), [filteredLoans]);
   const pipelineLoans = useMemo(() => buildPipelineLoans(filteredLoans), [filteredLoans]);
@@ -105,21 +118,23 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
               className="w-full bg-transparent text-sm outline-none"
             />
           </label>
-          <select
-            value={ownerFilter}
-            onChange={(e) => {
-              setOwnerFilter(e.target.value);
-              setSummaryFocus(null);
-            }}
-            className="lo-input h-11 rounded-lg px-3 text-sm"
-          >
-            <option value="all">All loan officers</option>
-            {loOptions.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.full_name ?? user.id}
-              </option>
-            ))}
-          </select>
+          {showOwnerFilter ? (
+            <select
+              value={ownerFilter}
+              onChange={(e) => {
+                setOwnerFilter(e.target.value);
+                setSummaryFocus(null);
+              }}
+              className="lo-input h-11 rounded-lg px-3 text-sm"
+            >
+              <option value="all">All loan officers</option>
+              {loOptions.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name ?? user.id}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
       </div>
 

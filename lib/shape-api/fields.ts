@@ -261,6 +261,7 @@ export const SHAPE_BULK_EXPORT_FIELDS_SYNC: readonly string[] = [
   "Conversion Date",
   "Last Status Change Date",
   "notes_sidebar",
+  "notes_sidebar_ai_note",
   "recent_notes",
   "trkApplicationCompleted",
   "trkCreditReportRequest",

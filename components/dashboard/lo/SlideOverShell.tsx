@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 export function SlideOverShell({
   open,
@@ -14,35 +14,55 @@ export function SlideOverShell({
   children: ReactNode;
   title: string;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
   return (
-    <>
-      {open ? (
-        <button
-          type="button"
-          aria-label="Close panel backdrop"
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-          onClick={onClose}
-        />
-      ) : null}
-      <aside
-        aria-hidden={!open}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detail-dialog-title"
         className={cn(
-          "lo-slide-over fixed right-0 top-0 z-50 flex h-full w-full max-w-3xl flex-col border-l shadow-2xl transition-transform duration-200 ease-out",
-          open ? "translate-x-0" : "translate-x-full",
+          "lo-detail-dialog relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border shadow-2xl",
+          "max-h-[min(90vh,900px)] lo-detail-dialog-enter",
         )}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[var(--lo-border)] px-5 py-3">
-          <p className="lo-accent-text text-xs font-bold uppercase tracking-wide">{title}</p>
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--lo-border)] px-5 py-3">
+          <p id="detail-dialog-title" className="lo-accent-text text-xs font-bold uppercase tracking-wide">
+            {title}
+          </p>
           <button
             type="button"
             onClick={onClose}
-            className="lo-muted rounded-lg px-2 py-1 text-sm hover:bg-[var(--lo-accent-soft)]"
+            className="lo-muted flex h-8 w-8 items-center justify-center rounded-lg text-lg leading-none hover:bg-[var(--lo-accent-soft)]"
+            aria-label="Close"
           >
-            Close
+            ×
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5">{children}</div>
-      </aside>
-    </>
+      </div>
+    </div>
   );
 }

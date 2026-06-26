@@ -7,7 +7,6 @@ import {
   isGreenLead,
   isHotLead,
   isUncontactedLead,
-  phaseLabel,
 } from "@/lib/shape-views/lo-dashboard";
 import type { ClassifiedLead } from "@/lib/shape-views/lo-dashboard";
 import type { TurntimePhaseKey } from "@/lib/shape-views/turntime-milestones";
@@ -24,6 +23,13 @@ function fmtRelative(iso: string | null | undefined) {
   } catch {
     return "—";
   }
+}
+
+function slaPillClass(sla: ClassifiedLead["leadSla"]) {
+  if (sla === "ALERT") return "bg-[#fde6e2] text-[#c83c31]";
+  if (sla === "CAUTION") return "bg-[#fff4d7] text-[#8a5a00]";
+  if (sla === "OK") return "bg-[#e2f6eb] text-[#178452]";
+  return "bg-transparent text-[var(--lo-muted)]";
 }
 
 type Props = {
@@ -79,12 +85,12 @@ export function LeadsWorkspace({
 
   const sectionHint =
     activeTab === "all"
-      ? "Every Shape CRM lead in your workspace"
+      ? "Shape CRM leads in your workspace"
       : activeTab === "hot"
-        ? "New leads and past clients due for touchpoints"
+        ? "New leads + past-client touchpoints"
         : activeTab === "green"
-          ? "Application activity ready to advance"
-          : "Leads with no completed contact attempt yet";
+          ? "Advanced / app completed — advance to verification"
+          : "Not Contacted status only";
 
   return (
     <section className="lo-card min-w-0 p-4">
@@ -112,7 +118,7 @@ export function LeadsWorkspace({
 
       {activePhase !== "all" ? (
         <div className="lo-phase-chip mb-4 flex items-center justify-between rounded-lg px-3 py-2 text-sm font-bold">
-          <span>Showing leads in {phaseLabel(activePhase)}</span>
+          <span>Filtered by turntime phase</span>
           <button type="button" onClick={onClearPhase} className="lo-segment-active rounded-md px-2 py-1 text-xs">
             Clear
           </button>
@@ -121,47 +127,75 @@ export function LeadsWorkspace({
 
       <div className="mb-3 flex items-baseline justify-between border-b border-[var(--lo-border)] pb-2">
         <h3 className="lo-heading text-[13px] font-black uppercase">{sectionTitle}</h3>
-        <span className="lo-muted text-xs">{sectionHint}</span>
+        <span className="lo-muted text-xs">{sectionHint} · {visible.length} leads</span>
       </div>
 
       {searchQuery ? (
         <p className="lo-muted mb-3 text-xs">Filtered by search: “{searchQuery}”</p>
       ) : null}
 
-      <div className="grid gap-2.5">
-        {visible.length === 0 ? (
-          <div className="lo-muted rounded-lg border border-[var(--lo-border)] px-4 py-8 text-center text-sm">
-            No leads in this view.
-          </div>
-        ) : (
-          visible.map((lead) => (
-            <button
-              key={lead.id}
-              type="button"
-              onClick={() => onSelectLead(lead)}
-              className={cn(
-                "grid w-full gap-3 rounded-lg border border-[var(--lo-border)] bg-white px-3 py-3 text-left transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto]",
-                activeTab === "hot" && "border-l-4 border-l-[#c83c31]",
-                activeTab === "green" && "border-l-4 border-l-[#087f7a]",
-                activeTab === "uncontacted" && "border-l-4 border-l-[#f3b33d]",
-              )}
-            >
-              <div>
-                <h4 className="lo-heading text-[15px] font-bold">{borrowerName(lead)}</h4>
-                <div className="lo-muted mt-1 flex flex-wrap gap-2 text-xs">
-                  <span>{lead.displayStatus}</span>
-                  <span>{formatMoney(lead.loan_amount_cents)}</span>
-                  <span>{lead.source ?? "—"}</span>
-                  <span>{phaseLabel(lead.leadPhase)}</span>
-                  <span>{fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}</span>
-                </div>
-              </div>
-              <div className="lo-phase-chip self-center rounded-md px-2 py-1 text-xs font-extrabold">
-                {lead.hotTouchpointLabel ?? lead.portal_status_raw ?? lead.status_raw ?? "Follow up"}
-              </div>
-            </button>
-          ))
-        )}
+      <div
+        className="lo-table-wrap rounded-lg border border-[var(--lo-border)]"
+        style={{ maxHeight: "min(70vh, 720px)" }}
+      >
+        <table>
+          <thead>
+            <tr>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">SLA</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Borrower</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Status</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Phase</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Amount</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Source</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Verification</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Last Change</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase">Trigger</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="lo-muted px-4 py-10 text-center text-sm">
+                  No leads in this view.
+                </td>
+              </tr>
+            ) : (
+              visible.map((lead) => (
+                <tr
+                  key={lead.id}
+                  className="cursor-pointer"
+                  onClick={() => onSelectLead(lead)}
+                >
+                  <td className="px-3 py-2.5">
+                    {lead.leadSla ? (
+                      <span
+                        className={`${slaPillClass(lead.leadSla)} inline-flex min-w-[70px] justify-center rounded-full px-2 py-1 text-xs font-black`}
+                      >
+                        {lead.leadSla}
+                      </span>
+                    ) : (
+                      <span className="lo-muted text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className="font-bold text-[#2d67b1]">{borrowerName(lead)}</span>
+                  </td>
+                  <td className="px-3 py-2.5">{lead.displayStatus}</td>
+                  <td className="lo-muted px-3 py-2.5 text-xs">{lead.leadPhaseLabel}</td>
+                  <td className="px-3 py-2.5">{formatMoney(lead.loan_amount_cents)}</td>
+                  <td className="lo-muted px-3 py-2.5 text-xs">{lead.source ?? "—"}</td>
+                  <td className="lo-muted px-3 py-2.5 text-xs">{lead.verificationTrack}</td>
+                  <td className="lo-muted px-3 py-2.5 text-xs">
+                    {fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}
+                  </td>
+                  <td className="lo-wrap lo-muted px-3 py-2.5 text-xs">
+                    {lead.hotTouchpointLabel ?? lead.portal_status_raw ?? lead.status_raw ?? "Follow up"}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </section>
   );

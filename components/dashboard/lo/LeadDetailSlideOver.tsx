@@ -2,7 +2,6 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { NEUTRAL_MILESTONE_PROGRESS } from "@/lib/shape-views/turntime-milestones";
-import { phaseLabel } from "@/lib/shape-views/lo-dashboard";
 import type { ClassifiedLead } from "@/lib/shape-views/lo-dashboard";
 import { formatMoney, stateForRow } from "@/lib/shape-views/lo-dashboard";
 import { ActionButtons } from "./ActionButtons";
@@ -35,6 +34,7 @@ export function LeadDetailSlideOver({
   if (!lead) return null;
 
   const notes = [lead.notes_sidebar, lead.recent_notes].filter(Boolean).join("\n\n");
+  const aiNotes = lead.notes_sidebar_ai_note?.trim() ?? "";
 
   return (
     <SlideOverShell open={open} onClose={onClose} title="Shape Lead File">
@@ -68,7 +68,7 @@ export function LeadDetailSlideOver({
         <ActionButtons record={lead} />
 
         <div>
-          <div className="mb-2 flex items-baseline justify-between gap-3 border-b pb-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-[var(--lo-border)] pb-2">
             <h3 className="text-[13px] font-black uppercase tracking-wide">Turntimes</h3>
             <span className="text-xs text-muted-foreground">
               Lead workspace files are unfilled until converted to loan pipeline
@@ -84,7 +84,7 @@ export function LeadDetailSlideOver({
             ["Trigger", lead.hotTouchpointLabel ?? lead.portal_status_raw ?? lead.status_raw],
             ["Contact Attempts", lead.contactAttempts],
             ["Verification Track", lead.verificationTrack],
-            ["Current Phase", phaseLabel(lead.leadPhase)],
+            ["Current Phase", lead.leadPhaseLabel],
             ["Loan Purpose", lead.loan_purpose],
             ["Estimated Amount", formatMoney(lead.loan_amount_cents)],
             ["State", stateForRow(lead)],
@@ -93,10 +93,17 @@ export function LeadDetailSlideOver({
           ]}
         />
 
+        {aiNotes ? (
+          <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+            <strong className="lo-muted block text-[11px] font-black uppercase">AI Notes / Call Summary</strong>
+            <p className="lo-heading mt-2 whitespace-pre-wrap text-sm leading-relaxed">{aiNotes}</p>
+          </div>
+        ) : null}
+
         <div
           className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3"
         >
-          <strong className="lo-muted block text-[11px] font-black uppercase">Notes</strong>
+          <strong className="lo-muted block text-[11px] font-black uppercase">Shape Notes</strong>
           <p className="lo-heading mt-2 whitespace-pre-wrap text-sm leading-relaxed">
             {notes || "No notes synced from Shape yet."}
           </p>

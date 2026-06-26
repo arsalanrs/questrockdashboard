@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireCurrentUser } from "@/lib/current-user";
-import { canAccessAdmin } from "@/lib/permissions";
+import { canViewAsLoanOfficer } from "@/lib/permissions";
 import { filterLoDashboardUsers } from "@/lib/dashboard/lo-selector";
 import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 import { LoCommandCenter } from "@/components/dashboard/lo/LoCommandCenter";
@@ -23,14 +23,15 @@ export default async function LoanOfficerDashboardPage({
   const { appUser } = await requireCurrentUser();
   const params = await searchParams;
 
-  const isAdmin = canAccessAdmin(appUser.role);
-  const effectiveViewAsId = isAdmin && params.viewAs ? params.viewAs : null;
+  const canViewAs = canViewAsLoanOfficer(appUser.role);
+  const isLoanOfficer = appUser.role === "loan_officer";
+  const effectiveViewAsId = canViewAs && params.viewAs ? params.viewAs : null;
 
   const adminClient = createSupabaseAdminClient();
   let loUsersForSelector: Array<{ id: string; full_name: string | null; role: string }> = [];
   let viewAsUser: { id: string; full_name: string | null; role: string } | null = null;
 
-  if (isAdmin) {
+  if (canViewAs) {
     const { data: users } = await adminClient
       .from("users")
       .select("id,full_name,role")
@@ -40,11 +41,30 @@ export default async function LoanOfficerDashboardPage({
     viewAsUser = loUsersForSelector.find((u) => u.id === effectiveViewAsId) ?? null;
   }
 
-  const fetchClient = effectiveViewAsId ? adminClient : await createSupabaseServerClient();
-  const { loans, error } = await fetchLoDashboardLoans(fetchClient, {
-    windowStartIso: windowStartIso(),
-    assignedLoUserId: effectiveViewAsId ?? undefined,
-  });
+  const windowStart = windowStartIso();
+  const fetchOptions = { windowStartIso: windowStart };
+
+  let fetchClient = await createSupabaseServerClient();
+  let lockedOwnerId: string | null = null;
+
+  if (isLoanOfficer) {
+    fetchClient = adminClient;
+    lockedOwnerId = appUser.id;
+    Object.assign(fetchOptions, {
+      assignedLoUserId: appUser.id,
+      assignedLoName: appUser.full_name,
+    });
+  } else if (canViewAs && effectiveViewAsId) {
+    fetchClient = adminClient;
+    Object.assign(fetchOptions, {
+      assignedLoUserId: effectiveViewAsId,
+      assignedLoName: viewAsUser?.full_name ?? null,
+    });
+  } else if (canViewAs) {
+    fetchClient = adminClient;
+  }
+
+  const { loans, error } = await fetchLoDashboardLoans(fetchClient, fetchOptions);
 
   const pipelineIds = buildPipelineLoans(loans).map((loan) => loan.id);
   const richByLoanId = await fetchRichLoanDataByIds(fetchClient, pipelineIds);
@@ -58,11 +78,13 @@ export default async function LoanOfficerDashboardPage({
   const pageTitle =
     effectiveViewAsId && viewAsUser
       ? `Daily command center — ${viewAsUser.full_name ?? "LO"}`
-      : "Daily command center";
+      : isLoanOfficer
+        ? `Daily command center — ${appUser.full_name ?? "My book"}`
+        : "Daily command center";
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      {isAdmin && loUsersForSelector.length > 0 && (
+      {canViewAs && loUsersForSelector.length > 0 && (
         <Suspense fallback={null}>
           <ViewAsSelector users={loUsersForSelector} currentViewAs={effectiveViewAsId} />
         </Suspense>
@@ -74,7 +96,14 @@ export default async function LoanOfficerDashboardPage({
         </div>
       ) : null}
 
-      <LoCommandCenter loans={loans} richByLoanId={richByLoanId} loUsers={loUsers} pageTitle={pageTitle} />
+      <LoCommandCenter
+        loans={loans}
+        richByLoanId={richByLoanId}
+        loUsers={loUsers}
+        pageTitle={pageTitle}
+        lockedOwnerId={lockedOwnerId}
+        showOwnerFilter={canViewAs && !isLoanOfficer}
+      />
     </div>
   );
 }

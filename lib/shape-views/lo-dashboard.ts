@@ -1,4 +1,5 @@
-import { differenceInDays, differenceInHours, parseISO } from "date-fns";
+import { differenceInDays, differenceInHours, differenceInMinutes, parseISO } from "date-fns";
+import { mapLendingPadStatusToStage } from "@/lib/lendingpad/map-lp-status-to-stage";
 import { normalizeStatus } from "./status-normalize";
 import { normalizeRecordType } from "./record-type-normalize";
 import {
@@ -22,6 +23,7 @@ export type LoDashboardLoanRow = ShapeLoanRow & {
   documentation_type: string | null;
   is_brokered: boolean | null;
   notes_sidebar: string | null;
+  notes_sidebar_ai_note: string | null;
   recent_notes: string | null;
   game_plan_notes: string | null;
   initial_contact_attempted: boolean | null;
@@ -40,7 +42,7 @@ export type LoDashboardLoanRow = ShapeLoanRow & {
   credit_score_mid: number | null;
 };
 
-export type VerificationTrack = "Verification A" | "Verification B";
+export type VerificationTrack = "Verification A" | "Verification B" | "Pending";
 
 export type SlaStatus = "OK" | "CAUTION" | "ALERT";
 
@@ -48,8 +50,10 @@ export type ClassifiedLead = LoDashboardLoanRow & {
   displayStatus: string;
   hotTouchpointLabel: string | null;
   leadPhase: TurntimePhaseKey;
+  leadPhaseLabel: string;
   verificationTrack: VerificationTrack;
   contactAttempts: number;
+  leadSla: SlaStatus | null;
 };
 
 export type PipelineLoanRow = LoDashboardLoanRow & {
@@ -63,9 +67,30 @@ export type PipelineLoanRow = LoDashboardLoanRow & {
   notesPreview: string;
 };
 
-const GREEN_STATUSES = new Set(["App Sent", "App Started", "App Completed", "Advanced"]);
+const GREEN_STATUSES = new Set(["App Completed", "Advanced"]);
 
 const CLOSED_FAMILY = new Set(["Closed", "Funded", "Purchased"]);
+
+/** LP statuses before Application Taken — excluded from pipeline table. */
+const PRE_PIPELINE_LP_STATUSES = new Set([
+  "Pre-Approved",
+  "Pre Approval",
+  "Pre Qualify",
+  "Registered",
+  "Lead",
+  "Prospect",
+]);
+
+const VERIFICATION_B_LOAN_TYPES = new Set([
+  "Commercial",
+  "Construction",
+  "Fix & Flip",
+  "Rehab",
+  "DSCR",
+  "Hard Money",
+  "Ground Up",
+  "Ground Up Construction",
+]);
 
 const TERMINAL_PIPELINE_STATUSES = new Set([
   "Closed",
@@ -103,19 +128,44 @@ export function displayLeadStatus(statusRaw: string | null): string {
   return normalized;
 }
 
-export function getVerificationTrack(row: Pick<LoDashboardLoanRow, "track" | "documentation_type" | "loan_type">): VerificationTrack {
+export function getVerificationTrack(
+  row: Pick<LoDashboardLoanRow, "track" | "documentation_type" | "loan_type" | "status_raw" | "verification_started_at" | "verification_completed_at">,
+): VerificationTrack {
+  if (!hasEnteredVerification(row)) return "Pending";
+
   const doc = row.documentation_type?.toLowerCase() ?? "";
   const loanType = row.loan_type ?? "";
   if (row.track === "slow") return "Verification B";
   if (SLOW_DOC_HINTS.some((hint) => doc.includes(hint))) return "Verification B";
+  if (VERIFICATION_B_LOAN_TYPES.has(loanType)) return "Verification B";
   if (["Construction", "Fix & Flip", "Rehab", "DSCR"].includes(loanType)) return "Verification B";
   return "Verification A";
 }
 
+function hasEnteredVerification(
+  row: Pick<LoDashboardLoanRow, "status_raw" | "verification_started_at" | "verification_completed_at">,
+): boolean {
+  if (row.verification_started_at || row.verification_completed_at) return true;
+  const status = normalizeStatus(row.status_raw);
+  if (!status) return false;
+  return status.includes("Verification") || status.includes("Package") || status.includes("Validation");
+}
+
+export function leadPhaseLabelFor(row: LoDashboardLoanRow): string {
+  const status = normalizeStatus(row.status_raw);
+  if (status === "New Lead" || status === "Not Contacted" || status === "Attempting Contact") {
+    return "New Lead";
+  }
+  if (status && GREEN_STATUSES.has(status)) return status;
+  return phaseLabel(inferLeadPhase(row));
+}
+
 export function inferLeadPhase(row: LoDashboardLoanRow): TurntimePhaseKey {
   const status = normalizeStatus(row.status_raw);
-  if (!status) return "verificationA";
-  if (GREEN_STATUSES.has(status) || status.includes("App")) return "packageOutA";
+  if (!status || status === "New Lead" || status === "Not Contacted" || status === "Attempting Contact") {
+    return "verificationA";
+  }
+  if (GREEN_STATUSES.has(status)) return "packageOutA";
   if (status.includes("Verification")) return getVerificationTrack(row) === "Verification B" ? "verificationB" : "verificationA";
   if (status.includes("Package")) return row.is_brokered ? "packageOutB" : "packageOutA";
   if (status.includes("Validation") || status.includes("Processing")) return "validation";
@@ -146,9 +196,6 @@ export function getHotTouchpointLabel(row: LoDashboardLoanRow, now = new Date())
     { label: "6 month touchpoint", target: 182, tolerance: 21 },
     { label: "1 year touchpoint", target: 365, tolerance: 21 },
   ];
-  for (let years = 2; years <= 10; years += 1) {
-    windows.push({ label: `${years} year touchpoint`, target: years * 365, tolerance: 21 });
-  }
 
   for (const window of windows) {
     if (Math.abs(daysSince - window.target) <= window.tolerance) return window.label;
@@ -156,41 +203,79 @@ export function getHotTouchpointLabel(row: LoDashboardLoanRow, now = new Date())
   return null;
 }
 
+export function isShapeCrmFile(row: LoDashboardLoanRow): boolean {
+  const rt = normalizeRecordType(row.record_type);
+  if (rt === "Leads" || rt === "Applications") return true;
+  return Boolean(row.shape_record_id) && !isActiveLpPipeline(row);
+}
+
+export function isActiveLpPipeline(row: LoDashboardLoanRow): boolean {
+  if (!row.lendingpad_loan_uuid) return false;
+  const status = normalizeStatus(row.lendingpad_status_raw) ?? normalizeStatus(row.status_raw);
+  if (status && TERMINAL_PIPELINE_STATUSES.has(status)) return false;
+  return isPipelineEligible(row);
+}
+
+export function isPipelineEligible(row: LoDashboardLoanRow): boolean {
+  if (!row.lendingpad_loan_uuid) return false;
+
+  const status = normalizeStatus(row.lendingpad_status_raw) ?? normalizeStatus(row.status_raw);
+  if (status && TERMINAL_PIPELINE_STATUSES.has(status)) return false;
+  if (status && PRE_PIPELINE_LP_STATUSES.has(status)) return false;
+
+  if (row.conversion_date || row.submitted_to_processing_at || row.processing_completed_at) return true;
+
+  const stage = mapLendingPadStatusToStage(row.lendingpad_status_raw ?? row.status_raw);
+  if (!stage || stage === "lead") return false;
+
+  return stage !== "funded";
+}
+
 export function isHotLead(row: LoDashboardLoanRow, now = new Date()): boolean {
   const status = normalizeStatus(row.status_raw);
-  if (status === "New Lead") return true;
-  return getHotTouchpointLabel(row, now) !== null;
+  const lpStatus = normalizeStatus(row.lendingpad_status_raw);
+
+  if (status === "New Lead" && isShapeCrmFile(row) && !isActiveLpPipeline(row)) return true;
+
+  const closedStatus = lpStatus ?? status;
+  if (closedStatus && CLOSED_FAMILY.has(closedStatus)) {
+    return getHotTouchpointLabel(row, now) !== null;
+  }
+  return false;
 }
 
 export function isGreenLead(row: LoDashboardLoanRow): boolean {
+  if (!isShapeCrmFile(row) || isActiveLpPipeline(row)) return false;
   const status = normalizeStatus(row.status_raw);
   return status != null && GREEN_STATUSES.has(status);
 }
 
 export function isUncontactedLead(row: LoDashboardLoanRow): boolean {
-  return contactAttemptsFor(row) === 0;
+  if (!isShapeCrmFile(row)) return false;
+  return normalizeStatus(row.status_raw) === "Not Contacted";
+}
+
+export function computeLeadSLA(row: LoDashboardLoanRow, now = new Date()): SlaStatus | null {
+  if (normalizeStatus(row.status_raw) !== "New Lead") return null;
+  if (row.last_contacted_at || row.initial_contact_attempted) return null;
+
+  const created = parseTs(row.lead_created_at);
+  if (!created) return null;
+
+  const minutes = differenceInMinutes(now, created);
+  if (minutes > 5) return "ALERT";
+  if (minutes >= 4) return "CAUTION";
+  return "OK";
 }
 
 export function isLeadWorkspaceRow(row: LoDashboardLoanRow, now = new Date()): boolean {
-  const rt = normalizeRecordType(row.record_type);
-  if (rt === "Leads" || rt === "Applications") return true;
   if (isHotLead(row, now) || isGreenLead(row) || isUncontactedLead(row)) return true;
-  // Shape CRM file without an active LP pipeline row — still a lead for the LO.
-  if (row.shape_record_id && !isLoanWorkspaceRow(row)) return true;
+  if (isShapeCrmFile(row) && !isLoanWorkspaceRow(row)) return true;
   return false;
 }
 
 export function isLoanWorkspaceRow(row: LoDashboardLoanRow): boolean {
-  if (row.lendingpad_loan_uuid) {
-    const status = normalizeStatus(row.status_raw) ?? normalizeStatus(row.lendingpad_status_raw);
-    if (status && TERMINAL_PIPELINE_STATUSES.has(status)) return false;
-    return true;
-  }
-  const rt = row.record_type?.trim();
-  if (rt !== "Loans") return false;
-  const status = normalizeStatus(row.status_raw) ?? normalizeStatus(row.lendingpad_status_raw);
-  if (status && TERMINAL_PIPELINE_STATUSES.has(status)) return false;
-  return true;
+  return isPipelineEligible(row);
 }
 
 function toClassifiedLead(row: LoDashboardLoanRow, now: Date): ClassifiedLead {
@@ -199,8 +284,10 @@ function toClassifiedLead(row: LoDashboardLoanRow, now: Date): ClassifiedLead {
     displayStatus: displayLeadStatus(row.status_raw),
     hotTouchpointLabel: getHotTouchpointLabel(row, now),
     leadPhase: inferLeadPhase(row),
+    leadPhaseLabel: leadPhaseLabelFor(row),
     verificationTrack: getVerificationTrack(row),
     contactAttempts: contactAttemptsFor(row),
+    leadSla: computeLeadSLA(row, now),
   };
 }
 
@@ -215,12 +302,18 @@ export function classifyLeads(rows: LoDashboardLoanRow[], now = new Date()) {
   };
 }
 
+function milestoneTrackFor(row: LoDashboardLoanRow): "Verification A" | "Verification B" {
+  const track = getVerificationTrack(row);
+  return track === "Verification B" ? "Verification B" : "Verification A";
+}
+
 function packageOutKey(row: LoDashboardLoanRow): "packageOutA" | "packageOutB" {
   return row.is_brokered ? "packageOutB" : "packageOutA";
 }
 
 function verificationKey(row: LoDashboardLoanRow): "verificationA" | "verificationB" {
-  return getVerificationTrack(row) === "Verification B" ? "verificationB" : "verificationA";
+  const track = getVerificationTrack(row);
+  return track === "Verification B" ? "verificationB" : "verificationA";
 }
 
 function activeMilestoneKey(row: LoDashboardLoanRow): TurntimePhaseKey {
@@ -288,7 +381,7 @@ export function deriveMilestoneProgress(
 ): Record<TurntimePhaseKey, MilestoneProgressState> {
   const progress: Record<TurntimePhaseKey, MilestoneProgressState> = { ...NEUTRAL_MILESTONE_PROGRESS };
   const active = activeMilestoneKey(row);
-  const applicable = milestonesForVerificationTrack(getVerificationTrack(row)).map((m) => m.key);
+  const applicable = milestonesForVerificationTrack(milestoneTrackFor(row)).map((m) => m.key);
 
   for (const key of applicable) {
     const completed = milestoneCompletedAt(row, key);
@@ -303,7 +396,7 @@ export function deriveMilestoneProgress(
       continue;
     }
 
-    const milestone = milestonesForVerificationTrack(getVerificationTrack(row)).find((m) => m.key === key);
+    const milestone = milestonesForVerificationTrack(milestoneTrackFor(row)).find((m) => m.key === key);
     const slaHours = milestone?.slaHours ?? 48;
     const hours = differenceInHours(now, started);
 
@@ -319,15 +412,16 @@ export function deriveMilestoneProgress(
   }
 
   // Hide non-applicable verification track
-  if (getVerificationTrack(row) === "Verification A") progress.verificationB = "open";
-  if (getVerificationTrack(row) === "Verification B") progress.verificationA = "open";
+  const track = getVerificationTrack(row);
+  if (track === "Verification A" || track === "Pending") progress.verificationB = "open";
+  if (track === "Verification B") progress.verificationA = "open";
 
   return progress;
 }
 
 export function computeLoanSLA(row: LoDashboardLoanRow, now = new Date()): { sla: SlaStatus; turntimeLabel: string } {
   const active = activeMilestoneKey(row);
-  const milestone = milestonesForVerificationTrack(getVerificationTrack(row)).find((m) => m.key === active);
+  const milestone = milestonesForVerificationTrack(milestoneTrackFor(row)).find((m) => m.key === active);
   const slaHours = milestone?.slaHours ?? 48;
   const started = milestoneStartAt(row, active);
   const completed = milestoneCompletedAt(row, active);

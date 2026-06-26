@@ -194,12 +194,9 @@ function ProcessingChecklist({
   if (!items.length) return null;
 
   return (
-    <div
-      className="rounded-lg border px-4 py-3"
-      style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-    >
-      <h3 className="text-xs font-black uppercase text-muted-foreground">Processing checklist</h3>
-      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+    <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+      <h3 className="lo-muted text-xs font-black uppercase">Processing checklist</h3>
+      <ul className="lo-muted mt-2 space-y-1 text-sm">
         {items.map(([key, v]) => (
           <li key={key}>
             {v.completed ? "✓" : "○"} {key.replace(/([A-Z])/g, " $1")}
@@ -223,18 +220,15 @@ function NotesFeed({ loanId }: { loanId: string }) {
   if (!notes.length) return null;
 
   return (
-    <div
-      className="rounded-lg border px-4 py-3"
-      style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-    >
-      <h3 className="text-xs font-black uppercase text-muted-foreground">Synced notes</h3>
+    <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+      <h3 className="lo-muted text-xs font-black uppercase">Synced notes</h3>
       <ul className="mt-2 space-y-2 text-sm">
         {notes.slice(0, 8).map((n) => (
-          <li key={n.id} className="rounded border px-2 py-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <div className="text-xs text-muted-foreground">
+          <li key={n.id} className="rounded border border-[var(--lo-border)] px-2 py-2">
+            <div className="lo-muted text-xs">
               {new Date(n.noted_at).toLocaleString()} · {n.source}
             </div>
-            <div className="mt-1 text-foreground">{n.body}</div>
+            <div className="lo-heading mt-1">{n.body}</div>
           </li>
         ))}
       </ul>

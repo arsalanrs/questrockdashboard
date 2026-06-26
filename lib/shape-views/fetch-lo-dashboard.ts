@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loanMatchesLoFilter } from "@/lib/dashboard/lo-selector";
 import { passesGlobalFilters } from "./global-filters";
 import { DEFAULT_WINDOW_DAYS, windowStartIso, type FetchShapeLoansOptions } from "./query-loans";
 import type { LoDashboardLoanRow } from "./lo-dashboard";
 
 export const LO_DASHBOARD_SELECT =
-  "id,shape_record_id,record_type,source,status_raw,portal_status_raw,lendingpad_status_raw,borrower_first_name,borrower_last_name,borrower_email,borrower_phone,assigned_loan_officer_user_id,assigned_loan_officer_name,lead_created_at,application_completed_at,conversion_date,shape_last_updated_at,last_status_change_at,last_contacted_at,funded_at,closed_at,lendingpad_loan_uuid,current_stage,loan_amount_cents,loan_type,loan_purpose,property_state,mailing_state,track,documentation_type,is_brokered,notes_sidebar,recent_notes,game_plan_notes,initial_contact_attempted,credit_report_requested_at,verification_started_at,verification_completed_at,submitted_to_processing_at,processing_completed_at,submitted_to_uw_at,uw_decision_at,ctc_at,closing_date,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,credit_score_mid";
+  "id,shape_record_id,record_type,source,status_raw,portal_status_raw,lendingpad_status_raw,borrower_first_name,borrower_last_name,borrower_email,borrower_phone,assigned_loan_officer_user_id,assigned_loan_officer_name,lead_created_at,application_completed_at,conversion_date,shape_last_updated_at,last_status_change_at,last_contacted_at,funded_at,closed_at,lendingpad_loan_uuid,current_stage,loan_amount_cents,loan_type,loan_purpose,property_state,mailing_state,track,documentation_type,is_brokered,notes_sidebar,notes_sidebar_ai_note,recent_notes,game_plan_notes,initial_contact_attempted,credit_report_requested_at,verification_started_at,verification_completed_at,submitted_to_processing_at,processing_completed_at,submitted_to_uw_at,uw_decision_at,ctc_at,closing_date,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,credit_score_mid";
 
 export type LoDashboardRichData = {
   front_dti?: number | null;
@@ -38,8 +39,15 @@ export async function fetchLoDashboardLoans(
       .order("shape_last_updated_at", { ascending: false, nullsFirst: false })
       .range(offset, offset + pageSize - 1);
 
-    if (options.assignedLoUserId) {
-      q = q.eq("assigned_loan_officer_user_id", options.assignedLoUserId);
+    if (options.assignedLoUserId || options.assignedLoName) {
+      const orParts: string[] = [];
+      if (options.assignedLoUserId) {
+        orParts.push(`assigned_loan_officer_user_id.eq.${options.assignedLoUserId}`);
+      }
+      if (options.assignedLoName?.trim()) {
+        orParts.push(`assigned_loan_officer_name.eq.${options.assignedLoName.trim()}`);
+      }
+      if (orParts.length) q = q.or(orParts.join(","));
     }
 
     const { data, error } = await q;
@@ -52,7 +60,21 @@ export async function fetchLoDashboardLoans(
     offset += pageSize;
   }
 
-  return { loans: loans.slice(0, maxRows).filter(passesGlobalFilters), error: null };
+  const scoped =
+    options.assignedLoUserId || options.assignedLoName?.trim()
+      ? loans.slice(0, maxRows).filter((row) => {
+          const filterId = options.assignedLoUserId ?? "all";
+          if (filterId === "all") return true;
+          return loanMatchesLoFilter(row, filterId, [
+            {
+              id: filterId,
+              full_name: options.assignedLoName?.trim() ?? null,
+            },
+          ]);
+        })
+      : loans.slice(0, maxRows);
+
+  return { loans: scoped.filter(passesGlobalFilters), error: null };
 }
 
 export async function fetchRichLoanDataByIds(
