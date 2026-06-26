@@ -424,9 +424,12 @@ html[data-theme="dark"] .lo-segment-track {
 .lo-table-wrap {
   overflow-x: auto;
   overflow-y: auto;
-  overscroll-behavior-x: contain;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
+  /* Fixed viewport — header/tabs stay put; rows scroll inside (matches LO + LP panels). */
+  height: min(70vh, 720px);
+  min-height: 280px;
 }
 
 .lo-table-wrap table {
@@ -442,6 +445,8 @@ html[data-theme="dark"] .lo-segment-track {
   color: var(--lo-muted);
   border-bottom: 1px solid var(--lo-border);
   white-space: nowrap;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 html[data-theme="dark"] .lo-table-wrap thead th {
@@ -453,6 +458,11 @@ html[data-theme="dark"] .lo-table-wrap thead th {
   white-space: nowrap;
   color: var(--lo-text);
   background: var(--lo-card);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  font-size: 12px;
+  line-height: 1.35;
+  vertical-align: middle;
 }
 
 .lo-table-wrap tbody tr:hover td {
@@ -461,7 +471,18 @@ html[data-theme="dark"] .lo-table-wrap thead th {
 
 .lo-table-wrap td.lo-wrap {
   white-space: normal;
-  max-width: 220px;
+  max-width: 180px;
+}
+
+.lo-workspace-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lo-workspace-panel .lo-table-wrap {
+  flex: none;
 }
 
 html[data-theme="light"] .chevron-open {
