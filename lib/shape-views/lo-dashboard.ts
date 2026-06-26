@@ -1,5 +1,6 @@
 import { differenceInDays, differenceInHours, parseISO } from "date-fns";
 import { normalizeStatus } from "./status-normalize";
+import { normalizeRecordType } from "./record-type-normalize";
 import {
   milestonesForVerificationTrack,
   NEUTRAL_MILESTONE_PROGRESS,
@@ -171,9 +172,11 @@ export function isUncontactedLead(row: LoDashboardLoanRow): boolean {
 }
 
 export function isLeadWorkspaceRow(row: LoDashboardLoanRow, now = new Date()): boolean {
-  const rt = row.record_type?.trim();
+  const rt = normalizeRecordType(row.record_type);
   if (rt === "Leads" || rt === "Applications") return true;
   if (isHotLead(row, now) || isGreenLead(row) || isUncontactedLead(row)) return true;
+  // Shape CRM file without an active LP pipeline row — still a lead for the LO.
+  if (row.shape_record_id && !isLoanWorkspaceRow(row)) return true;
   return false;
 }
 

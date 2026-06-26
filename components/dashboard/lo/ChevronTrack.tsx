@@ -51,8 +51,8 @@ export function ChevronTrack({
         const inner = (
           <>
             <strong className="block text-[12px]">{step.title}</strong>
-            <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">{step.detail}</span>
-            <em className="mt-2 block text-[11px] font-extrabold not-italic text-[#8ee0d4]">{step.time}</em>
+            <span className="mt-1 block text-[11px] leading-snug text-[var(--lo-muted,#62716c)]">{step.detail}</span>
+            <em className="mt-2 block text-[11px] font-extrabold not-italic text-[var(--lo-teal,#087f7a)]">{step.time}</em>
           </>
         );
 

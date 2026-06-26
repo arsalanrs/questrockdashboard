@@ -22,22 +22,19 @@ export function SummaryStrip({ hotCount, greenCount, pipelineCount, alertCount, 
   ];
 
   return (
-    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <section className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
       {tiles.map((tile) => (
         <button
           key={tile.key}
           type="button"
           onClick={() => onFocus(activeFocus === tile.key ? null : tile.key)}
           className={cn(
-            "rounded-xl border px-4 py-4 text-left transition-all hover:-translate-y-0.5",
-            activeFocus === tile.key
-              ? "border-[#087f7a]/60 shadow-lg"
-              : "border-white/10 hover:border-[#087f7a]/40",
+            "lo-card px-4 py-4 text-left transition-all hover:-translate-y-0.5",
+            activeFocus === tile.key && "ring-2 ring-[#087f7a]/40",
           )}
-          style={{ background: "rgba(255,255,255,0.03)" }}
         >
-          <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">{tile.label}</span>
-          <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{tile.count}</strong>
+          <span className="lo-muted block text-xs font-bold uppercase tracking-wide">{tile.label}</span>
+          <strong className="lo-heading mt-2 block text-3xl font-bold tabular-nums">{tile.count}</strong>
         </button>
       ))}
     </section>

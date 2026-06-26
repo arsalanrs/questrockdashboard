@@ -41,26 +41,28 @@ export function LeadDetailSlideOver({
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">{borrowerName(lead)}</h2>
-            <div className="mt-2 flex flex-wrap gap-2 text-[13px] text-muted-foreground">
-              {lead.borrower_email ? (
-                <span className="rounded-md border px-2 py-1" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-                  {lead.borrower_email}
-                </span>
-              ) : null}
-              {lead.borrower_phone ? (
-                <span className="rounded-md border px-2 py-1" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-                  {lead.borrower_phone}
-                </span>
-              ) : null}
-              {lead.assigned_loan_officer_name ? (
-                <span className="rounded-md border px-2 py-1" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-                  {lead.assigned_loan_officer_name}
-                </span>
-              ) : null}
-            </div>
+          <h2 className="lo-heading text-2xl font-bold">{borrowerName(lead)}</h2>
+            <div className="mt-2 flex flex-wrap gap-2 text-[13px]">
+          {lead.borrower_email ? (
+            <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
+              {lead.borrower_email}
+            </span>
+          ) : null}
+          {lead.borrower_phone ? (
+            <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
+              {lead.borrower_phone}
+            </span>
+          ) : null}
+          {lead.assigned_loan_officer_name ? (
+            <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
+              {lead.assigned_loan_officer_name}
+            </span>
+          ) : null}
+        </div>
           </div>
-          <span className="pill-green rounded-full px-3 py-1 text-xs font-black">{lead.displayStatus}</span>
+          <span className="rounded-full bg-[var(--lo-accent-soft)] px-3 py-1 text-xs font-black text-[var(--lo-accent)]">
+            {lead.displayStatus}
+          </span>
         </div>
 
         <ActionButtons record={lead} />
@@ -92,11 +94,10 @@ export function LeadDetailSlideOver({
         />
 
         <div
-          className="rounded-lg border px-4 py-3"
-          style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
+          className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3"
         >
-          <strong className="block text-[11px] font-black uppercase text-muted-foreground">Notes</strong>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+          <strong className="lo-muted block text-[11px] font-black uppercase">Notes</strong>
+          <p className="lo-heading mt-2 whitespace-pre-wrap text-sm leading-relaxed">
             {notes || "No notes synced from Shape yet."}
           </p>
         </div>

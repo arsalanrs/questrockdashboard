@@ -1,1 +1,1 @@
-export type LeadViewTab = "hot" | "green" | "uncontacted";
+export type LeadViewTab = "all" | "hot" | "green" | "uncontacted";

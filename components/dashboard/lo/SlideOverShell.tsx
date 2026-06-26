@@ -20,28 +20,23 @@ export function SlideOverShell({
         <button
           type="button"
           aria-label="Close panel backdrop"
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
           onClick={onClose}
         />
       ) : null}
       <aside
         aria-hidden={!open}
         className={cn(
-          "fixed right-0 top-0 z-50 flex h-full w-full max-w-3xl flex-col border-l shadow-2xl transition-transform duration-200 ease-out",
+          "lo-slide-over fixed right-0 top-0 z-50 flex h-full w-full max-w-3xl flex-col border-l shadow-2xl transition-transform duration-200 ease-out",
           open ? "translate-x-0" : "translate-x-full",
         )}
-        style={{
-          borderColor: "rgba(255,255,255,0.1)",
-          background: "rgba(8,12,10,0.96)",
-          backdropFilter: "blur(24px)",
-        }}
       >
-        <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#8ee0d4]">{title}</p>
+        <div className="flex items-center justify-between border-b border-[var(--lo-border)] px-5 py-3">
+          <p className="lo-accent-text text-xs font-bold uppercase tracking-wide">{title}</p>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-muted-foreground hover:bg-white/10 hover:text-foreground"
+            className="lo-muted rounded-lg px-2 py-1 text-sm hover:bg-[var(--lo-accent-soft)]"
           >
             Close
           </button>

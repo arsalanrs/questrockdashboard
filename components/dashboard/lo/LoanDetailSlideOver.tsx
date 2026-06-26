@@ -15,9 +15,9 @@ import { DetailGrid } from "./DetailGrid";
 import { SlideOverShell } from "./SlideOverShell";
 
 function slaClass(sla: PipelineLoanRow["sla"]) {
-  if (sla === "ALERT") return "pill-red";
-  if (sla === "CAUTION") return "pill-amber";
-  return "pill-green";
+  if (sla === "ALERT") return "bg-[#fde6e2] text-[#c83c31]";
+  if (sla === "CAUTION") return "bg-[#fff4d7] text-[#8a5a00]";
+  return "bg-[#e2f6eb] text-[#178452]";
 }
 
 export function LoanDetailSlideOver({
@@ -71,34 +71,30 @@ export function LoanDetailSlideOver({
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">{borrowerDisplayName(loan)}</h2>
-            <div className="mt-2 flex flex-wrap gap-2 text-[13px] text-muted-foreground">
+            <h2 className="lo-heading text-2xl font-bold">{borrowerDisplayName(loan)}</h2>
+            <div className="mt-2 flex flex-wrap gap-2 text-[13px]">
               {email ? (
-                <span className="rounded-md border px-2 py-1" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-                  {email}
-                </span>
+                <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">{email}</span>
               ) : null}
               {phone ? (
-                <span className="rounded-md border px-2 py-1" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-                  {phone}
-                </span>
+                <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">{phone}</span>
               ) : null}
               {loan.assigned_loan_officer_name ? (
-                <span className="rounded-md border px-2 py-1" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+                <span className="lo-muted rounded-md border border-[var(--lo-border)] bg-white px-2 py-1">
                   {loan.assigned_loan_officer_name}
                 </span>
               ) : null}
             </div>
           </div>
-          <span className={cnPill(slaClass(loan.sla))}>{loan.sla}</span>
+          <span className={`${slaClass(loan.sla)} rounded-full px-3 py-1 text-xs font-black`}>{loan.sla}</span>
         </div>
 
         <ActionButtons record={loan} />
 
         <div>
-          <div className="mb-2 flex items-baseline justify-between gap-3 border-b pb-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <h3 className="text-[13px] font-black uppercase tracking-wide">Turntimes</h3>
-            <span className="text-xs text-muted-foreground">
+          <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-[var(--lo-border)] pb-2">
+            <h3 className="lo-heading text-[13px] font-black uppercase tracking-wide">Turntimes</h3>
+            <span className="lo-muted text-xs">
               {loan.milestoneLabel} · {loan.turntimeLabel}
             </span>
           </div>
@@ -133,40 +129,32 @@ export function LoanDetailSlideOver({
         <ProcessingChecklist data={rich?.processing_checklist_json} />
         <NotesFeed loanId={loan.id} />
 
-        <div
-          className="rounded-lg border px-4 py-3"
-          style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-        >
-          <strong className="block text-[11px] font-black uppercase text-muted-foreground">Pipeline Notes</strong>
-          <p className="mt-2 text-sm leading-relaxed text-foreground">{loan.notesPreview}</p>
+        <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+          <strong className="lo-muted block text-[11px] font-black uppercase">Pipeline Notes</strong>
+          <p className="lo-heading mt-2 text-sm leading-relaxed">{loan.notesPreview}</p>
         </div>
 
-        <div className="space-y-2 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-          <label className="text-xs font-semibold text-muted-foreground">Add note to LendingPad</label>
+        <div className="space-y-2 border-t border-[var(--lo-border)] pt-4">
+          <label className="lo-muted text-xs font-semibold">Add note to LendingPad</label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border bg-black/40 p-3 text-sm text-foreground"
-            style={{ borderColor: "rgba(255,255,255,0.12)" }}
+            className="lo-input w-full rounded-lg p-3 text-sm"
           />
           <button
             type="button"
             disabled={busy}
             onClick={postNote}
-            className="rounded-lg bg-[#E8FF00]/15 px-3 py-2 text-xs font-bold text-[#E8FF00] disabled:opacity-50"
+            className="rounded-lg bg-[var(--lo-accent)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
           >
             Save note
           </button>
-          {msg ? <p className="text-xs text-muted-foreground">{msg}</p> : null}
+          {msg ? <p className="lo-muted text-xs">{msg}</p> : null}
         </div>
       </div>
     </SlideOverShell>
   );
-}
-
-function cnPill(base: string) {
-  return `${base} rounded-full px-3 py-1 text-xs font-black`;
 }
 
 function LiveConditions({ loanId }: { loanId: string }) {
@@ -183,11 +171,8 @@ function LiveConditions({ loanId }: { loanId: string }) {
   if (!conditions.length) return null;
 
   return (
-    <div
-      className="rounded-lg border px-4 py-3"
-      style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-    >
-      <h3 className="text-xs font-black uppercase text-muted-foreground">Conditions ({open.length} open)</h3>
+    <div className="rounded-lg border border-[var(--lo-border)] bg-white px-4 py-3">
+      <h3 className="lo-muted text-xs font-black uppercase">Conditions ({open.length} open)</h3>
       <ul className="mt-2 space-y-1 text-sm">
         {open.slice(0, 8).map((c) => (
           <li key={c.id} className="text-[#FF4B4B]">

@@ -6,56 +6,204 @@
 /*  Design Tokens — Questrock Dark Theme                               */
 /* ------------------------------------------------------------------ */
 
-:root {
-  /* ── Core surfaces ── */
-  --background:       0 0% 0%;           /* pure black   #000 */
-  --foreground:       210 20% 96%;       /* near-white   #F1F3F5 */
+:root,
+html[data-theme="dark"] {
+  color-scheme: dark;
 
-  --muted:            220 10% 13%;       /* hover bg */
-  --muted-foreground: 215 14% 50%;       /* secondary text */
-
-  --border:           220 8% 16%;        /* subtle border */
-
-  --card:             220 10% 10%;       /* card surface */
-  --card-foreground:  210 20% 96%;
-
-  --primary:          54 100% 53%;
+  --background: 0 0% 0%;
+  --foreground: 210 20% 96%;
+  --muted: 220 10% 13%;
+  --muted-foreground: 215 14% 50%;
+  --border: 220 8% 16%;
+  --card: 220 10% 10%;
+  --card-foreground: 210 20% 96%;
+  --primary: 54 100% 53%;
   --primary-foreground: 0 0% 0%;
-
-  --destructive:      0 72% 51%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 210 20% 96%;
-
   --radius: 12px;
 
-  /* ── Brand accent ── */
-  --accent-yellow:     #E8FF00;
-  --accent-yellow-dim: rgba(232, 255, 0, 0.10);
+  --accent-yellow: #e8ff00;
+  --accent-yellow-dim: rgba(232, 255, 0, 0.1);
   --accent-yellow-glow: rgba(232, 255, 0, 0.18);
 
-  /* ── Semantic status colors ── */
-  --color-red:        #FF4B4B;
-  --color-red-dim:    rgba(255, 75, 75, 0.12);
-  --color-green:      #22C55E;
-  --color-green-dim:  rgba(34, 197, 94, 0.10);
-  --color-amber:      #F59E0B;
-  --color-amber-dim:  rgba(245, 158, 11, 0.10);
-  --color-blue:       #60A5FA;
-  --color-blue-dim:   rgba(96, 165, 250, 0.10);
+  --color-red: #ff4b4b;
+  --color-red-dim: rgba(255, 75, 75, 0.12);
+  --color-green: #22c55e;
+  --color-green-dim: rgba(34, 197, 94, 0.1);
+  --color-amber: #f59e0b;
+  --color-amber-dim: rgba(245, 158, 11, 0.1);
+  --color-blue: #60a5fa;
+  --color-blue-dim: rgba(96, 165, 250, 0.1);
 
-  /* ── Font family ── */
-  --font-sans: var(--font-geist, -apple-system, BlinkMacSystemFont, 'SF Pro Display',
-               'Segoe UI Variable', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
+  --qr-page-bg: #000000;
+  --qr-header-bg: rgba(0, 0, 0, 0.55);
+  --qr-header-border: rgba(255, 255, 255, 0.07);
+  --qr-header-blur: blur(20px);
+  --qr-brand-text: #ffffff;
+  --qr-brand-subtext: #e8ff00;
+  --qr-nav-link: rgba(209, 213, 219, 1);
+  --qr-nav-link-hover: #ffffff;
+  --qr-nav-link-active: #e8ff00;
+  --qr-nav-link-active-bg: rgba(232, 255, 0, 0.08);
+  --qr-nav-indicator: #e8ff00;
+  --qr-user-text: rgba(209, 213, 219, 1);
+  --qr-theme-toggle-bg: rgba(255, 255, 255, 0.06);
+  --qr-theme-toggle-text: rgba(209, 213, 219, 1);
+
+  --lo-bg: transparent;
+  --lo-card: rgba(255, 255, 255, 0.03);
+  --lo-border: rgba(255, 255, 255, 0.08);
+  --lo-text: #f1f3f5;
+  --lo-muted: hsl(215 14% 50%);
+  --lo-accent: #174c3e;
+  --lo-accent-soft: rgba(23, 132, 82, 0.15);
+  --lo-teal: #8ee0d4;
+
+  --font-sans: var(
+    --font-geist,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Segoe UI Variable",
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif
+  );
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --background: 90 20% 97%;
+  --foreground: 160 30% 10%;
+  --muted: 120 15% 94%;
+  --muted-foreground: 160 8% 40%;
+  --border: 140 12% 86%;
+  --card: 0 0% 100%;
+  --card-foreground: 160 30% 10%;
+
+  --qr-page-bg: #f7faf5;
+  --qr-header-bg: linear-gradient(
+    145deg,
+    rgba(31, 181, 119, 0.98) 0%,
+    rgba(8, 127, 122, 0.98) 46%,
+    rgba(23, 76, 62, 1) 100%
+  );
+  --qr-header-border: rgba(255, 255, 255, 0.18);
+  --qr-header-blur: none;
+  --qr-brand-text: #ffffff;
+  --qr-brand-subtext: rgba(255, 255, 255, 0.88);
+  --qr-nav-link: rgba(255, 255, 255, 0.88);
+  --qr-nav-link-hover: #ffffff;
+  --qr-nav-link-active: #ffffff;
+  --qr-nav-link-active-bg: rgba(255, 255, 255, 0.16);
+  --qr-nav-indicator: #ffffff;
+  --qr-user-text: rgba(255, 255, 255, 0.92);
+  --qr-theme-toggle-bg: rgba(255, 255, 255, 0.16);
+  --qr-theme-toggle-text: #ffffff;
+
+  --lo-bg: #f7faf5;
+  --lo-card: #ffffff;
+  --lo-border: #d8e1dc;
+  --lo-text: #14201c;
+  --lo-muted: #62716c;
+  --lo-accent: #174c3e;
+  --lo-accent-soft: #dff5ea;
+  --lo-teal: #087f7a;
 }
 
 /* ---- Base ---- */
 html, body { height: 100%; }
 
 body {
-  background: #000;
+  background: var(--qr-page-bg);
   color: hsl(var(--foreground));
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.dashboard-shell {
+  background: var(--qr-page-bg);
+  color: hsl(var(--foreground));
+}
+
+html[data-theme="light"] .dashboard-orbs {
+  display: none;
+}
+
+.dashboard-header {
+  background: var(--qr-header-bg);
+  backdrop-filter: var(--qr-header-blur);
+  -webkit-backdrop-filter: var(--qr-header-blur);
+  border-color: var(--qr-header-border);
+}
+
+.dashboard-header-accent {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(232, 255, 0, 0.3) 30%,
+    rgba(232, 255, 0, 0.3) 70%,
+    transparent 100%
+  );
+}
+
+html[data-theme="light"] .dashboard-header-accent {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 30%,
+    rgba(255, 255, 255, 0.35) 70%,
+    transparent 100%
+  );
+}
+
+.dashboard-brand-copy {
+  color: var(--qr-brand-text);
+}
+
+.dashboard-brand-copy div:last-child {
+  color: var(--qr-brand-subtext);
+}
+
+html[data-theme="light"] .dashboard-logo-wrap {
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 4px 8px;
+}
+
+.nav-link {
+  color: var(--qr-nav-link);
+}
+
+.nav-link:hover {
+  color: var(--qr-nav-link-hover);
+}
+
+.nav-link-active {
+  color: var(--qr-nav-link-active);
+  background: var(--qr-nav-link-active-bg);
+}
+
+.nav-link-indicator {
+  background: var(--qr-nav-indicator);
+}
+
+.dashboard-user {
+  color: var(--qr-user-text);
+}
+
+.theme-toggle {
+  background: var(--qr-theme-toggle-bg);
+  color: var(--qr-theme-toggle-text);
+}
+
+.theme-toggle:hover {
+  filter: brightness(1.08);
 }
 
 /* ---- Scrollbar ---- */
@@ -222,4 +370,116 @@ body {
 .chevron-open {
   background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
   border-color: rgba(255,255,255,0.08);
+}
+
+/* ---- LO Command Center surfaces (theme-aware) ---- */
+.lo-card {
+  background: var(--lo-card);
+  border: 1px solid var(--lo-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(27, 42, 36, 0.06);
+}
+
+html[data-theme="dark"] .lo-card {
+  box-shadow: none;
+}
+
+.lo-muted {
+  color: var(--lo-muted);
+}
+
+.lo-accent-text {
+  color: var(--lo-teal);
+}
+
+.lo-heading {
+  color: var(--lo-text);
+}
+
+.lo-input {
+  background: var(--lo-card);
+  border: 1px solid var(--lo-border);
+  color: var(--lo-text);
+}
+
+.lo-segment-track {
+  background: #edf3f0;
+}
+
+html[data-theme="dark"] .lo-segment-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lo-segment-active {
+  background: var(--lo-accent);
+  color: #fff;
+}
+
+.lo-phase-chip {
+  color: var(--lo-accent);
+  background: var(--lo-accent-soft);
+  border: 1px solid rgba(23, 132, 82, 0.22);
+}
+
+.lo-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.lo-table-wrap table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.lo-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f1f6f3;
+  color: var(--lo-muted);
+  border-bottom: 1px solid var(--lo-border);
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .lo-table-wrap thead th {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lo-table-wrap tbody td {
+  border-bottom: 1px solid var(--lo-border);
+  white-space: nowrap;
+  color: var(--lo-text);
+  background: var(--lo-card);
+}
+
+.lo-table-wrap tbody tr:hover td {
+  background: color-mix(in srgb, var(--lo-card) 92%, var(--lo-accent-soft));
+}
+
+.lo-table-wrap td.lo-wrap {
+  white-space: normal;
+  max-width: 220px;
+}
+
+html[data-theme="light"] .chevron-open {
+  background: linear-gradient(135deg, #ffffff, #edf3f0);
+  border-color: var(--lo-border);
+  color: var(--lo-text);
+}
+
+html[data-theme="light"] .chevron-open span {
+  color: var(--lo-muted);
+}
+
+html[data-theme="light"] .chevron-open em {
+  color: var(--lo-accent);
+}
+
+.lo-slide-over {
+  background: var(--lo-card);
+  color: var(--lo-text);
+  border-color: var(--lo-border);
 }

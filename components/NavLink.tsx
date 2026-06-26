@@ -9,27 +9,9 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
   const active = pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <Link
-      href={href}
-      className={cn(
-        "relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150",
-        active ? "font-semibold text-[#E8FF00]" : "text-gray-300 hover:text-white",
-      )}
-      style={
-        active
-          ? {
-              background: "rgba(232,255,0,0.08)",
-            }
-          : undefined
-      }
-    >
+    <Link href={href} className={cn("nav-link relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150", active && "nav-link-active font-semibold")}>
       {children}
-      {active && (
-        <span
-          className="absolute inset-x-3 bottom-0.5 h-[2px] rounded-full"
-          style={{ background: "#E8FF00" }}
-        />
-      )}
+      {active ? <span className="nav-link-indicator absolute inset-x-3 bottom-0.5 h-[2px] rounded-full" /> : null}
     </Link>
   );
 }

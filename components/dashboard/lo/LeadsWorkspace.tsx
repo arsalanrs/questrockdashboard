@@ -53,25 +53,47 @@ export function LeadsWorkspace({
   const uncontacted = phaseFiltered.filter((l) => isUncontactedLead(l));
 
   const visible =
-    activeTab === "hot" ? hot : activeTab === "green" ? green : uncontacted;
+    activeTab === "all"
+      ? phaseFiltered
+      : activeTab === "hot"
+        ? hot
+        : activeTab === "green"
+          ? green
+          : uncontacted;
 
   const tabs: Array<{ key: LeadViewTab; label: string; count: number }> = [
+    { key: "all", label: "All", count: phaseFiltered.length },
     { key: "hot", label: "Hot", count: hot.length },
     { key: "green", label: "Green", count: green.length },
     { key: "uncontacted", label: "Uncontacted", count: uncontacted.length },
   ];
 
+  const sectionTitle =
+    activeTab === "all"
+      ? "All Leads"
+      : activeTab === "hot"
+        ? "Hot Leads"
+        : activeTab === "green"
+          ? "Green Leads"
+          : "Uncontacted Leads";
+
+  const sectionHint =
+    activeTab === "all"
+      ? "Every Shape CRM lead in your workspace"
+      : activeTab === "hot"
+        ? "New leads and past clients due for touchpoints"
+        : activeTab === "green"
+          ? "Application activity ready to advance"
+          : "Leads with no completed contact attempt yet";
+
   return (
-    <section
-      className="rounded-xl border p-4"
-      style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
-    >
+    <section className="lo-card min-w-0 p-4">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#8ee0d4]">Shape CRM</p>
-          <h2 className="text-xl font-bold text-foreground">LEADS</h2>
+          <p className="lo-accent-text text-xs font-bold uppercase tracking-wide">Shape CRM</p>
+          <h2 className="lo-heading text-xl font-bold">LEADS</h2>
         </div>
-        <div className="inline-grid grid-cols-3 rounded-lg p-1" style={{ background: "rgba(255,255,255,0.06)" }}>
+        <div className="lo-segment-track inline-grid grid-cols-2 gap-1 rounded-lg p-1 sm:grid-cols-4">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -79,7 +101,7 @@ export function LeadsWorkspace({
               onClick={() => onTabChange(tab.key)}
               className={cn(
                 "rounded-md px-3 py-2 text-xs font-bold",
-                activeTab === tab.key ? "bg-[#174c3e] text-white" : "text-muted-foreground",
+                activeTab === tab.key ? "lo-segment-active" : "lo-muted",
               )}
             >
               {tab.label} ({tab.count})
@@ -89,37 +111,26 @@ export function LeadsWorkspace({
       </div>
 
       {activePhase !== "all" ? (
-        <div
-          className="mb-4 flex items-center justify-between rounded-lg border px-3 py-2 text-sm font-bold text-[#8ee0d4]"
-          style={{ borderColor: "rgba(23,132,82,0.25)", background: "rgba(23,132,82,0.12)" }}
-        >
+        <div className="lo-phase-chip mb-4 flex items-center justify-between rounded-lg px-3 py-2 text-sm font-bold">
           <span>Showing leads in {phaseLabel(activePhase)}</span>
-          <button type="button" onClick={onClearPhase} className="rounded-md bg-[#174c3e] px-2 py-1 text-xs text-white">
+          <button type="button" onClick={onClearPhase} className="lo-segment-active rounded-md px-2 py-1 text-xs">
             Clear
           </button>
         </div>
       ) : null}
 
-      <div className="mb-3 flex items-baseline justify-between border-b pb-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <h3 className="text-[13px] font-black uppercase">
-          {activeTab === "hot" ? "Hot Leads" : activeTab === "green" ? "Green Leads" : "Uncontacted Leads"}
-        </h3>
-        <span className="text-xs text-muted-foreground">
-          {activeTab === "hot"
-            ? "New leads and past clients due for touchpoints"
-            : activeTab === "green"
-              ? "Application activity ready to advance"
-              : "Leads with no completed contact attempt yet"}
-        </span>
+      <div className="mb-3 flex items-baseline justify-between border-b border-[var(--lo-border)] pb-2">
+        <h3 className="lo-heading text-[13px] font-black uppercase">{sectionTitle}</h3>
+        <span className="lo-muted text-xs">{sectionHint}</span>
       </div>
 
       {searchQuery ? (
-        <p className="mb-3 text-xs text-muted-foreground">Filtered by search: “{searchQuery}”</p>
+        <p className="lo-muted mb-3 text-xs">Filtered by search: “{searchQuery}”</p>
       ) : null}
 
       <div className="grid gap-2.5">
         {visible.length === 0 ? (
-          <div className="rounded-lg border px-4 py-8 text-center text-sm text-muted-foreground" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <div className="lo-muted rounded-lg border border-[var(--lo-border)] px-4 py-8 text-center text-sm">
             No leads in this view.
           </div>
         ) : (
@@ -129,16 +140,15 @@ export function LeadsWorkspace({
               type="button"
               onClick={() => onSelectLead(lead)}
               className={cn(
-                "grid w-full gap-3 rounded-lg border px-3 py-3 text-left transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto]",
+                "grid w-full gap-3 rounded-lg border border-[var(--lo-border)] bg-white px-3 py-3 text-left transition hover:-translate-y-0.5 sm:grid-cols-[1fr_auto]",
                 activeTab === "hot" && "border-l-4 border-l-[#c83c31]",
                 activeTab === "green" && "border-l-4 border-l-[#087f7a]",
                 activeTab === "uncontacted" && "border-l-4 border-l-[#f3b33d]",
               )}
-              style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
             >
               <div>
-                <h4 className="text-[15px] font-bold text-foreground">{borrowerName(lead)}</h4>
-                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <h4 className="lo-heading text-[15px] font-bold">{borrowerName(lead)}</h4>
+                <div className="lo-muted mt-1 flex flex-wrap gap-2 text-xs">
                   <span>{lead.displayStatus}</span>
                   <span>{formatMoney(lead.loan_amount_cents)}</span>
                   <span>{lead.source ?? "—"}</span>
@@ -146,7 +156,7 @@ export function LeadsWorkspace({
                   <span>{fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}</span>
                 </div>
               </div>
-              <div className="self-center rounded-md px-2 py-1 text-xs font-extrabold text-[#8ee0d4]" style={{ background: "rgba(23,132,82,0.15)" }}>
+              <div className="lo-phase-chip self-center rounded-md px-2 py-1 text-xs font-extrabold">
                 {lead.hotTouchpointLabel ?? lead.portal_status_raw ?? lead.status_raw ?? "Follow up"}
               </div>
             </button>

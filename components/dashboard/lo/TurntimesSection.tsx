@@ -11,17 +11,14 @@ type Props = {
 
 export function TurntimesSection({ activePhase, onPhaseClick }: Props) {
   return (
-    <section className="grid gap-3">
-      <div
-        className="rounded-xl border px-5 py-4"
-        style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-      >
-        <h2 className="text-lg font-semibold text-foreground">Company Leads Policy</h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+    <section className="grid min-w-0 gap-3">
+      <div className="lo-card px-5 py-4">
+        <h2 className="lo-heading text-lg font-semibold">Company Leads Policy</h2>
+        <p className="lo-muted mt-2 text-sm leading-relaxed">
           Treat every lead with urgency. The client walked into your shop, do not look away and ignore them.
           Go up and help them.
         </p>
-        <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+        <ol className="lo-muted mt-3 list-decimal space-y-1 pl-5 text-sm">
           <li>Initial contact attempt within 30 seconds, no later than 2 minutes.</li>
           <li>Call twice per day for 3 days.</li>
           <li>
@@ -31,13 +28,10 @@ export function TurntimesSection({ activePhase, onPhaseClick }: Props) {
         </ol>
       </div>
 
-      <div
-        className="rounded-xl border px-5 py-4"
-        style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-      >
-        <div className="mb-3 flex items-baseline justify-between gap-3 border-b pb-3" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <h3 className="text-[13px] font-black uppercase tracking-wide text-foreground">General Turntimes</h3>
-          <span className="text-xs text-muted-foreground">Shared service level expectations · click a phase to filter leads</span>
+      <div className="lo-card px-5 py-4">
+        <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-[var(--lo-border)] pb-3">
+          <h3 className="lo-heading text-[13px] font-black uppercase tracking-wide">General Turntimes</h3>
+          <span className="lo-muted text-xs">Shared service level expectations · click a phase to filter leads</span>
         </div>
         <ChevronTrack
           progress={NEUTRAL_MILESTONE_PROGRESS}

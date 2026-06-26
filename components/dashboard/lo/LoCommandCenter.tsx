@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  buildLoSelectOptions,
+  loanMatchesLoFilter,
+  type LoSelectOption,
+} from "@/lib/dashboard/lo-selector";
 import type { LoDashboardRichData } from "@/lib/shape-views/fetch-lo-dashboard";
 import {
   borrowerDisplayName,
@@ -22,27 +27,25 @@ import type { LeadViewTab } from "./types";
 type Props = {
   loans: LoDashboardLoanRow[];
   richByLoanId: Record<string, LoDashboardRichData>;
-  loUsers: Array<{ id: string; full_name: string | null }>;
+  loUsers: LoSelectOption[];
   pageTitle: string;
 };
 
 export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [leadTab, setLeadTab] = useState<LeadViewTab>("hot");
+  const [leadTab, setLeadTab] = useState<LeadViewTab>("all");
   const [activePhase, setActivePhase] = useState<TurntimePhaseKey | "all">("all");
   const [summaryFocus, setSummaryFocus] = useState<SummaryFocus>(null);
   const [selectedLead, setSelectedLead] = useState<ClassifiedLead | null>(null);
   const [selectedLoan, setSelectedLoan] = useState<PipelineLoanRow | null>(null);
 
+  const loOptions = useMemo(() => buildLoSelectOptions(loUsers, loans), [loUsers, loans]);
+
   const filteredLoans = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return loans.filter((loan) => {
-      const ownerOk =
-        ownerFilter === "all" ||
-        loan.assigned_loan_officer_name === ownerFilter ||
-        loan.assigned_loan_officer_user_id === ownerFilter;
-      if (!ownerOk) return false;
+      if (!loanMatchesLoFilter(loan, ownerFilter, loOptions)) return false;
       if (!q) return true;
       const haystack = [
         borrowerDisplayName(loan),
@@ -59,7 +62,7 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [loans, ownerFilter, searchQuery]);
+  }, [loans, ownerFilter, loOptions, searchQuery]);
 
   const classified = useMemo(() => classifyLeads(filteredLoans), [filteredLoans]);
   const pipelineLoans = useMemo(() => buildPipelineLoans(filteredLoans), [filteredLoans]);
@@ -79,18 +82,18 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
   }
 
   return (
-    <div className="flex flex-col gap-5 py-3 animate-fade-up">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex min-w-0 flex-col gap-5 animate-fade-up">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#8ee0d4]">Loan Officer Dashboard</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{pageTitle}</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+          <p className="lo-accent-text text-xs font-bold uppercase tracking-wide">Loan Officer Dashboard</p>
+          <h1 className="lo-heading text-2xl font-semibold tracking-tight">{pageTitle}</h1>
+          <p className="lo-muted mt-1 text-[13px]">
             Daily command center · {filteredLoans.length} records · Shape leads + LendingPad pipeline
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row">
-          <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border px-3" style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)" }}>
-            <span aria-hidden className="text-muted-foreground">⌕</span>
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:max-w-xl sm:flex-row">
+          <label className="lo-input flex h-11 flex-1 items-center gap-2 rounded-lg px-3">
+            <span aria-hidden className="lo-muted">⌕</span>
             <input
               type="search"
               value={searchQuery}
@@ -108,12 +111,11 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
               setOwnerFilter(e.target.value);
               setSummaryFocus(null);
             }}
-            className="h-11 rounded-lg border bg-transparent px-3 text-sm"
-            style={{ borderColor: "rgba(255,255,255,0.1)" }}
+            className="lo-input h-11 rounded-lg px-3 text-sm"
           >
             <option value="all">All loan officers</option>
-            {loUsers.map((user) => (
-              <option key={user.id} value={user.full_name ?? user.id}>
+            {loOptions.map((user) => (
+              <option key={user.id} value={user.id}>
                 {user.full_name ?? user.id}
               </option>
             ))}
@@ -132,7 +134,7 @@ export function LoCommandCenter({ loans, richByLoanId, loUsers, pageTitle }: Pro
         onFocus={handleSummaryFocus}
       />
 
-      <div className="grid gap-5">
+      <div className="grid min-w-0 gap-5">
         <LeadsWorkspace
           leads={classified.all}
           activeTab={leadTab}
