@@ -7,6 +7,7 @@ import {
   isGreenLead,
   isHotLead,
   isUncontactedLead,
+  stateForRow,
 } from "@/lib/shape-views/lo-dashboard";
 import type { ClassifiedLead } from "@/lib/shape-views/lo-dashboard";
 import type { TurntimePhaseKey } from "@/lib/shape-views/turntime-milestones";
@@ -30,6 +31,28 @@ function slaPillClass(sla: ClassifiedLead["leadSla"]) {
   if (sla === "CAUTION") return "bg-[#fff4d7] text-[#8a5a00]";
   if (sla === "OK") return "bg-[#e2f6eb] text-[#178452]";
   return "bg-transparent text-[var(--lo-muted)]";
+}
+
+function phasePillClass(phase: string) {
+  if (phase.toLowerCase().includes("hot") || phase === "New Lead") return "bg-[#fde6e2] text-[#c83c31]";
+  if (phase.toLowerCase().includes("green") || phase === "Advanced" || phase === "App Completed") return "bg-[#e2f6eb] text-[#178452]";
+  if (phase.toLowerCase().includes("verification")) return "bg-[#e8f0fd] text-[#2d67b1]";
+  if (phase.toLowerCase().includes("underwriting") || phase.toLowerCase().includes("uw")) return "bg-[#fff4d7] text-[#8a5a00]";
+  if (phase.toLowerCase().includes("ctc") || phase.toLowerCase().includes("close")) return "bg-[#e2f6eb] text-[#0a5c3a]";
+  return "bg-[var(--lo-chip-bg)] text-[var(--lo-chip-text)]";
+}
+
+function verificationPillClass(track: string) {
+  if (track === "Verification A") return "bg-[#e8f0fd] text-[#2d67b1]";
+  if (track === "Verification B") return "bg-[#f0e8fd] text-[#6b2db1]";
+  return "bg-[var(--lo-chip-bg)] text-[var(--lo-muted)]";
+}
+
+function leadTypeAccent(lead: ClassifiedLead) {
+  if (isHotLead(lead)) return "border-l-[3px] border-l-[#c83c31]";
+  if (isGreenLead(lead)) return "border-l-[3px] border-l-[#22c55e]";
+  if (isUncontactedLead(lead)) return "border-l-[3px] border-l-[var(--lo-border)]";
+  return "border-l-[3px] border-l-transparent";
 }
 
 type Props = {
@@ -137,34 +160,37 @@ export function LeadsWorkspace({
       ) : null}
 
       <div className="lo-table-wrap min-w-0 rounded-lg border border-[var(--lo-border)]">
-        <table className="min-w-[1040px]">
+        <table className="min-w-[900px]">
           <thead>
             <tr>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">SLA</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Borrower</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Status</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Phase</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Amount</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Source</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Verification</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Last Change</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Trigger</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">SLA</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Last Change</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Borrower</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Phase</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Verification</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Amount</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">State</th>
+              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Source</th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={9} className="lo-muted px-4 py-10 text-center text-sm">
+                <td colSpan={8} className="lo-muted px-4 py-10 text-center text-sm">
                   No leads in this view.
                 </td>
               </tr>
             ) : (
               visible.map((lead) => (
-                <tr key={lead.id} className="cursor-pointer" onClick={() => onSelectLead(lead)}>
-                  <td className="px-3">
+                <tr
+                  key={lead.id}
+                  className={`cursor-pointer ${leadTypeAccent(lead)}`}
+                  onClick={() => onSelectLead(lead)}
+                >
+                  <td className="px-3 py-3">
                     {lead.leadSla ? (
                       <span
-                        className={`${slaPillClass(lead.leadSla)} inline-flex min-w-[70px] justify-center rounded-full px-2 py-0.5 text-[11px] font-black`}
+                        className={`${slaPillClass(lead.leadSla)} inline-flex min-w-[58px] justify-center rounded-md px-2 py-0.5 text-[10px] font-black tracking-wide`}
                       >
                         {lead.leadSla}
                       </span>
@@ -172,19 +198,37 @@ export function LeadsWorkspace({
                       <span className="lo-muted text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3">
-                    <span className="font-bold text-[#2d67b1]">{borrowerName(lead)}</span>
+                  <td className="px-3 py-3">
+                    <span className="lo-muted text-[11px]">
+                      {fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}
+                    </span>
                   </td>
-                  <td className="px-3">{lead.displayStatus}</td>
-                  <td className="lo-muted px-3">{lead.leadPhaseLabel}</td>
-                  <td className="px-3">{formatMoney(lead.loan_amount_cents)}</td>
-                  <td className="lo-source-text px-3 font-semibold">{lead.source ?? "—"}</td>
-                  <td className="lo-muted px-3">{lead.verificationTrack}</td>
-                  <td className="lo-muted px-3">
-                    {fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}
+                  <td className="px-3 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[13px] font-bold text-[#2d67b1]">{borrowerName(lead)}</span>
+                      {lead.hotTouchpointLabel && (
+                        <span className="text-[10px] font-semibold text-[#c83c31]">{lead.hotTouchpointLabel}</span>
+                      )}
+                    </div>
                   </td>
-                  <td className="lo-wrap lo-muted px-3">
-                    {lead.hotTouchpointLabel ?? lead.portal_status_raw ?? lead.status_raw ?? "Follow up"}
+                  <td className="px-3 py-3">
+                    <span className={`${phasePillClass(lead.leadPhaseLabel)} inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold`}>
+                      {lead.leadPhaseLabel}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`${verificationPillClass(lead.verificationTrack)} inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold`}>
+                      {lead.verificationTrack}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className="text-[12px] font-semibold">{formatMoney(lead.loan_amount_cents)}</span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className="lo-muted text-[12px]">{stateForRow(lead)}</span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className="lo-source-text text-[11px] font-semibold">{lead.source ?? "—"}</span>
                   </td>
                 </tr>
               ))

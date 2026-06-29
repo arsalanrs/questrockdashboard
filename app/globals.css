@@ -482,12 +482,30 @@ html[data-theme="dark"] .lo-table-wrap thead th {
 }
 
 .lo-table-wrap tbody tr:hover td {
-  background: color-mix(in srgb, var(--lo-card) 92%, var(--lo-accent-soft));
+  background: color-mix(in srgb, var(--lo-card) 90%, var(--lo-accent-soft));
+}
+
+/* Alternating subtle row tint for readability */
+.lo-table-wrap tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--lo-card) 96%, var(--lo-surface-muted));
+}
+
+.lo-table-wrap tbody tr:nth-child(even):hover td {
+  background: color-mix(in srgb, var(--lo-card) 88%, var(--lo-accent-soft));
 }
 
 .lo-table-wrap td.lo-wrap {
   white-space: normal;
-  max-width: 180px;
+  max-width: 200px;
+}
+
+/* Next action cell — italic hint style */
+.lo-table-wrap td.lo-next-action {
+  white-space: normal;
+  max-width: 200px;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--lo-muted);
 }
 
 .lo-workspace-panel {

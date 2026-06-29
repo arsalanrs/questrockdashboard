@@ -9,6 +9,12 @@ function slaPillClass(sla: PipelineLoanRow["sla"]) {
   return "bg-[#e2f6eb] text-[#178452]";
 }
 
+function slaRowAccent(sla: PipelineLoanRow["sla"]) {
+  if (sla === "ALERT") return "border-l-[3px] border-l-[#c83c31]";
+  if (sla === "CAUTION") return "border-l-[3px] border-l-[#f59e0b]";
+  return "border-l-[3px] border-l-transparent";
+}
+
 type Props = {
   loans: PipelineLoanRow[];
   alertsOnly: boolean;
@@ -51,34 +57,33 @@ export function LoansWorkspace({ loans, alertsOnly, onSelectLoan }: Props) {
             <tr>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">SLA</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Turntime</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Borrower Name</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Borrower</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Milestone</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Next Action</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Notes</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">State</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Loan Amount</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Loan Type</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Loan Purpose</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Amount</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Type</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Purpose</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Credit Pulled</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Piped</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Approved</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Lock Days</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">CTC</th>
               <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Closing Date</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Finance Contingency</th>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Appraisal Contingency</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Finance Cont.</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase">Appraisal Cont.</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={18} className="lo-muted px-4 py-10 text-center text-sm">
+                <td colSpan={17} className="lo-muted px-4 py-10 text-center text-sm">
                   No loans in this view.
                 </td>
               </tr>
             ) : (
               rows.map((loan) => (
-                <tr key={loan.id} className="cursor-pointer" onClick={() => onSelectLoan(loan)}>
+                <tr key={loan.id} className={`cursor-pointer ${slaRowAccent(loan.sla)}`} onClick={() => onSelectLoan(loan)}>
                   <td className="px-3">
                     <span
                       className={`${slaPillClass(loan.sla)} inline-flex min-w-[70px] justify-center rounded-full px-2 py-0.5 text-[11px] font-black`}
@@ -86,17 +91,16 @@ export function LoansWorkspace({ loans, alertsOnly, onSelectLoan }: Props) {
                       {loan.sla}
                     </span>
                   </td>
-                  <td className="lo-muted px-3">{loan.turntimeLabel}</td>
+                  <td className="lo-muted px-3 text-[11px]">{loan.turntimeLabel}</td>
                   <td className="px-3">
                     <button type="button" className="font-bold text-[#2d67b1] hover:underline">
                       {borrowerDisplayName(loan)}
                     </button>
                   </td>
-                  <td className="px-3">{loan.milestoneLabel}</td>
-                  <td className="lo-wrap px-3">{loan.nextAction}</td>
-                  <td className="lo-wrap lo-muted px-3">{loan.notesPreview}</td>
+                  <td className="px-3 text-[12px] font-medium">{loan.milestoneLabel}</td>
+                  <td className="lo-wrap px-3 text-[11px] italic text-[var(--lo-muted)]">{loan.nextAction}</td>
                   <td className="px-3">{stateForRow(loan)}</td>
-                  <td className="px-3">{formatMoney(loan.loan_amount_cents)}</td>
+                  <td className="px-3 font-semibold">{formatMoney(loan.loan_amount_cents)}</td>
                   <td className="px-3">{loan.loan_type ?? "—"}</td>
                   <td className="px-3">{loan.loan_purpose ?? "—"}</td>
                   <td className="px-3">{formatShortDate(loan.credit_report_requested_at)}</td>

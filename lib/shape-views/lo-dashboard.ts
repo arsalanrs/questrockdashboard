@@ -493,18 +493,31 @@ function notesPreview(row: LoDashboardLoanRow): string {
 }
 
 function nextActionFor(row: LoDashboardLoanRow): string {
+  // Prefer Shape AI note (first sentence, ≤80 chars)
+  const aiNote = row.notes_sidebar_ai_note?.trim();
+  if (aiNote) {
+    const firstSentence = aiNote.split(/[.!?]\s+/)[0]?.trim() ?? "";
+    if (firstSentence.length > 8 && firstSentence.length <= 120) {
+      return firstSentence.replace(/\.?$/, ".");
+    }
+  }
+
   const status = normalizeStatus(row.status_raw) ?? normalizeStatus(row.lendingpad_status_raw);
   const { turntimeLabel } = computeLoanSLA(row);
-  if (status?.includes("Underwriting") || status?.includes("UW")) {
-    return `Escalate underwriting review — ${turntimeLabel.toLowerCase()}.`;
+
+  if (status?.includes("Clear to Close") || status === "CTC") {
+    return "Confirm cash to close + signing time.";
   }
-  if (status?.includes("Clear to Close")) {
-    return "Confirm final cash to close and signing time.";
+  if (status?.includes("Underwriting") || status?.includes("UW")) {
+    return `Chase UW decision — ${turntimeLabel.toLowerCase()}.`;
   }
   if (status?.includes("Processing") || status?.includes("Validation")) {
-    return "Collect outstanding conditions and update borrower.";
+    return "Clear outstanding conditions.";
   }
-  return `Advance ${milestoneLabelFor(row).toLowerCase()} — ${turntimeLabel.toLowerCase()}.`;
+  if (status?.includes("Package")) {
+    return "Submit package to processing.";
+  }
+  return `${milestoneLabelFor(row)} — ${turntimeLabel.toLowerCase()}.`;
 }
 
 export function buildPipelineLoans(rows: LoDashboardLoanRow[], now = new Date()): PipelineLoanRow[] {
