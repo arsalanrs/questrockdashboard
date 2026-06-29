@@ -8,6 +8,11 @@ import {
   type MilestoneProgressState,
   type TurntimePhaseKey,
 } from "./turntime-milestones";
+import {
+  approvedDateForDisplay,
+  ctcDateForDisplay,
+  pipedDateForDisplay,
+} from "@/lib/lendingpad/lp-milestone-dates";
 import type { ShapeLoanRow } from "./types";
 
 export type { TurntimePhaseKey, MilestoneProgressState };
@@ -612,6 +617,8 @@ export function formatShortDate(iso: string | null | undefined): string {
   if (!d) return "—";
   return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
 }
+
+export { pipedDateForDisplay, approvedDateForDisplay, ctcDateForDisplay };
 
 export function formatMoney(cents: number | null | undefined): string {
   if (!cents) return "—";

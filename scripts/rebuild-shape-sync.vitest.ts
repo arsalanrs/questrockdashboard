@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "vitest";
 import { resetOperationalLoans } from "@/lib/admin/reset-operational-loans";
+import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
 import { runShapeApiSync } from "@/lib/shape-api/sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -38,6 +39,13 @@ describe("rebuild-shape-sync", () => {
 
     const result = await runShapeApiSync({ mode: "full", dateFrom: from, dateTo: to });
     console.log("Sync result:", result);
+
+    console.log("LendingPad list sync (required for pipeline dates)...");
+    const lp = await runLendingPadLoansSync({ fetchDetail: false });
+    console.log("LP sync:", {
+      loansUpserted: lp.loansUpserted,
+      errors: lp.errors.length,
+    });
 
     const { count: withName } = await admin
       .from("loans")

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatShortDate, formatMoney, stateForRow, borrowerDisplayName } from "@/lib/shape-views/lo-dashboard";
+import { formatShortDate, formatMoney, stateForRow, borrowerDisplayName, pipedDateForDisplay, approvedDateForDisplay, ctcDateForDisplay } from "@/lib/shape-views/lo-dashboard";
 import type { PipelineLoanRow } from "@/lib/shape-views/lo-dashboard";
 import { BorrowerAvatar } from "./BorrowerAvatar";
 
@@ -150,10 +150,10 @@ export function LoansWorkspace({ loans, alertsOnly, onSelectLoan }: Props) {
                     <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.credit_report_requested_at)}</span>
                   </td>
                   <td className="lo-td">
-                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.conversion_date ?? loan.submitted_to_processing_at)}</span>
+                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(pipedDateForDisplay(loan))}</span>
                   </td>
                   <td className="lo-td">
-                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.uw_decision_at)}</span>
+                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(approvedDateForDisplay(loan))}</span>
                   </td>
                   <td className="lo-td">
                     <span className={`text-[12px] font-medium ${loan.lockDaysLabel === "Expired" ? "text-[#c83c31]" : loan.lockDaysLabel === "Unlocked" ? "lo-muted" : ""}`}>
@@ -161,7 +161,7 @@ export function LoansWorkspace({ loans, alertsOnly, onSelectLoan }: Props) {
                     </span>
                   </td>
                   <td className="lo-td">
-                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.ctc_at)}</span>
+                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(ctcDateForDisplay(loan))}</span>
                   </td>
                   <td className="lo-td">
                     <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.closing_date)}</span>

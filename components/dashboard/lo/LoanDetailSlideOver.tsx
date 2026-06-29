@@ -7,6 +7,9 @@ import {
   formatMoney,
   formatShortDate,
   stateForRow,
+  pipedDateForDisplay,
+  approvedDateForDisplay,
+  ctcDateForDisplay,
   type PipelineLoanRow,
 } from "@/lib/shape-views/lo-dashboard";
 import { ActionButtons } from "./ActionButtons";
@@ -109,10 +112,10 @@ export function LoanDetailSlideOver({
             ["Loan Type", loan.loan_type],
             ["Loan Purpose", loan.loan_purpose],
             ["Credit Pulled", formatShortDate(loan.credit_report_requested_at)],
-            ["Piped", formatShortDate(loan.conversion_date ?? loan.submitted_to_processing_at)],
-            ["Approved", formatShortDate(loan.uw_decision_at)],
+            ["Piped", formatShortDate(pipedDateForDisplay(loan))],
+            ["Approved", formatShortDate(approvedDateForDisplay(loan))],
             ["Lock Days", loan.lockDaysLabel],
-            ["CTC", formatShortDate(loan.ctc_at)],
+            ["CTC", formatShortDate(ctcDateForDisplay(loan))],
             ["Closing Date", formatShortDate(loan.closing_date)],
             ["Finance Contingency", formatShortDate(loan.finance_contingency_date)],
             ["Appraisal Contingency", formatShortDate(loan.appraisal_contingency_date)],

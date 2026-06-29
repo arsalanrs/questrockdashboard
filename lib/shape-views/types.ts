@@ -12,6 +12,7 @@ export type ShapeLoanRow = {
   status_raw: string | null;
   portal_status_raw: string | null;
   lendingpad_status_raw: string | null;
+  lendingpad_status_at: string | null;
   borrower_first_name: string | null;
   borrower_last_name: string | null;
   borrower_email: string | null;

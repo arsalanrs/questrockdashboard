@@ -15,6 +15,7 @@ import {
 import { getLendingPadLoanDetail, listLendingPadLoansWithAuth } from "./client";
 import type { LendingPadAuthContext } from "./auth-fetch";
 import { mapLendingPadStatusToStage } from "./map-lp-status-to-stage";
+import { lpMilestoneDatesFromListStatus } from "./lp-milestone-dates";
 import type { NormalizedLpLoanDetail, NormalizedLpLoanListItem } from "./parse-response";
 import { upsertRichLoanDataFromSync } from "./upsert-rich-loan-data";
 
@@ -231,6 +232,11 @@ function mergeListItemFields(
   setIf("credit_report_requested_at", item.creditReportRequestedAt);
   setIf("closing_date", item.estimatedClosingDate);
   setIf("lock_expiration_date", item.lockExpirationDate);
+  for (const [k, v] of Object.entries(
+    lpMilestoneDatesFromListStatus(item.statusRaw, item.statusAt),
+  )) {
+    setIf(k, v);
+  }
   return map;
 }
 
