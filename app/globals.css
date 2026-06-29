@@ -443,7 +443,6 @@ html[data-theme="dark"] .lo-segment-track {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
-  /* Fixed viewport — header/tabs stay put; rows scroll inside (matches LO + LP panels). */
   height: min(70vh, 720px);
   min-height: 280px;
 }
@@ -451,61 +450,70 @@ html[data-theme="dark"] .lo-segment-track {
 .lo-table-wrap table {
   width: max-content;
   min-width: 100%;
+  border-collapse: collapse;
 }
 
-.lo-table-wrap thead th {
+/* ---- Shared table header ---- */
+.lo-th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f1f6f3;
+  padding: 10px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: left;
   color: var(--lo-muted);
+  background: var(--lo-card);
   border-bottom: 1px solid var(--lo-border);
-  white-space: nowrap;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
 }
 
-html[data-theme="dark"] .lo-table-wrap thead th {
-  background: rgba(255, 255, 255, 0.05);
+html[data-theme="light"] .lo-th {
+  background: #f8faf9;
 }
 
-.lo-table-wrap tbody td {
+html[data-theme="dark"] .lo-th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ---- Shared table data cell ---- */
+.lo-td {
+  padding: 11px 14px;
   border-bottom: 1px solid var(--lo-border);
   white-space: nowrap;
+  vertical-align: middle;
   color: var(--lo-text);
   background: var(--lo-card);
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
   font-size: 12px;
-  line-height: 1.35;
-  vertical-align: middle;
+  line-height: 1.4;
 }
 
-.lo-table-wrap tbody tr:hover td {
-  background: color-mix(in srgb, var(--lo-card) 90%, var(--lo-accent-soft));
-}
-
-/* Alternating subtle row tint for readability */
-.lo-table-wrap tbody tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--lo-card) 96%, var(--lo-surface-muted));
-}
-
-.lo-table-wrap tbody tr:nth-child(even):hover td {
+/* ---- Data row hover ---- */
+.lo-data-row:hover .lo-td {
   background: color-mix(in srgb, var(--lo-card) 88%, var(--lo-accent-soft));
 }
 
-.lo-table-wrap td.lo-wrap {
-  white-space: normal;
-  max-width: 200px;
+/* ---- Borrower name ---- */
+.lo-name-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lo-text);
 }
 
-/* Next action cell — italic hint style */
-.lo-table-wrap td.lo-next-action {
-  white-space: normal;
-  max-width: 200px;
-  font-style: italic;
-  font-size: 11px;
-  color: var(--lo-muted);
+/* ---- Amount / money ---- */
+.lo-amount-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lo-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Next action (loans table) ---- */
+.lo-next-action-cell {
+  white-space: normal !important;
+  max-width: 220px;
 }
 
 .lo-workspace-panel {

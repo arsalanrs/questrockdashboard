@@ -11,48 +11,58 @@ import {
 } from "@/lib/shape-views/lo-dashboard";
 import type { ClassifiedLead } from "@/lib/shape-views/lo-dashboard";
 import type { TurntimePhaseKey } from "@/lib/shape-views/turntime-milestones";
+import { BorrowerAvatar } from "./BorrowerAvatar";
 import type { LeadViewTab } from "./types";
 
-function borrowerName(lead: ClassifiedLead) {
-  return [lead.borrower_first_name, lead.borrower_last_name].filter(Boolean).join(" ") || "—";
-}
-
 function fmtRelative(iso: string | null | undefined) {
-  if (!iso) return "—";
+  if (!iso) return null;
   try {
     return formatDistanceToNow(new Date(iso), { addSuffix: true });
   } catch {
-    return "—";
+    return null;
   }
 }
 
-function slaPillClass(sla: ClassifiedLead["leadSla"]) {
-  if (sla === "ALERT") return "bg-[#fde6e2] text-[#c83c31]";
-  if (sla === "CAUTION") return "bg-[#fff4d7] text-[#8a5a00]";
-  if (sla === "OK") return "bg-[#e2f6eb] text-[#178452]";
-  return "bg-transparent text-[var(--lo-muted)]";
+function SlaPill({ sla }: { sla: ClassifiedLead["leadSla"] }) {
+  if (!sla) return <span className="text-[var(--lo-muted)] text-sm">—</span>;
+  const cls =
+    sla === "ALERT"
+      ? "text-[#c83c31] font-bold text-[11px] tracking-wide"
+      : sla === "CAUTION"
+        ? "text-[#b45309] font-bold text-[11px] tracking-wide"
+        : "text-[#178452] font-bold text-[11px] tracking-wide";
+  return <span className={cls}>{sla === "ALERT" ? "Alert" : sla === "CAUTION" ? "Caution" : "OK"}</span>;
 }
 
-function phasePillClass(phase: string) {
-  if (phase.toLowerCase().includes("hot") || phase === "New Lead") return "bg-[#fde6e2] text-[#c83c31]";
-  if (phase.toLowerCase().includes("green") || phase === "Advanced" || phase === "App Completed") return "bg-[#e2f6eb] text-[#178452]";
-  if (phase.toLowerCase().includes("verification")) return "bg-[#e8f0fd] text-[#2d67b1]";
-  if (phase.toLowerCase().includes("underwriting") || phase.toLowerCase().includes("uw")) return "bg-[#fff4d7] text-[#8a5a00]";
-  if (phase.toLowerCase().includes("ctc") || phase.toLowerCase().includes("close")) return "bg-[#e2f6eb] text-[#0a5c3a]";
-  return "bg-[var(--lo-chip-bg)] text-[var(--lo-chip-text)]";
+function PhaseBadge({ label }: { label: string }) {
+  let cls = "bg-[var(--lo-chip-bg)] text-[var(--lo-chip-text)]";
+  const l = label.toLowerCase();
+  if (l === "new lead" || l.includes("hot")) cls = "bg-[#fee2e2] text-[#c83c31]";
+  else if (l === "app completed" || l === "advanced") cls = "bg-[#dcfce7] text-[#15803d]";
+  else if (l.includes("verification")) cls = "bg-[#dbeafe] text-[#1d4ed8]";
+  else if (l.includes("underwriting") || l.includes("uw")) cls = "bg-[#fef9c3] text-[#854d0e]";
+  else if (l.includes("ctc") || l.includes("close")) cls = "bg-[#d1fae5] text-[#065f46]";
+  else if (l.includes("package") || l.includes("validation")) cls = "bg-[#f3e8ff] text-[#6b21a8]";
+
+  return (
+    <span className={`${cls} inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap`}>
+      {label}
+    </span>
+  );
 }
 
-function verificationPillClass(track: string) {
-  if (track === "Verification A") return "bg-[#e8f0fd] text-[#2d67b1]";
-  if (track === "Verification B") return "bg-[#f0e8fd] text-[#6b2db1]";
-  return "bg-[var(--lo-chip-bg)] text-[var(--lo-muted)]";
-}
-
-function leadTypeAccent(lead: ClassifiedLead) {
-  if (isHotLead(lead)) return "border-l-[3px] border-l-[#c83c31]";
-  if (isGreenLead(lead)) return "border-l-[3px] border-l-[#22c55e]";
-  if (isUncontactedLead(lead)) return "border-l-[3px] border-l-[var(--lo-border)]";
-  return "border-l-[3px] border-l-transparent";
+function VerifBadge({ track }: { track: string }) {
+  const cls =
+    track === "Verification A"
+      ? "bg-[#dbeafe] text-[#1e40af]"
+      : track === "Verification B"
+        ? "bg-[#ede9fe] text-[#5b21b6]"
+        : "bg-[var(--lo-chip-bg)] text-[var(--lo-muted)]";
+  return (
+    <span className={`${cls} inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap`}>
+      {track}
+    </span>
+  );
 }
 
 type Props = {
@@ -92,146 +102,141 @@ export function LeadsWorkspace({
 
   const tabs: Array<{ key: LeadViewTab; label: string; count: number }> = [
     { key: "all", label: "All", count: phaseFiltered.length },
-    { key: "hot", label: "Hot", count: hot.length },
-    { key: "green", label: "Green", count: green.length },
+    { key: "hot", label: "Hot 🔥", count: hot.length },
+    { key: "green", label: "Green ✓", count: green.length },
     { key: "uncontacted", label: "Uncontacted", count: uncontacted.length },
   ];
 
-  const sectionTitle =
-    activeTab === "all"
-      ? "All Leads"
-      : activeTab === "hot"
-        ? "Hot Leads"
-        : activeTab === "green"
-          ? "Green Leads"
-          : "Uncontacted Leads";
-
   const sectionHint =
-    activeTab === "all"
-      ? "Shape CRM leads in your workspace"
-      : activeTab === "hot"
-        ? "New leads + past-client touchpoints"
-        : activeTab === "green"
-          ? "Advanced / app completed — advance to verification"
-          : "Not Contacted status only";
+    activeTab === "hot"
+      ? "New leads + past-client touchpoints"
+      : activeTab === "green"
+        ? "Advanced / app completed"
+        : activeTab === "uncontacted"
+          ? "Not Contacted status only"
+          : "Shape CRM leads in your workspace";
 
   return (
-    <section className="lo-card lo-workspace-panel min-w-0 p-4">
-      <div className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="lo-card lo-workspace-panel min-w-0 overflow-hidden">
+      {/* Header */}
+      <div className="flex shrink-0 flex-col gap-3 border-b border-[var(--lo-border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="lo-accent-text text-xs font-bold uppercase tracking-wide">Shape CRM</p>
-          <h2 className="lo-heading text-xl font-bold">LEADS</h2>
+          <p className="lo-accent-text text-[10px] font-bold uppercase tracking-widest">Shape CRM</p>
+          <h2 className="lo-heading text-lg font-bold tracking-tight">Leads</h2>
+          <p className="lo-muted mt-0.5 text-[11px]">{sectionHint} · {visible.length} records</p>
         </div>
-        <div className="lo-segment-track inline-grid grid-cols-2 gap-1 rounded-lg p-1 sm:grid-cols-4">
+        <div className="lo-segment-track inline-flex gap-1 rounded-xl p-1">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => onTabChange(tab.key)}
               className={cn(
-                "rounded-md px-3 py-2 text-xs font-bold",
-                activeTab === tab.key ? "lo-segment-active" : "lo-muted",
+                "rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all",
+                activeTab === tab.key ? "lo-segment-active shadow-sm" : "lo-muted hover:opacity-80",
               )}
             >
-              {tab.label} ({tab.count})
+              {tab.label}
+              <span className={cn("ml-1.5 rounded-full px-1.5 py-0.5 text-[10px]",
+                activeTab === tab.key ? "bg-white/20" : "bg-[var(--lo-chip-bg)]"
+              )}>
+                {tab.count}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
-      {activePhase !== "all" ? (
-        <div className="lo-phase-chip mb-4 flex shrink-0 items-center justify-between rounded-lg px-3 py-2 text-sm font-bold">
+      {activePhase !== "all" && (
+        <div className="lo-phase-chip mx-5 mt-3 shrink-0 flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold">
           <span>Filtered by turntime phase</span>
           <button type="button" onClick={onClearPhase} className="lo-segment-active rounded-md px-2 py-1 text-xs">
             Clear
           </button>
         </div>
-      ) : null}
+      )}
 
-      <div className="mb-3 flex shrink-0 items-baseline justify-between border-b border-[var(--lo-border)] pb-2">
-        <h3 className="lo-heading text-[13px] font-black uppercase">{sectionTitle}</h3>
-        <span className="lo-muted text-xs">
-          {sectionHint} · {visible.length} leads
-        </span>
-      </div>
+      {searchQuery && (
+        <p className="lo-muted mx-5 mt-2 shrink-0 text-[11px]">Search: "{searchQuery}"</p>
+      )}
 
-      {searchQuery ? (
-        <p className="lo-muted mb-3 shrink-0 text-xs">Filtered by search: “{searchQuery}”</p>
-      ) : null}
-
-      <div className="lo-table-wrap min-w-0 rounded-lg border border-[var(--lo-border)]">
-        <table className="min-w-[900px]">
+      {/* Table */}
+      <div className="lo-table-wrap">
+        <table className="min-w-[860px] w-full border-collapse">
           <thead>
-            <tr>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">SLA</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Last Change</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Borrower</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Phase</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Verification</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Amount</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">State</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider">Source</th>
+            <tr className="lo-table-header-row">
+              <th className="lo-th w-[70px]">SLA</th>
+              <th className="lo-th">Borrower</th>
+              <th className="lo-th">Phase</th>
+              <th className="lo-th">Verification</th>
+              <th className="lo-th text-right">Amount</th>
+              <th className="lo-th">State</th>
+              <th className="lo-th">Source</th>
+              <th className="lo-th">Last change</th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={8} className="lo-muted px-4 py-10 text-center text-sm">
+                <td colSpan={8} className="lo-muted px-5 py-14 text-center text-sm">
                   No leads in this view.
                 </td>
               </tr>
             ) : (
-              visible.map((lead) => (
-                <tr
-                  key={lead.id}
-                  className={`cursor-pointer ${leadTypeAccent(lead)}`}
-                  onClick={() => onSelectLead(lead)}
-                >
-                  <td className="px-3 py-3">
-                    {lead.leadSla ? (
-                      <span
-                        className={`${slaPillClass(lead.leadSla)} inline-flex min-w-[58px] justify-center rounded-md px-2 py-0.5 text-[10px] font-black tracking-wide`}
-                      >
-                        {lead.leadSla}
+              visible.map((lead) => {
+                const accent = isHotLead(lead)
+                  ? "border-l-[3px] border-l-[#c83c31]"
+                  : isGreenLead(lead)
+                    ? "border-l-[3px] border-l-[#22c55e]"
+                    : "border-l-[3px] border-l-transparent";
+
+                return (
+                  <tr
+                    key={lead.id}
+                    className={`lo-data-row cursor-pointer ${accent}`}
+                    onClick={() => onSelectLead(lead)}
+                  >
+                    <td className="lo-td w-[70px]">
+                      <SlaPill sla={lead.leadSla} />
+                    </td>
+                    <td className="lo-td">
+                      <div className="flex items-center gap-2.5">
+                        <BorrowerAvatar firstName={lead.borrower_first_name} lastName={lead.borrower_last_name} />
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="lo-name-text truncate">
+                            {[lead.borrower_first_name, lead.borrower_last_name].filter(Boolean).join(" ") || "—"}
+                          </span>
+                          {lead.hotTouchpointLabel && (
+                            <span className="text-[10px] font-semibold text-[#c83c31] leading-none">
+                              {lead.hotTouchpointLabel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="lo-td">
+                      <PhaseBadge label={lead.leadPhaseLabel} />
+                    </td>
+                    <td className="lo-td">
+                      <VerifBadge track={lead.verificationTrack} />
+                    </td>
+                    <td className="lo-td text-right">
+                      <span className="lo-amount-text">{formatMoney(lead.loan_amount_cents)}</span>
+                    </td>
+                    <td className="lo-td">
+                      <span className="lo-muted text-[12px]">{stateForRow(lead)}</span>
+                    </td>
+                    <td className="lo-td">
+                      <span className="lo-source-text text-[11px] font-medium">{lead.source ?? "—"}</span>
+                    </td>
+                    <td className="lo-td">
+                      <span className="lo-muted text-[11px]">
+                        {fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at) ?? "—"}
                       </span>
-                    ) : (
-                      <span className="lo-muted text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="lo-muted text-[11px]">
-                      {fmtRelative(lead.last_status_change_at ?? lead.shape_last_updated_at)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[13px] font-bold text-[#2d67b1]">{borrowerName(lead)}</span>
-                      {lead.hotTouchpointLabel && (
-                        <span className="text-[10px] font-semibold text-[#c83c31]">{lead.hotTouchpointLabel}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`${phasePillClass(lead.leadPhaseLabel)} inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold`}>
-                      {lead.leadPhaseLabel}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`${verificationPillClass(lead.verificationTrack)} inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold`}>
-                      {lead.verificationTrack}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="text-[12px] font-semibold">{formatMoney(lead.loan_amount_cents)}</span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="lo-muted text-[12px]">{stateForRow(lead)}</span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="lo-source-text text-[11px] font-semibold">{lead.source ?? "—"}</span>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
