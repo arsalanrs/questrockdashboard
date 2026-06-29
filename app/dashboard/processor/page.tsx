@@ -1,5 +1,6 @@
 import { differenceInHours } from "date-fns";
 import { notFound } from "next/navigation";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { Badge } from "@/components/Badge";
 import { cn } from "@/lib/cn";
 import { requireCurrentUser } from "@/lib/current-user";
@@ -187,27 +188,21 @@ export default async function ProcessorDashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Section 1: Header */}
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Processor Queue</h1>
-        <p className="text-sm text-mutedForeground">
-          {appUser.full_name} &middot; Questrock File Flow
-        </p>
-      </div>
+    <div className="qr-dashboard-page animate-fade-up">
+      <DashboardPageHeader
+        eyebrow="Operations"
+        title="Processor Queue"
+        description={`${appUser.full_name} · Questrock File Flow`}
+      />
 
-      {/* Section 2: Stage Summary Cards */}
-      <section className="space-y-3">
-        <div className="text-sm font-semibold">Pipeline Overview</div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="space-y-2">
+        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Pipeline Overview</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {SUMMARY_CARDS.map((card) => {
             const count = cardCount(card);
             const exceeded = cardHasExceeded(card);
             return (
-              <div
-                key={card.label}
-                className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-cardForeground"
-              >
+              <div key={card.label} className="lo-mini-stat">
                 <span
                   className={cn(
                     "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
@@ -215,8 +210,8 @@ export default async function ProcessorDashboardPage() {
                   )}
                 />
                 <div className="min-w-0">
-                  <div className="truncate text-xs text-mutedForeground">{card.label}</div>
-                  <div className="text-lg font-semibold tabular-nums">{count}</div>
+                  <div className="lo-mini-stat-label truncate">{card.label}</div>
+                  <div className="lo-mini-stat-value">{count}</div>
                 </div>
               </div>
             );
@@ -224,22 +219,21 @@ export default async function ProcessorDashboardPage() {
         </div>
       </section>
 
-      {/* Section 3: Work Queue Table */}
-      <section className="space-y-3">
-        <div className="text-sm font-semibold">Work Queue</div>
-        <div className="overflow-x-auto rounded-lg border border-border">
+      <section className="space-y-2">
+        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Work Queue</div>
+        <div className="lo-card lo-table-wrap">
           <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr className="text-left text-xs text-mutedForeground">
-                <th className="whitespace-nowrap px-3 py-2">Queue</th>
-                <th className="whitespace-nowrap px-3 py-2">Loan #</th>
-                <th className="whitespace-nowrap px-3 py-2">Borrower</th>
-                <th className="whitespace-nowrap px-3 py-2">Loan Type</th>
-                <th className="whitespace-nowrap px-3 py-2">Stage</th>
-                <th className="whitespace-nowrap px-3 py-2">Hours in Stage</th>
-                <th className="whitespace-nowrap px-3 py-2">Open Conditions</th>
-                <th className="whitespace-nowrap px-3 py-2">Assigned LO</th>
-                <th className="whitespace-nowrap px-3 py-2">SLA Status</th>
+            <thead>
+              <tr>
+                <th className="lo-th">Queue</th>
+                <th className="lo-th">Loan #</th>
+                <th className="lo-th">Borrower</th>
+                <th className="lo-th">Loan Type</th>
+                <th className="lo-th">Stage</th>
+                <th className="lo-th">Hours in Stage</th>
+                <th className="lo-th">Open Conditions</th>
+                <th className="lo-th">Assigned LO</th>
+                <th className="lo-th">SLA Status</th>
               </tr>
             </thead>
             <tbody>
@@ -247,34 +241,28 @@ export default async function ProcessorDashboardPage() {
                 <tr
                   key={l.id}
                   className={cn(
-                    "border-t border-border",
-                    l.is_restructure_hold && "bg-amber-50/50 dark:bg-amber-950/20",
+                    "lo-data-row",
+                    l.is_restructure_hold && "bg-amber-50/80 dark:bg-amber-950/20",
                   )}
                 >
-                  <td className="whitespace-nowrap px-3 py-2 font-medium">{l.queue}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
-                    {l.shape_record_id ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">
+                  <td className="lo-td font-medium">{l.queue}</td>
+                  <td className="lo-td font-mono text-xs">{l.shape_record_id ?? "—"}</td>
+                  <td className="lo-td">
                     {l.borrower_first_name ?? ""} {l.borrower_last_name ?? ""}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">{l.loan_type ?? "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    {STAGE_LABEL[l.current_stage ?? ""] ?? l.current_stage ?? "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
-                    {l.hours !== null ? l.hours : "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">{l.openConditions}</td>
-                  <td className="px-3 py-2">{l.assigned_loan_officer_name ?? "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
+                  <td className="lo-td">{l.loan_type ?? "—"}</td>
+                  <td className="lo-td">{STAGE_LABEL[l.current_stage ?? ""] ?? l.current_stage ?? "—"}</td>
+                  <td className="lo-td tabular-nums">{l.hours !== null ? l.hours : "—"}</td>
+                  <td className="lo-td tabular-nums">{l.openConditions}</td>
+                  <td className="lo-td">{l.assigned_loan_officer_name ?? "—"}</td>
+                  <td className="lo-td">
                     <Badge variant={SLA_BADGE_VARIANT[l.slaStatus]}>{l.slaStatus}</Badge>
                   </td>
                 </tr>
               ))}
               {display.length === 0 && (
                 <tr>
-                  <td className="px-3 py-6 text-center text-sm text-mutedForeground" colSpan={9}>
+                  <td className="lo-muted lo-td px-3 py-6 text-center text-sm" colSpan={9}>
                     No files in processing queue.
                   </td>
                 </tr>
@@ -284,10 +272,9 @@ export default async function ProcessorDashboardPage() {
         </div>
       </section>
 
-      {/* Section 4: Game Plan Panel (placeholder) */}
-      <section className="rounded-lg border border-border bg-card p-6 text-cardForeground">
-        <h2 className="text-sm font-semibold">Game Plan</h2>
-        <p className="mt-2 text-sm text-mutedForeground">
+      <section className="lo-card p-5">
+        <h2 className="lo-heading text-sm font-semibold">Game Plan</h2>
+        <p className="lo-muted mt-2 text-sm">
           Select a loan above to view its game plan and checklist.
         </p>
       </section>

@@ -2,22 +2,22 @@ import { cn } from "@/lib/cn";
 
 type KpiColor = "yellow" | "red" | "green" | "amber" | "blue" | "muted";
 
-const VALUE_COLORS: Record<KpiColor, string> = {
-  yellow: "#E8FF00",
-  red:    "#FF4B4B",
-  green:  "#22C55E",
-  amber:  "#F59E0B",
-  blue:   "#60A5FA",
-  muted:  "hsl(210 20% 96%)",
+const STRIPE_CLASS: Record<KpiColor, string> = {
+  yellow: "kpi-stripe-yellow",
+  red: "kpi-stripe-red",
+  green: "kpi-stripe-green",
+  amber: "kpi-stripe-amber",
+  blue: "kpi-stripe-blue",
+  muted: "kpi-stripe-muted",
 };
 
-const STRIPE_COLORS: Record<KpiColor, string> = {
-  yellow: "#E8FF00",
-  red:    "#FF4B4B",
-  green:  "#22C55E",
-  amber:  "#F59E0B",
-  blue:   "#60A5FA",
-  muted:  "rgba(255,255,255,0.12)",
+const VALUE_CLASS: Record<KpiColor, string> = {
+  yellow: "kpi-value-yellow",
+  red: "kpi-value-red",
+  green: "kpi-value-green",
+  amber: "kpi-value-amber",
+  blue: "kpi-value-blue",
+  muted: "kpi-value-muted",
 };
 
 export function KpiCard({
@@ -35,47 +35,18 @@ export function KpiCard({
   subColor?: "up" | "down" | "neutral";
   className?: string;
 }) {
-  const subStyle =
+  const subClass =
     subColor === "up"
-      ? { color: "#22C55E" }
+      ? "kpi-sub-up"
       : subColor === "down"
-      ? { color: "#FF4B4B" }
-      : { color: "hsl(215 14% 50%)" };
+        ? "kpi-sub-down"
+        : "kpi-sub-neutral";
 
   return (
-    <div
-      className={cn(
-        "relative flex flex-col gap-1.5 overflow-hidden rounded-[14px] p-4 transition-all duration-150",
-        "border hover:border-white/[0.12]",
-        className,
-      )}
-      style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.07)",
-      }}
-    >
-      {/* 2px color stripe at top */}
-      <div
-        className="absolute inset-x-0 top-0 h-[2px]"
-        style={{ background: STRIPE_COLORS[color] }}
-      />
-
-      <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>
-        {label}
-      </div>
-
-      <div
-        className="text-[28px] font-bold leading-none tabular-nums tracking-tight"
-        style={{ color: VALUE_COLORS[color] }}
-      >
-        {value}
-      </div>
-
-      {sub != null && (
-        <div className="text-[11px] font-medium" style={subStyle}>
-          {sub}
-        </div>
-      )}
+    <div className={cn("kpi-card lo-card", STRIPE_CLASS[color], className)}>
+      <div className="kpi-card-label">{label}</div>
+      <div className={cn("kpi-card-value", VALUE_CLASS[color])}>{value}</div>
+      {sub != null ? <div className={cn("kpi-card-sub", subClass)}>{sub}</div> : null}
     </div>
   );
 }

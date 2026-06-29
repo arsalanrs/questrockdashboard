@@ -109,7 +109,7 @@ export function ExecChat() {
 
       <div className={cn("grid gap-4", showLibrary ? "lg:grid-cols-[1fr_320px]" : "grid-cols-1")}>
         {/* Chat */}
-        <div className="flex h-[520px] flex-col rounded-lg border border-border bg-card">
+        <div className="lo-card flex h-[520px] flex-col overflow-hidden">
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.length === 0 && (
               <div className="flex h-full items-center justify-center">
@@ -184,7 +184,7 @@ export function ExecChat() {
 
         {/* Suggested prompts sidebar */}
         {showLibrary && (
-          <aside className="rounded-lg border border-border bg-card">
+          <aside className="lo-card overflow-hidden">
             <div className="space-y-3 p-3">
               <div>
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-mutedForeground">

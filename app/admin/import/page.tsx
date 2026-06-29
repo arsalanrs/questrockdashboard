@@ -60,16 +60,16 @@ export default async function AdminImportPage({ searchParams }: Props) {
   (teams ?? []).forEach((t) => teamNameById.set(t.id, t.name));
 
   return (
-    <div className="space-y-6">
+    <div className="qr-dashboard-page">
       <div className="space-y-1">
         <p className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Admin</p>
-        <h1 className="lo-heading text-xl font-semibold">Import &amp; sync</h1>
+        <h1 className="lo-heading text-xl font-semibold sm:text-2xl">Import &amp; sync</h1>
         <p className="lo-muted text-sm">Import Shape KPI CSV into Supabase (raw + normalized loans).</p>
       </div>
 
       <div className="lo-card p-5">
-        <h2 className="text-sm font-semibold">Import: Shape KPI CSV</h2>
-        <p className="mt-1 text-sm text-mutedForeground">
+        <h2 className="lo-heading text-sm font-semibold">Import: Shape KPI CSV</h2>
+        <p className="lo-muted mt-1 text-sm">
           Upload the exported report (e.g. <span className="font-mono">customreportcsv_*.csv</span>).
         </p>
 

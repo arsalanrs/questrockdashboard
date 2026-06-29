@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cn } from "@/lib/cn";
 import {
   SHAPE_VIEW_CATEGORIES,
   defaultViewIdForCategory,
@@ -36,9 +37,8 @@ export function ShapePipelineNav({ basePath, category, activeViewId, viewCounts,
   const sidebarViews = getViewsForCategory(category);
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Record-type tabs */}
-      <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/30 p-1">
+    <div className="flex flex-col gap-3">
+      <div className="lo-segment-track flex flex-wrap gap-1 rounded-lg p-1">
         {SHAPE_VIEW_CATEGORIES.map(({ key, label }) => {
           const isActive = category === key;
           const href = buildHref(
@@ -53,14 +53,15 @@ export function ShapePipelineNav({ basePath, category, activeViewId, viewCounts,
             <Link
               key={key}
               href={href}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
                 isActive
-                  ? "bg-foreground text-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+                  ? "lo-segment-active shadow-sm"
+                  : "lo-heading hover:bg-[var(--lo-accent-soft)]",
+              )}
             >
               {label}
-              <span className={`ml-1.5 tabular-nums text-xs ${isActive ? "opacity-80" : "opacity-60"}`}>
+              <span className={cn("ml-1.5 tabular-nums text-xs", isActive ? "opacity-90" : "lo-muted")}>
                 ({total})
               </span>
             </Link>
@@ -68,10 +69,9 @@ export function ShapePipelineNav({ basePath, category, activeViewId, viewCounts,
         })}
       </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-        {/* Sidebar views */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:gap-4">
         <nav
-          className="flex shrink-0 flex-row gap-1 overflow-x-auto lg:w-56 lg:flex-col lg:gap-0.5 lg:overflow-visible"
+          className="lo-card flex shrink-0 flex-row gap-0.5 overflow-x-auto p-1.5 lg:w-56 lg:flex-col lg:overflow-visible"
           aria-label="Shape pipeline views"
         >
           {sidebarViews.map((view) => {
@@ -82,19 +82,15 @@ export function ShapePipelineNav({ basePath, category, activeViewId, viewCounts,
               <Link
                 key={view.id}
                 href={href}
-                className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors whitespace-nowrap lg:whitespace-normal ${
-                  isActive
-                    ? "bg-muted font-semibold text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                } ${view.deferred ? "opacity-60" : ""}`}
+                className={cn(
+                  "lo-pipeline-view-link flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap lg:whitespace-normal",
+                  isActive && "lo-pipeline-view-active",
+                  view.deferred && "opacity-60",
+                )}
                 title={view.deferred ? view.deferredReason : undefined}
               >
                 <span className="leading-snug">{view.label}</span>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
-                    isActive ? "bg-foreground/10" : "bg-muted"
-                  }`}
-                >
+                <span className={cn("lo-pipeline-count", isActive && "lo-pipeline-count-active")}>
                   {view.deferred ? "—" : count}
                 </span>
               </Link>

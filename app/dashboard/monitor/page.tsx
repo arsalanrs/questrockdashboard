@@ -12,6 +12,7 @@
  *   5. Open Escalations     — unresolved escalation notes
  */
 import { notFound } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewManagerDashboard } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,6 +20,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SLA_BREACH_LABELS } from "@/lib/sla/compute";
 import { evaluateIntradayRules } from "@/lib/sla/time-rules";
 import { shapeLeadUrl } from "@/lib/shape-link";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { EscalateButton, ResolveButton } from "@/components/monitor/EscalateButton";
 import { Badge } from "@/components/Badge";
 import { StatCard } from "@/components/StatCard";
@@ -60,53 +62,39 @@ function contactRateColor(pct: number): string {
 function SectionHeading({ children, count, critical }: { children: React.ReactNode; count?: number; critical?: boolean }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[13px] font-semibold uppercase tracking-widest text-mutedForeground">
+      <span className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">
         {children}
       </span>
       {count !== undefined && (
-        <span
-          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums"
-          style={{
-            background: critical ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.08)",
-            color: critical ? "#f87171" : "var(--muted-foreground)",
-          }}
-        >
+        <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold tabular-nums", critical ? "pill-red" : "pill-muted")}>
           {count}
         </span>
       )}
-      <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />
+      <div className="h-px flex-1 bg-[var(--lo-border)]" />
     </div>
   );
 }
 
 function TableWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+    <div className="lo-table-shell">
       <table className="w-full text-sm">{children}</table>
     </div>
   );
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-mutedForeground" style={{ background: "rgba(255,255,255,0.03)" }}>
-      {children}
-    </th>
-  );
+  return <th className="lo-th">{children}</th>;
 }
 
 function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <td className={`px-4 py-3 ${className ?? ""}`} style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-      {children}
-    </td>
-  );
+  return <td className={cn("lo-td", className)}>{children}</td>;
 }
 
 function EmptyRow({ cols, msg }: { cols: number; msg: string }) {
   return (
     <tr>
-      <td colSpan={cols} className="px-4 py-6 text-center text-sm text-mutedForeground">{msg}</td>
+      <td colSpan={cols} className="lo-muted lo-td px-4 py-6 text-center text-sm">{msg}</td>
     </tr>
   );
 }
@@ -115,13 +103,7 @@ function ShapeLink({ shapeLeadId }: { shapeLeadId: number | null }) {
   const url = shapeLeadUrl(shapeLeadId);
   if (!url) return null;
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
-      style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}
-    >
+    <a href={url} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">
       Shape ↗
     </a>
   );
@@ -287,29 +269,24 @@ export default async function MonitorPage() {
   const totalUntouched = todayOnlyLoans.filter((l) => (touchMap.get(l.id as string) ?? 0) === 0).length;
 
   return (
-    <div className="space-y-8">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Monitor</h1>
-          <p className="mt-0.5 text-sm text-mutedForeground">
-            Exceptions only — leads that need immediate attention
-          </p>
-        </div>
-        <div className="ml-auto flex items-center gap-2 text-xs text-mutedForeground">
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: "#4ade80", boxShadow: "0 0 6px #4ade80" }}
-          />
-          Live · refreshes every 30s
-          <span className="ml-1" style={{ color: "rgba(255,255,255,0.3)" }}>
+    <div className="qr-dashboard-page animate-fade-up">
+      <DashboardPageHeader
+        eyebrow="Live ops"
+        title="Monitor"
+        description="Exceptions only — leads that need immediate attention"
+        meta={
+          <span className="inline-flex items-center gap-2">
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: "#22c55e", boxShadow: "0 0 6px #22c55e" }}
+            />
+            Live · refreshes every 30s ·{" "}
             {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "America/New_York" })} ET
           </span>
-        </div>
-      </div>
+        }
+      />
 
-      {/* ── Stat bar ───────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatCard
           label="New Leads Today"
           value={totalNewToday}

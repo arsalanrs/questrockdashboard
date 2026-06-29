@@ -24,7 +24,7 @@ export type AssignmentQueueRow = {
 
 export function AssignmentQueuePanel({ rows }: { rows: AssignmentQueueRow[] }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
+    <section className="dash-card p-4">
       <div className="mb-3 text-[11px] uppercase tracking-wider text-mutedForeground">Auto-assignment</div>
       <h2 className="text-base font-semibold">Recent blitz queue</h2>
       <p className="mt-1 text-xs text-mutedForeground">

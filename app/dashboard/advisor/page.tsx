@@ -1,18 +1,20 @@
 import { requireCurrentUser } from "@/lib/current-user";
 import { AdvisorChat } from "@/components/advisor/AdvisorChat";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 export default async function AdvisorPage() {
   await requireCurrentUser();
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">AI Guideline Advisor</h1>
-        <p className="text-sm text-mutedForeground">
-          Ask questions about loan programs, guidelines, and scenarios
-        </p>
+    <div className="qr-dashboard-page animate-fade-up">
+      <DashboardPageHeader
+        eyebrow="AI tools"
+        title="AI Guideline Advisor"
+        description="Ask questions about loan programs, guidelines, and scenarios"
+      />
+      <div className="lo-card min-h-[480px] overflow-hidden p-1">
+        <AdvisorChat />
       </div>
-      <AdvisorChat />
     </div>
   );
 }

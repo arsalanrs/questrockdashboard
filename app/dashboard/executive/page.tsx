@@ -9,6 +9,7 @@ import { ExecChat } from "@/components/executive/ExecChat";
 import { ExecNotifications, type ExecNotification } from "@/components/executive/ExecNotifications";
 import { MlReadinessCard } from "@/components/executive/MlReadinessCard";
 import { DocumentHealthCard } from "@/components/executive/DocumentHealthCard";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { LeadTierOverview, type TierBreakdownRow } from "@/components/executive/LeadTierOverview";
 import { AssignmentQueuePanel, type AssignmentQueueRow } from "@/components/executive/AssignmentQueuePanel";
 import { BlitzBuilder } from "@/components/executive/BlitzBuilder";
@@ -474,18 +475,13 @@ export default async function ExecutiveDashboardPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-8 animate-fade-up">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
-            Executive Dashboard
-          </h1>
-          <p className="mt-0.5 text-[13px] text-mutedForeground">
-            All-company visibility · signals · AI command center
-          </p>
-        </div>
-        <ExecNotifications initial={notifications} />
-      </div>
+    <div className="qr-dashboard-page animate-fade-up">
+      <DashboardPageHeader
+        eyebrow="Executive"
+        title="Executive Dashboard"
+        description="All-company visibility · signals · AI command center"
+        actions={<ExecNotifications initial={notifications} />}
+      />
 
       <LeadTierOverview stats={tierStats} />
 
@@ -499,7 +495,7 @@ export default async function ExecutiveDashboardPage() {
                 {unassignedExecLoans.length}
               </span>
             </div>
-            <span className="text-[11px] text-mutedForeground">No LO assigned — needs routing</span>
+            <span className="lo-muted text-[11px]">No LO assigned — needs routing</span>
           </div>
           <table className="dt">
             <thead>
@@ -521,19 +517,17 @@ export default async function ExecutiveDashboardPage() {
                     <tr key={l.id} style={{ background: "rgba(255,75,75,0.02)" }}>
                       <td className="font-medium">{name}</td>
                       <td><SourceBadge source={l.source} /></td>
-                      <td className="text-[12px] text-mutedForeground">{l.status_raw || "—"}</td>
-                      <td className="text-[12px] text-mutedForeground">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
-                      <td className="font-mono text-[11px] text-mutedForeground">
+                      <td className="lo-muted text-[12px]">{l.status_raw || "—"}</td>
+                      <td className="lo-muted text-[12px]">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                      <td className="lo-muted font-mono text-[11px]">
                         {l.lead_created_at ? new Date(l.lead_created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                       </td>
                       <td className="r">
                         {shapeUrl ? (
-                          <a href={shapeUrl} target="_blank" rel="noopener noreferrer"
-                            className="rounded px-2 py-0.5 text-[11px] font-medium hover:opacity-80"
-                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
+                          <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">
                             Open ↗
                           </a>
-                        ) : <span className="font-mono text-[11px] text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
+                        ) : <span className="lo-muted font-mono text-[11px]">{l.shape_record_id ?? "—"}</span>}
                       </td>
                     </tr>
                   );

@@ -129,9 +129,9 @@ export function LeadTierOverview({ stats }: { stats: TierBreakdownRow[] }) {
 
   return (
     <>
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="dash-card p-4">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div className="text-[11px] uppercase tracking-wider text-mutedForeground">Lead tier</div>
+          <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Lead tier</div>
           <button
             type="button"
             onClick={() => void recomputeSignalsAndTiers()}
@@ -141,8 +141,8 @@ export function LeadTierOverview({ stats }: { stats: TierBreakdownRow[] }) {
             {recomputing ? "Recomputing…" : "Recompute buckets & signals"}
           </button>
         </div>
-        <h2 className="text-base font-semibold">RED / ORANGE / GREEN snapshot</h2>
-        <p className="mt-1 text-xs text-mutedForeground">
+        <h2 className="lo-heading text-base font-semibold">RED / ORANGE / GREEN snapshot</h2>
+        <p className="lo-muted mt-1 text-xs">
           Tiers are rule-based (pipeline stage, status, funded/closed) — same logic as deal-signal detectors and book
           cadence policy. The page also refreshes tiers on load. Use{" "}
           <strong>Recompute buckets &amp; signals</strong> after you change rules so RED/ORANGE/GREEN and opportunity
@@ -154,7 +154,7 @@ export function LeadTierOverview({ stats }: { stats: TierBreakdownRow[] }) {
         {recomputeErr && (
           <p className="mt-2 text-xs text-red-600 dark:text-red-400">{recomputeErr}</p>
         )}
-        <p className="mt-2 text-xs text-mutedForeground">
+        <p className="lo-muted mt-2 text-xs">
           Click a box below to see loans in that bucket. <strong>Unset</strong> shows why each row has no tier (inactive /
           dispositions, or not persisted yet).
         </p>
@@ -200,7 +200,7 @@ export function LeadTierOverview({ stats }: { stats: TierBreakdownRow[] }) {
                   {panel.title}
                 </h3>
                 {panel.tier === "UNSET" && (
-                  <p className="mt-2 text-xs text-mutedForeground">
+                  <p className="lo-muted mt-2 text-xs">
                     Reasons are computed from flags and status (not AI). “Should be X after refresh” means the loan
                     qualifies for RED/ORANGE/GREEN but <code className="rounded bg-muted px-1">lead_tier</code> wasn’t
                     saved yet.

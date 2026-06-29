@@ -68,42 +68,43 @@ export function ConciergeDesk() {
   const lpUrl = lendingPadLoanUrl(selected?.lendingpad_loan_uuid);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="qr-dashboard-page mx-auto max-w-2xl animate-fade-up">
       <div>
-        <h1 className="text-xl font-semibold text-white">Concierge Desk</h1>
-        <p className="text-sm text-gray-400 mt-1">
+        <p className="lo-accent-text text-xs font-bold uppercase tracking-wide">Front desk</p>
+        <h1 className="lo-heading text-xl font-semibold sm:text-2xl">Concierge Desk</h1>
+        <p className="lo-muted mt-1 text-[13px]">
           Lookup caller by phone or name. Save phone to Shape before transcript arrives (~7 min).
         </p>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+      <div className="lo-card space-y-3 p-4">
         <input
           placeholder="Caller phone"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded border border-white/10 bg-black/40 p-2 text-sm text-white"
+          className="lo-input w-full rounded-lg p-2.5 text-sm"
         />
         <input
           placeholder="Borrower name (optional)"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full rounded border border-white/10 bg-black/40 p-2 text-sm text-white"
+          className="lo-input w-full rounded-lg p-2.5 text-sm"
         />
         <button
           type="button"
           onClick={search}
           disabled={busy}
-          className="rounded bg-[#E8FF00] px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+          className="accent-bg rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
         >
           Search
         </button>
       </div>
 
-      {msg && <p className="text-sm text-gray-300">{msg}</p>}
+      {msg ? <p className="lo-heading text-sm font-medium">{msg}</p> : null}
 
       {results.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-500">Results from {source}</p>
+          <p className="lo-muted text-xs">Results from {source}</p>
           {results.map((r, i) => {
             const id = String(r.id ?? r.shape_record_id ?? i);
             const label = [r.borrower_first_name, r.borrower_last_name].filter(Boolean).join(" ") || "Lead";
@@ -112,10 +113,10 @@ export function ConciergeDesk() {
                 key={id}
                 type="button"
                 onClick={() => setSelected(r)}
-                className="w-full rounded border border-white/10 bg-white/5 p-3 text-left text-sm hover:border-[#E8FF00]/40"
+                className="lo-card w-full p-3 text-left text-sm transition-colors hover:border-[var(--lo-teal)]"
               >
-                <div className="font-medium text-white">{label}</div>
-                <div className="text-xs text-gray-400">
+                <div className="lo-heading font-semibold">{label}</div>
+                <div className="lo-muted text-xs">
                   {r.status_raw ?? "—"} · {r.source ?? ""}
                 </div>
               </button>
@@ -125,8 +126,8 @@ export function ConciergeDesk() {
       )}
 
       {selected && (
-        <div className="rounded-xl border border-[#E8FF00]/30 bg-[#E8FF00]/5 p-4 space-y-3">
-          <div className="font-medium text-white">
+        <div className="lo-card border-[var(--lo-teal)] bg-[var(--lo-accent-soft)] p-4 space-y-3">
+          <div className="lo-heading font-semibold">
             {[selected.borrower_first_name, selected.borrower_last_name].filter(Boolean).join(" ")}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -135,7 +136,7 @@ export function ConciergeDesk() {
                 href={shapeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded border border-white/20 px-3 py-1 text-xs hover:border-[#E8FF00]/50"
+                className="lo-contact-chip rounded-lg px-3 py-1.5 text-xs font-semibold hover:opacity-90"
               >
                 Open Shape ↗
               </a>
@@ -145,7 +146,7 @@ export function ConciergeDesk() {
                 href={lpUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded border border-white/20 px-3 py-1 text-xs hover:border-[#E8FF00]/50"
+                className="lo-contact-chip rounded-lg px-3 py-1.5 text-xs font-semibold hover:opacity-90"
               >
                 Open LP ↗
               </a>
@@ -154,7 +155,7 @@ export function ConciergeDesk() {
               type="button"
               onClick={savePhoneToShape}
               disabled={busy || !phone.trim() || !selected.shape_record_id}
-              className="rounded border border-white/20 px-3 py-1 text-xs disabled:opacity-50"
+              className="accent-bg rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
             >
               Save phone to Shape
             </button>

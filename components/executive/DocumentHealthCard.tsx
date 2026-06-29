@@ -23,7 +23,7 @@ export function DocumentHealthCard({ health }: { health: DocumentHealthSummary }
         : "bg-red-100 text-red-800";
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <section className="dash-card p-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-mutedForeground">

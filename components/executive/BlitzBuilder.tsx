@@ -70,7 +70,7 @@ export function BlitzBuilder() {
   }
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
+    <section className="dash-card p-4">
       <div className="mb-3 text-[11px] uppercase tracking-wider text-mutedForeground">Blitz</div>
       <h2 className="text-base font-semibold">Assignment preview &amp; execute</h2>
       <p className="mt-1 text-xs text-mutedForeground">

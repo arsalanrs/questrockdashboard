@@ -6,6 +6,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { SourceBadge } from "@/components/SourceBadge";
 import { ExpandableRows } from "@/components/ExpandableRows";
 import { NotMovingTabs, type StuckLoan, type BasicLoan } from "@/components/dashboard/NotMovingTabs";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { ShapePipelineNav } from "@/components/dashboard/ShapePipelineNav";
 import { ShapeViewTable } from "@/components/dashboard/ShapeViewTable";
 import { LoFilterSelector } from "@/components/dashboard/LoFilterSelector";
@@ -90,7 +91,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 function EmptyRow({ cols, message }: { cols: number; message: string }) {
   return (
     <tr>
-      <td colSpan={cols} className="px-4 py-6 text-center text-sm text-mutedForeground">
+      <td colSpan={cols} className="lo-muted lo-td px-4 py-6 text-center text-sm">
         {message}
       </td>
     </tr>
@@ -146,35 +147,19 @@ function OverdueBadge({ daysLate }: { daysLate: number }) {
 
 function TableWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="overflow-hidden rounded-xl"
-      style={{
-        border: "1px solid rgba(255,255,255,0.07)",
-        background: "rgba(255,255,255,0.02)",
-      }}
-    >
+    <div className="lo-table-shell">
       <table className="w-full text-sm">{children}</table>
     </div>
   );
 }
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return (
-    <th
-      className={`px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-mutedForeground ${right ? "text-right" : "text-left"}`}
-      style={{ background: "rgba(255,255,255,0.03)" }}
-    >
-      {children}
-    </th>
-  );
+  return <th className={`lo-th ${right ? "text-right" : ""}`}>{children}</th>;
 }
 
 function Td({ children, right, mono }: { children: React.ReactNode; right?: boolean; mono?: boolean }) {
   return (
-    <td
-      className={`px-4 py-3 ${right ? "text-right" : ""} ${mono ? "font-mono text-xs" : ""}`}
-      style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-    >
+    <td className={`lo-td ${right ? "text-right" : ""} ${mono ? "font-mono text-xs" : ""}`}>
       {children}
     </td>
   );
@@ -766,23 +751,16 @@ export default async function ManagerDashboardPage({
   };
 
   return (
-    <div className="flex flex-col gap-5 py-3 animate-fade-up">
-
-      {/* ── Page header ───────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
-            Pipeline
-          </h1>
-          <p className="mt-0.5 text-[13px] text-mutedForeground">{teamLabel}</p>
-        </div>
-        <div className="text-[11px] text-mutedForeground shrink-0 pt-0.5">
-          {format(new Date(), "EEE MMM d, yyyy")}
-        </div>
-      </div>
+    <div className="qr-dashboard-page animate-fade-up">
+      <DashboardPageHeader
+        eyebrow="Manager"
+        title="Pipeline"
+        description={teamLabel}
+        meta={format(new Date(), "EEE MMM d, yyyy")}
+      />
 
       {/* ── Shape Pipeline (Nikk views) ─────────────────────────────────── */}
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionHeading>Shape Pipeline</SectionHeading>
           {(activeLoUsers ?? []).length > 0 && (
@@ -795,7 +773,7 @@ export default async function ManagerDashboardPage({
           )}
         </div>
         {activeShapeView && (
-          <p className="text-xs text-mutedForeground -mt-2">
+          <p className="lo-muted -mt-1 text-xs">
             {activeShapeView.label} · {shapeViewRows.length} records · 90-day window
           </p>
         )}

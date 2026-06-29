@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewCloserDashboard } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -33,9 +34,9 @@ export default async function CloserDashboardPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm dark:bg-amber-950/30">
-        <p className="font-medium">Unable to load queue</p>
-        <p className="mt-1 font-mono text-xs">{error.message}</p>
+      <div className="lo-card border-amber-500/50 bg-amber-50 p-4 text-sm dark:bg-amber-950/30">
+        <p className="lo-heading font-medium">Unable to load queue</p>
+        <p className="lo-muted mt-1 font-mono text-xs">{error.message}</p>
       </div>
     );
   }
@@ -47,56 +48,55 @@ export default async function CloserDashboardPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Closer queue</h1>
-        <p className="text-sm text-mutedForeground">
-          {appUser.full_name} · Files clear to close or in closing
-        </p>
-      </div>
+    <div className="qr-dashboard-page animate-fade-up">
+      <DashboardPageHeader
+        eyebrow="Operations"
+        title="Closer Queue"
+        description={`${appUser.full_name} · Files clear to close or in closing`}
+      />
 
-      <section className="space-y-3">
-        <div className="text-sm font-semibold">By stage</div>
-        <div className="flex flex-wrap gap-3">
+      <section className="space-y-2">
+        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">By stage</div>
+        <div className="flex flex-wrap gap-2">
           {CLOSING_STAGES.map((s) => (
-            <div
-              key={s}
-              className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-cardForeground"
-            >
-              {STAGE_LABEL[s] ?? s}: {byStage.get(s) ?? 0}
+            <div key={s} className="lo-mini-stat">
+              <div>
+                <div className="lo-mini-stat-label">{STAGE_LABEL[s] ?? s}</div>
+                <div className="lo-mini-stat-value">{byStage.get(s) ?? 0}</div>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="text-sm font-semibold">Queue</div>
-        <div className="overflow-hidden rounded-lg border border-border">
+      <section className="space-y-2">
+        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Queue</div>
+        <div className="lo-card lo-table-wrap">
           <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr className="text-left text-xs text-mutedForeground">
-                <th className="px-3 py-2">Loan #</th>
-                <th className="px-3 py-2">Borrower</th>
-                <th className="px-3 py-2">Stage</th>
-                <th className="px-3 py-2">Closing Date</th>
-                <th className="px-3 py-2">Assigned LO</th>
+            <thead>
+              <tr>
+                <th className="lo-th">Loan #</th>
+                <th className="lo-th">Borrower</th>
+                <th className="lo-th">Stage</th>
+                <th className="lo-th">Closing Date</th>
+                <th className="lo-th">Assigned LO</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((l) => (
-                <tr key={l.id} className="border-t border-border">
-                  <td className="px-3 py-2 font-mono text-xs">{l.shape_record_id ?? "—"}</td>
-                  <td className="px-3 py-2">
+                <tr key={l.id} className="lo-data-row">
+                  <td className="lo-td font-mono text-xs">{l.shape_record_id ?? "—"}</td>
+                  <td className="lo-td lo-name-text">
                     {l.borrower_first_name ?? ""} {l.borrower_last_name ?? ""}
                   </td>
-                  <td className="px-3 py-2">{STAGE_LABEL[l.current_stage ?? ""] ?? l.current_stage ?? "—"}</td>
-                  <td className="px-3 py-2">{l.closing_date ?? "—"}</td>
-                  <td className="px-3 py-2">{l.assigned_loan_officer_name ?? "—"}</td>
+                  <td className="lo-td">{STAGE_LABEL[l.current_stage ?? ""] ?? l.current_stage ?? "—"}</td>
+                  <td className="lo-td">{l.closing_date ?? "—"}</td>
+                  <td className="lo-td">{l.assigned_loan_officer_name ?? "—"}</td>
                 </tr>
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-sm text-mutedForeground" colSpan={5}>
+                  <td className="lo-muted lo-td px-3 py-6 text-center text-sm" colSpan={5}>
                     No files in closing queue.
                   </td>
                 </tr>

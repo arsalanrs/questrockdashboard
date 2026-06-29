@@ -19,7 +19,7 @@ export function MlReadinessCard({ readiness }: { readiness: MlReadiness }) {
   const topTypes = [...byType].sort((a, b) => b.total - a.total).slice(0, 5);
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <section className="dash-card p-5">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold tracking-wide text-mutedForeground uppercase">
