@@ -77,18 +77,14 @@ const CHANGE_TYPE_LABELS: Record<string, string> = {
 
 function ActivityBadge({ type }: { type: string }) {
   const label = CHANGE_TYPE_LABELS[type] ?? type;
-  const style =
-    type === "loan_created"
-      ? { background: "rgba(34,197,94,0.15)", color: "#4ade80" }
-      : type === "status_changed"
-      ? { background: "rgba(232,255,0,0.1)", color: "#E8FF00" }
-      : type === "owner_changed"
-      ? { background: "rgba(139,92,246,0.15)", color: "#a78bfa" }
-      : type === "note_added"
-      ? { background: "rgba(59,130,246,0.15)", color: "#60a5fa" }
-      : { background: "rgba(255,255,255,0.07)", color: "hsl(215 14% 52%)" };
+  const cls =
+    type === "loan_created" ? "pill-green"
+    : type === "status_changed" ? "pill-yellow"
+    : type === "owner_changed" ? "pill-blue"
+    : type === "note_added" ? "pill-blue"
+    : "pill-muted";
   return (
-    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={style}>
+    <span className={`${cls} inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide`}>
       {label}
     </span>
   );
@@ -109,43 +105,33 @@ async function LiveActivityFeedSection() {
     return (
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-sm font-semibold tracking-tight">Live Activity Feed</span>
-          <span className="text-xs text-mutedForeground">— last 50 changes from Shape sync</span>
+          <div className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--color-green)" }} />
+          <span className="lo-heading text-sm font-semibold tracking-tight">Live Activity Feed</span>
+          <span className="lo-muted text-xs">— last 50 changes from Shape sync</span>
         </div>
-        <div
-          className="overflow-hidden rounded-xl"
-          style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}
-        >
+        <div className="lo-table-shell">
           <table className="w-full text-sm">
             <thead>
-              <tr
-                className="text-left text-[11px] uppercase tracking-widest text-mutedForeground"
-                style={{ background: "rgba(255,255,255,0.04)" }}
-              >
-                <th className="px-4 py-2.5">Time</th>
-                <th className="px-4 py-2.5">Type</th>
-                <th className="px-4 py-2.5">Borrower</th>
-                <th className="px-4 py-2.5">LO</th>
-                <th className="px-4 py-2.5">Detail</th>
+              <tr>
+                <th className="lo-th">Time</th>
+                <th className="lo-th">Type</th>
+                <th className="lo-th">Borrower</th>
+                <th className="lo-th">LO</th>
+                <th className="lo-th">Detail</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-                  className="transition-colors hover:bg-white/[0.02]"
-                >
-                  <td className="px-4 py-2.5 font-mono text-xs text-mutedForeground">
+                <tr key={row.id} className="lo-data-row">
+                  <td className="lo-muted lo-td font-mono text-xs">
                     {new Date(row.synced_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="lo-td">
                     <ActivityBadge type={row.change_type} />
                   </td>
-                  <td className="px-4 py-2.5 text-xs font-medium">{row.borrower_name || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-mutedForeground">{row.lo_name || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-mutedForeground max-w-xs truncate">
+                  <td className="lo-heading lo-td text-xs font-semibold">{row.borrower_name || "—"}</td>
+                  <td className="lo-muted lo-td text-xs">{row.lo_name || "—"}</td>
+                  <td className="lo-muted lo-td max-w-xs truncate text-xs">
                     {row.change_type === "status_changed"
                       ? `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`
                       : row.change_type === "owner_changed"
@@ -273,52 +259,46 @@ async function ManagerScorecardsSection() {
 
     return (
       <section className="space-y-3">
-        <div className="text-sm font-semibold tracking-tight">Manager Scorecards</div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="lo-accent-text text-[11px] font-bold uppercase tracking-[0.14em]">Manager Scorecards</div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {scorecards.map((sc) => (
             <div
               key={sc.managerId}
-              className="rounded-xl p-5 space-y-4"
-              style={{
-                border: sc.slaRed > 0 ? "1px solid rgba(239,68,68,0.25)" : "1px solid rgba(255,255,255,0.07)",
-                background: "rgba(255,255,255,0.03)",
-              }}
+              className="lo-card space-y-4 p-5"
+              style={sc.slaRed > 0 ? { borderColor: "var(--color-red)" } : undefined}
             >
               <div>
-                <div className="text-sm font-semibold">{sc.managerName}</div>
-                <div className="text-xs text-mutedForeground">{sc.teamName}</div>
+                <div className="lo-heading text-sm font-semibold">{sc.managerName}</div>
+                <div className="lo-muted text-xs">{sc.teamName}</div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaRed > 0 ? "#f87171" : "inherit" }}>
+                <div className="rounded-lg p-2.5 text-center" style={{ background: "var(--lo-surface-muted)" }}>
+                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaRed > 0 ? "var(--color-red)" : "var(--lo-text)" }}>
                     {sc.slaRed}
                   </div>
-                  <div className="text-[10px] text-mutedForeground mt-0.5">SLA Critical</div>
+                  <div className="lo-muted mt-0.5 text-[10px]">SLA Critical</div>
                 </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaGreenPct >= 80 ? "#4ade80" : "#fbbf24" }}>
+                <div className="rounded-lg p-2.5 text-center" style={{ background: "var(--lo-surface-muted)" }}>
+                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaGreenPct >= 80 ? "var(--color-green)" : "var(--color-amber)" }}>
                     {sc.slaGreenPct}%
                   </div>
-                  <div className="text-[10px] text-mutedForeground mt-0.5">SLA Compliant</div>
+                  <div className="lo-muted mt-0.5 text-[10px]">SLA Compliant</div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-mutedForeground">MTD Closed</span>
-                <span className="font-medium">
-                  {sc.closedMtd} loans · {formatCurrencyK(sc.mtdVolumeCents)}
-                </span>
+                <span className="lo-muted">MTD Closed</span>
+                <span className="lo-heading font-medium">{sc.closedMtd} loans · {formatCurrencyK(sc.mtdVolumeCents)}</span>
               </div>
 
-              {/* SLA compliance bar */}
-              <div className="space-y-1">
-                <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
                   <div
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${sc.slaGreenPct}%`,
-                      background: sc.slaGreenPct >= 80 ? "#4ade80" : sc.slaGreenPct >= 60 ? "#fbbf24" : "#f87171",
+                      background: sc.slaGreenPct >= 80 ? "var(--color-green)" : sc.slaGreenPct >= 60 ? "var(--color-amber)" : "var(--color-red)",
                     }}
                   />
                 </div>

@@ -185,59 +185,36 @@ function LoCard({
   const hasIssues = stuck > 0;
   return (
     <div
-      className="relative overflow-hidden rounded-xl p-4 transition-all duration-150"
-      style={{
-        background: "rgba(255,255,255,0.03)",
-        border: hasIssues
-          ? "1px solid rgba(239,68,68,0.25)"
-          : "1px solid rgba(255,255,255,0.07)",
-        boxShadow: hasIssues ? "0 0 0 1px rgba(239,68,68,0.10) inset" : undefined,
-      }}
+      className="lo-card relative overflow-hidden p-4 transition-all duration-150"
+      style={hasIssues ? { borderColor: "var(--color-red)", boxShadow: "inset 0 0 0 1px rgba(212,43,43,0.10)" } : undefined}
     >
-      {/* Status dot */}
       <div
         className="absolute right-3 top-3 h-2 w-2 rounded-full"
-        style={{ background: hasIssues ? "#ef4444" : "#22c55e" }}
+        style={{ background: hasIssues ? "var(--color-red)" : "var(--color-green)" }}
       />
 
-      {/* Name */}
-      <div className="mb-3 pr-4 text-sm font-semibold text-foreground">{name}</div>
+      <div className="lo-heading mb-3 pr-4 text-sm font-semibold">{name}</div>
 
-      {/* Mini stats row */}
       <div className="mb-3 grid grid-cols-3 gap-2">
         <div className="text-center">
-          <div className="text-lg font-bold tabular-nums text-foreground">{active}</div>
-          <div className="text-[10px] text-mutedForeground">Active</div>
+          <div className="lo-heading text-lg font-bold tabular-nums">{active}</div>
+          <div className="lo-muted text-[10px]">Active</div>
         </div>
         <div className="text-center">
-          <div
-            className="text-lg font-bold tabular-nums"
-            style={{ color: stuck > 0 ? "#f87171" : "var(--foreground)" }}
-          >
-            {stuck}
-          </div>
-          <div className="text-[10px] text-mutedForeground">Stuck</div>
+          <div className="text-lg font-bold tabular-nums" style={{ color: stuck > 0 ? "var(--color-red)" : "var(--lo-text)" }}>{stuck}</div>
+          <div className="lo-muted text-[10px]">Stuck</div>
         </div>
         <div className="text-center">
-          <div
-            className="text-lg font-bold tabular-nums"
-            style={{ color: closingThisWeek > 0 ? "#E8FF00" : "var(--foreground)" }}
-          >
-            {closingThisWeek}
-          </div>
-          <div className="text-[10px] text-mutedForeground">Closing</div>
+          <div className="text-lg font-bold tabular-nums" style={{ color: closingThisWeek > 0 ? "var(--lo-teal)" : "var(--lo-text)" }}>{closingThisWeek}</div>
+          <div className="lo-muted text-[10px]">Closing</div>
         </div>
       </div>
 
-      {/* MTD footer */}
-      <div
-        className="rounded-lg px-2.5 py-1.5 text-xs"
-        style={{ background: "rgba(255,255,255,0.04)" }}
-      >
-        <span className="text-mutedForeground">MTD </span>
-        <span className="font-medium text-foreground">{mtdLoans} loans</span>
-        <span className="mx-1.5 text-mutedForeground">/</span>
-        <span className="font-medium text-foreground">{formatCurrency(mtdVolumeCents)}</span>
+      <div className="rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "var(--lo-surface-muted)" }}>
+        <span className="lo-muted">MTD </span>
+        <span className="lo-heading font-medium">{mtdLoans} loans</span>
+        <span className="lo-muted mx-1.5">/</span>
+        <span className="lo-heading font-medium">{formatCurrency(mtdVolumeCents)}</span>
       </div>
     </div>
   );
@@ -827,7 +804,7 @@ export default async function ManagerDashboardPage({
       </div>
 
       {/* ── Main bento grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 anim-d2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 anim-d2">
 
         {/* What's Not Moving — 8 cols */}
         <div className="lg:col-span-8 dash-card">
@@ -877,39 +854,27 @@ export default async function ManagerDashboardPage({
             ) : (
               <div>
                 {overdueClosings.slice(0, 4).map((l) => (
-                  <div
-                    key={l.id}
-                    className="flex items-start gap-3 px-4 py-3"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-                  >
-                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#FF4B4B" }} />
+                  <div key={l.id} className="alert-row">
+                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--color-red)" }} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-medium">{borrowerName(l)}</div>
-                      <div className="mt-0.5 text-[11px] text-mutedForeground">
+                      <div className="lo-heading truncate text-[12.5px] font-semibold">{borrowerName(l)}</div>
+                      <div className="lo-muted mt-0.5 text-[11px]">
                         {l.assigned_loan_officer_name ?? "—"} · {stageLabel(l.current_stage)} · Was {formatClosingDate(l.closing_date!)}
                       </div>
                     </div>
-                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.12)", color: "#FF4B4B" }}>
-                      {l.daysLate}d late
-                    </span>
+                    <span className="pill-red shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold">{l.daysLate}d late</span>
                   </div>
                 ))}
                 {atRiskClosings.slice(0, 3).map((l) => (
-                  <div
-                    key={l.id}
-                    className="flex items-start gap-3 px-4 py-3"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-                  >
-                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#F59E0B" }} />
+                  <div key={l.id} className="alert-row">
+                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--color-amber)" }} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-medium">{borrowerName(l)}</div>
-                      <div className="mt-0.5 text-[11px] text-mutedForeground">
+                      <div className="lo-heading truncate text-[12.5px] font-semibold">{borrowerName(l)}</div>
+                      <div className="lo-muted mt-0.5 text-[11px]">
                         {l.assigned_loan_officer_name ?? "—"} · {formatClosingDate(l.closing_date!)} · {l.openConditions} open cond.
                       </div>
                     </div>
-                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
-                      {l.daysLeft}d left
-                    </span>
+                    <span className="pill-amber shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold">{l.daysLeft}d left</span>
                   </div>
                 ))}
               </div>
@@ -921,7 +886,7 @@ export default async function ManagerDashboardPage({
             <div className="dash-card">
               <div className="dash-card-header">
                 <span className="dash-card-title">Stage SLA Health</span>
-                <span className="text-[11px]" style={{ color: "hsl(215 14% 50%)" }}>% on time</span>
+                <span className="lo-muted text-[11px]">% on time</span>
               </div>
               <div className="flex flex-col gap-3 px-4 py-4">
                 {stageHealthBars.map((s) => (
@@ -935,12 +900,12 @@ export default async function ManagerDashboardPage({
                         {s.pct}%
                       </span>
                     </div>
-                    <div className="h-[4px] overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
+                    <div className="h-[4px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
                           width: `${s.pct}%`,
-                          background: s.pct >= 80 ? "#22C55E" : s.pct >= 60 ? "#F59E0B" : "#FF4B4B",
+                          background: s.pct >= 80 ? "var(--color-green)" : s.pct >= 60 ? "var(--color-amber)" : "var(--color-red)",
                         }}
                       />
                     </div>
@@ -954,54 +919,50 @@ export default async function ManagerDashboardPage({
 
       {/* ── Manager Scorecard strip ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {/* Contact Rate */}
         <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>Contact Rate</div>
+          <div className="kpi-card-label">Contact Rate</div>
           <div className="flex items-end gap-2">
-            <span className="text-2xl font-bold tabular-nums" style={{ color: contactRateColor }}>
+            <span className="kpi-card-value" style={{ color: contactRateColor }}>
               {contactRatePct != null ? `${contactRatePct}%` : "—"}
             </span>
-            <span className="mb-0.5 text-[11px] text-mutedForeground">
-              {contactedCount} contacted · {notContactedCount} not
+            <span className="lo-muted mb-0.5 text-[11px]">
+              {contactedCount} / {notContactedCount}
             </span>
           </div>
-          <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
             <div className="h-full rounded-full" style={{ width: `${contactRatePct ?? 0}%`, background: contactRateColor }} />
           </div>
         </div>
-        {/* SLA colors */}
         <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>SLA Status</div>
+          <div className="kpi-card-label">SLA Status</div>
           <div className="flex items-center gap-3">
             <div className="text-center">
-              <div className="text-xl font-bold tabular-nums" style={{ color: "#FF4B4B" }}>{slaRedCount}</div>
-              <div className="text-[10px] text-mutedForeground">Red</div>
+              <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-red)" }}>{slaRedCount}</div>
+              <div className="lo-muted text-[10px]">Red</div>
             </div>
-            <div className="h-6 w-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="h-6 w-px" style={{ background: "var(--lo-border)" }} />
             <div className="text-center">
-              <div className="text-xl font-bold tabular-nums" style={{ color: "#F59E0B" }}>{slaYellowCount}</div>
-              <div className="text-[10px] text-mutedForeground">Yellow</div>
+              <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-amber)" }}>{slaYellowCount}</div>
+              <div className="lo-muted text-[10px]">Yellow</div>
             </div>
-            <div className="h-6 w-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="h-6 w-px" style={{ background: "var(--lo-border)" }} />
             <div className="text-center">
-              <div className="text-xl font-bold tabular-nums" style={{ color: "#22C55E" }}>{Math.max(0, activeLoans.length - slaRedCount - slaYellowCount)}</div>
-              <div className="text-[10px] text-mutedForeground">Green</div>
+              <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-green)" }}>{Math.max(0, activeLoans.length - slaRedCount - slaYellowCount)}</div>
+              <div className="lo-muted text-[10px]">Green</div>
             </div>
           </div>
         </div>
-        {/* Piped & Pumped */}
         <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>Piped &amp; Pumped</div>
-          <div className="text-2xl font-bold tabular-nums" style={{ color: "#E8FF00" }}>{pipedCount}</div>
-          <div className="text-[11px] text-mutedForeground">in pipeline funnel</div>
+          <div className="kpi-card-label">Piped &amp; Pumped</div>
+          <div className="kpi-card-value kpi-value-yellow">{pipedCount}</div>
+          <div className="lo-muted text-[11px]">in pipeline funnel</div>
         </div>
-        {/* LOs active today */}
         <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="text-[11px] font-medium tracking-wide" style={{ color: "hsl(215 14% 52%)" }}>LOs Active Today</div>
-          <div className="text-2xl font-bold tabular-nums" style={{ color: losTouchedToday > 0 ? "#22C55E" : "#FF4B4B" }}>
+          <div className="kpi-card-label">LOs Active Today</div>
+          <div className="kpi-card-value" style={{ color: losTouchedToday > 0 ? "var(--color-green)" : "var(--color-red)" }}>
             {losTouchedToday}
           </div>
-          <div className="text-[11px] text-mutedForeground">{totalLoansTouchedToday} loans touched</div>
+          <div className="lo-muted text-[11px]">{totalLoansTouchedToday} loans touched</div>
         </div>
       </div>
 
@@ -1011,11 +972,9 @@ export default async function ManagerDashboardPage({
           <div className="dash-card-header">
             <div className="flex items-center gap-2">
               <span className="dash-card-title">Who Are We Calling Today?</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(232,255,0,0.10)", color: "#E8FF00" }}>
-                {callingTodayLoans.length}
-              </span>
+              <span className="pill-yellow rounded-full px-2 py-0.5 text-[10px] font-bold">{callingTodayLoans.length}</span>
             </div>
-            <span className="text-[11px] text-mutedForeground">Priority: CTC → Conditions → New Leads → Appointments</span>
+            <span className="lo-muted text-[11px]">Priority: CTC → Conditions → New Leads → Appointments</span>
           </div>
           <table className="dt">
             <thead>
@@ -1042,25 +1001,19 @@ export default async function ManagerDashboardPage({
                       <td className="font-medium">{borrowerName(l)}</td>
                       <td><SourceBadge source={l.source} /></td>
                       <td>
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                          style={{ background: "rgba(255,255,255,0.06)", color: statusColor }}>
+                        <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "var(--lo-chip-bg)", color: statusColor }}>
                           {l.status_raw ?? stageLabel(l.current_stage)}
                         </span>
                       </td>
-                      <td className="text-[12px] text-mutedForeground">{l.assigned_loan_officer_name ?? "—"}</td>
-                      <td className="text-[12px] text-mutedForeground">
+                      <td className="lo-muted text-[12px]">{l.assigned_loan_officer_name ?? "—"}</td>
+                      <td className="lo-muted text-[12px]">
                         {l.borrower_phone ? (
                           <a href={`tel:${l.borrower_phone}`} className="hover:underline">{l.borrower_phone}</a>
                         ) : "—"}
                       </td>
                       <td className="r">
-                        {url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer"
-                            className="rounded px-2 py-0.5 text-[11px] font-medium hover:opacity-80"
-                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
-                            Open ↗
-                          </a>
-                        ) : <span className="font-mono text-[11px] text-mutedForeground">{l.shape_record_id ?? "—"}</span>}
+                        {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">Open ↗</a>
+                          : <span className="lo-muted font-mono text-[11px]">{l.shape_record_id ?? "—"}</span>}
                       </td>
                     </tr>
                   );
@@ -1149,7 +1102,7 @@ export default async function ManagerDashboardPage({
             <span className="dash-card-title">Contact Rate Today</span>
             <span className="text-[11px] text-mutedForeground">{losTouchedToday} LOs active · {totalLoansTouchedToday} loans touched</span>
           </div>
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
             {loCards.map((lo) => {
               const activity = dailyActivity.find(
                 (a) => (a.lo_name ?? "").toLowerCase() === lo.name.toLowerCase(),
@@ -1157,43 +1110,39 @@ export default async function ManagerDashboardPage({
               const touched = activity?.loans_touched_today ?? 0;
               const total = lo.active;
               const pct = total > 0 ? Math.round((touched / total) * 100) : 0;
-              const clr = total === 0 ? "hsl(215 14% 42%)" : pct >= 60 ? "#22C55E" : pct >= 30 ? "#F59E0B" : "#FF4B4B";
+              const clr = total === 0 ? "var(--lo-muted)" : pct >= 60 ? "var(--color-green)" : pct >= 30 ? "var(--color-amber)" : "var(--color-red)";
               return (
-                <div
-                  key={lo.name}
-                  className="flex flex-col gap-3 rounded-xl p-3.5"
-                  style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
-                >
+                <div key={lo.name} className="lo-card flex flex-col gap-3 p-3.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-[13px] font-semibold leading-tight">{lo.name}</div>
+                    <div className="lo-heading text-[13px] font-semibold leading-tight">{lo.name}</div>
                     <div className="text-right">
                       <div className="text-lg font-bold tabular-nums" style={{ color: clr }}>{pct}%</div>
-                      <div className="text-[10px] text-mutedForeground">touch rate</div>
+                      <div className="lo-muted text-[10px]">touch rate</div>
                     </div>
                   </div>
                   <div>
-                    <div className="mb-1.5 h-[3px] overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                    <div className="mb-1.5 h-[3px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
                       <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: clr }} />
                     </div>
-                    <div className="flex justify-between text-[10px] text-mutedForeground">
+                    <div className="lo-muted flex justify-between text-[10px]">
                       <span>{touched} touched</span>
                       <span>{total} active</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 border-t pt-2.5 text-center" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                  <div className="grid grid-cols-3 gap-1 border-t pt-2.5 text-center" style={{ borderColor: "var(--lo-border)" }}>
                     <div>
-                      <div className="text-[12px] font-semibold">{activity?.status_changes_today ?? 0}</div>
-                      <div className="text-[10px] text-mutedForeground">Status</div>
+                      <div className="lo-heading text-[12px] font-semibold">{activity?.status_changes_today ?? 0}</div>
+                      <div className="lo-muted text-[10px]">Status</div>
                     </div>
                     <div>
-                      <div className="text-[12px] font-semibold">{activity?.notes_today ?? 0}</div>
-                      <div className="text-[10px] text-mutedForeground">Notes</div>
+                      <div className="lo-heading text-[12px] font-semibold">{activity?.notes_today ?? 0}</div>
+                      <div className="lo-muted text-[10px]">Notes</div>
                     </div>
                     <div>
-                      <div className="text-[12px] font-semibold" style={{ color: (activity?.new_leads_today ?? 0) > 0 ? "#22C55E" : undefined }}>
+                      <div className="text-[12px] font-semibold" style={{ color: (activity?.new_leads_today ?? 0) > 0 ? "var(--color-green)" : "var(--lo-text)" }}>
                         {activity?.new_leads_today ?? 0}
                       </div>
-                      <div className="text-[10px] text-mutedForeground">New</div>
+                      <div className="lo-muted text-[10px]">New</div>
                     </div>
                   </div>
                 </div>
@@ -1209,16 +1158,8 @@ export default async function ManagerDashboardPage({
           <div className="dash-card-header">
             <div className="flex items-center gap-2">
               <span className="dash-card-title">SLA Alerts</span>
-              {slaRedCount > 0 && (
-                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
-                  {slaRedCount} critical
-                </span>
-              )}
-              {slaYellowCount > 0 && (
-                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
-                  {slaYellowCount} at risk
-                </span>
-              )}
+              {slaRedCount > 0 && <span className="pill-red rounded-full px-2 py-0.5 text-[10px] font-bold">{slaRedCount} critical</span>}
+              {slaYellowCount > 0 && <span className="pill-amber rounded-full px-2 py-0.5 text-[10px] font-bold">{slaYellowCount} at risk</span>}
             </div>
           </div>
           <table className="dt">
@@ -1235,10 +1176,10 @@ export default async function ManagerDashboardPage({
             <tbody>
               <ExpandableRows max={6} label="alerts" colSpan={6}>
                 {slaAlerts.map((row) => (
-                  <tr key={row.loan_id} style={{ background: row.sla_color === "red" ? "rgba(255,75,75,0.04)" : "rgba(245,158,11,0.03)" }}>
+                  <tr key={row.loan_id} style={{ background: row.sla_color === "red" ? "color-mix(in srgb, var(--lo-card) 92%, #ff4b4b)" : "color-mix(in srgb, var(--lo-card) 94%, #f59e0b)" }}>
                     <td className="font-medium">{row.borrower_name || "—"}</td>
-                    <td className="text-mutedForeground">{row.lo_name || "Unassigned"}</td>
-                    <td className="text-mutedForeground">{row.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                    <td className="lo-muted">{row.lo_name || "Unassigned"}</td>
+                    <td className="lo-muted">{row.current_stage?.replace(/_/g, " ") ?? "—"}</td>
                     <td className="r font-mono text-[12px]">{row.hours_since_last_activity != null ? `${row.hours_since_last_activity}h` : "—"}</td>
                     <td>
                       {row.sla_color === "red" ? (
@@ -1249,8 +1190,8 @@ export default async function ManagerDashboardPage({
                     </td>
                     <td>
                       {row.touched_today
-                        ? <span style={{ color: "#22C55E", fontSize: "12px", fontWeight: 500 }}>Yes</span>
-                        : <span style={{ color: "#FF4B4B", fontSize: "12px", fontWeight: 500 }}>No</span>}
+                        ? <span style={{ color: "var(--color-green)", fontSize: "12px", fontWeight: 600 }}>Yes</span>
+                        : <span style={{ color: "var(--color-red)", fontSize: "12px", fontWeight: 600 }}>No</span>}
                     </td>
                   </tr>
                 ))}
@@ -1287,7 +1228,7 @@ export default async function ManagerDashboardPage({
                   <td className="r font-mono text-[12px]" style={{ color: row.new_leads_today > 0 ? "#22C55E" : undefined }}>
                     {row.new_leads_today}
                   </td>
-                  <td className="text-[12px] text-mutedForeground">
+                  <td className="lo-muted text-[12px]">
                     {row.last_activity_at
                       ? new Date(row.last_activity_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
                       : "—"}
@@ -1301,13 +1242,11 @@ export default async function ManagerDashboardPage({
 
       {/* ── Unassigned Leads ─────────────────────────────────────────────── */}
       {unassignedLoans.length > 0 && (
-        <div className="dash-card" style={{ borderColor: "rgba(255,75,75,0.2)" }}>
+        <div className="dash-card" style={{ borderColor: "var(--color-red)" }}>
           <div className="dash-card-header">
             <div className="flex items-center gap-2">
               <span className="dash-card-title">Unassigned Leads</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
-                {unassignedLoans.length}
-              </span>
+              <span className="pill-red rounded-full px-2 py-0.5 text-[10px] font-bold">{unassignedLoans.length}</span>
             </div>
           </div>
           <table className="dt">
@@ -1323,17 +1262,16 @@ export default async function ManagerDashboardPage({
             <tbody>
               <ExpandableRows max={5} label="leads" colSpan={5}>
                 {unassignedLoans.map((l) => (
-                  <tr key={l.id} style={{ background: "rgba(255,75,75,0.03)" }}>
+                  <tr key={l.id} style={{ background: "color-mix(in srgb, var(--lo-card) 92%, #ff4b4b)" }}>
                     <td className="font-medium">
                       {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
                     </td>
                     <td>
-                      {/* source not available in this sub-query; would need join */}
-                      <span className="text-[11px] text-mutedForeground">—</span>
+                      <span className="lo-muted text-[11px]">—</span>
                     </td>
-                    <td className="text-[12px] text-mutedForeground">{l.status_raw || "—"}</td>
-                    <td className="text-[12px] text-mutedForeground">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
-                    <td className="font-mono text-[11px] text-mutedForeground">
+                    <td className="lo-muted text-[12px]">{l.status_raw || "—"}</td>
+                    <td className="lo-muted text-[12px]">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
+                    <td className="lo-muted font-mono text-[11px]">
                       {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
                     </td>
                   </tr>
