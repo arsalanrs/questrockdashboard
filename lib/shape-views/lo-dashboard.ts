@@ -492,31 +492,55 @@ function notesPreview(row: LoDashboardLoanRow): string {
   return row.game_plan_notes?.trim() || row.recent_notes?.trim() || row.notes_sidebar?.trim() || "—";
 }
 
-function nextActionFor(row: LoDashboardLoanRow): string {
-  // Prefer Shape AI note (first sentence, ≤80 chars)
-  const aiNote = row.notes_sidebar_ai_note?.trim();
-  if (aiNote) {
-    const firstSentence = aiNote.split(/[.!?]\s+/)[0]?.trim() ?? "";
-    if (firstSentence.length > 8 && firstSentence.length <= 120) {
-      return firstSentence.replace(/\.?$/, ".");
+/** Strip HTML tags and collapse whitespace — Shape AI notes come back with <p> wrapping. */
+function stripHtmlTags(raw: string): string {
+  return raw
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Pull clean next-action text from available note fields, smartly truncated. */
+function bestNextActionNote(row: LoDashboardLoanRow): string | null {
+  // Prefer Shape AI note — strip HTML, grab first two sentences
+  const aiRaw = row.notes_sidebar_ai_note?.trim();
+  if (aiRaw) {
+    const plain = stripHtmlTags(aiRaw);
+    if (plain.length > 8) {
+      const sentences = plain.match(/[^.!?]+[.!?]*/g) ?? [];
+      const twoSentences = sentences.slice(0, 2).join(" ").trim();
+      if (twoSentences.length > 8) return twoSentences.length > 140 ? twoSentences.slice(0, 137) + "…" : twoSentences;
     }
   }
+
+  // Fallback: recent notes (first sentence only)
+  const recentRaw = row.recent_notes?.trim() ?? row.game_plan_notes?.trim();
+  if (recentRaw) {
+    const plain = stripHtmlTags(recentRaw);
+    const first = plain.split(/[.!?]\s+/)[0]?.trim();
+    if (first && first.length > 8) return first.length > 120 ? first.slice(0, 117) + "…" : first + ".";
+  }
+
+  return null;
+}
+
+function nextActionFor(row: LoDashboardLoanRow): string {
+  const note = bestNextActionNote(row);
+  if (note) return note;
 
   const status = normalizeStatus(row.status_raw) ?? normalizeStatus(row.lendingpad_status_raw);
   const { turntimeLabel } = computeLoanSLA(row);
 
-  if (status?.includes("Clear to Close") || status === "CTC") {
-    return "Confirm cash to close + signing time.";
-  }
-  if (status?.includes("Underwriting") || status?.includes("UW")) {
-    return `Chase UW decision — ${turntimeLabel.toLowerCase()}.`;
-  }
-  if (status?.includes("Processing") || status?.includes("Validation")) {
-    return "Clear outstanding conditions.";
-  }
-  if (status?.includes("Package")) {
-    return "Submit package to processing.";
-  }
+  if (status?.includes("Clear to Close") || status === "CTC") return "Confirm cash to close + signing time.";
+  if (status?.includes("Underwriting") || status?.includes("UW")) return `Chase UW decision — ${turntimeLabel.toLowerCase()}.`;
+  if (status?.includes("Processing") || status?.includes("Validation")) return "Clear outstanding conditions.";
+  if (status?.includes("Package")) return "Submit package to processing.";
   return `${milestoneLabelFor(row)} — ${turntimeLabel.toLowerCase()}.`;
 }
 
