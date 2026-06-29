@@ -1,0 +1,58 @@
+[
+  {
+    "endpoint": "bulk/export",
+    "keys": [
+      "Appraisal Value",
+      "Borrower Credit Score",
+      "Created Date",
+      "Down Payment Amount",
+      "Email",
+      "First Name",
+      "LOA User Name",
+      "Last Activity Date",
+      "Last Name",
+      "Lead ID",
+      "Lead Status",
+      "Loan Amount",
+      "Loan Officer User Name",
+      "Loan Purpose",
+      "Mobile Phone",
+      "Notes Sidebar",
+      "Notes Sidebar AI Note",
+      "Processor User Name",
+      "Property State",
+      "Purchase Price",
+      "Recent Note",
+      "Record Type",
+      "Source"
+    ],
+    "noteKeys": [
+      "Email",
+      "Appraisal Value",
+      "Notes Sidebar",
+      "Notes Sidebar AI Note",
+      "Recent Note"
+    ],
+    "dateKeys": [
+      "Created Date",
+      "Last Activity Date",
+      "Appraisal Value",
+      "Borrower Credit Score"
+    ]
+  },
+  {
+    "endpoint": "search/lead",
+    "keys": [
+      "AssignedUsers",
+      "email",
+      "firstname",
+      "id",
+      "lastname",
+      "phone"
+    ],
+    "noteKeys": [
+      "email"
+    ],
+    "dateKeys": []
+  }
+]

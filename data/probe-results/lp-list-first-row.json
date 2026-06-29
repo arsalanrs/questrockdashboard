@@ -1,0 +1,65 @@
+{
+  "occupancy": {
+    "id": 4,
+    "name": "Other"
+  },
+  "loanStatus": {
+    "id": 1,
+    "name": "Lead"
+  },
+  "loanNumber": "260624002",
+  "loanStatusDate": "2026-06-24T00:00:00Z",
+  "borrowers": [
+    {
+      "firstName": "Donna",
+      "lastName": "Alps",
+      "middleName": null,
+      "latestCreditReportIdentifier": {
+        "identifier": "12020969",
+        "name": "CIC Credit-MCL",
+        "date": "2026-06-24T00:00:00Z"
+      },
+      "coBorrower": null,
+      "id": "d1984c12-a41b-48d4-a33e-4fa1bf53f0e5"
+    }
+  ],
+  "subjectPropertyAddress": {
+    "county": "Gadsden",
+    "city": null,
+    "state": "FL",
+    "street": "TBD",
+    "zipCode": null
+  },
+  "purpose": {
+    "id": 6,
+    "name": "Other"
+  },
+  "loanType": {
+    "id": 8,
+    "name": "Other"
+  },
+  "totalLoanAmount": 0,
+  "creditScore": 625,
+  "loanTerm": null,
+  "appraisalValue": 0,
+  "borrowersTotalIncomeAmount": 0,
+  "estimatedClosingDate": null,
+  "loanDates": {
+    "loanStatus": {
+      "id": 1,
+      "name": "Lead"
+    },
+    "lastModified": "2026-06-24T14:24:34.6721624Z"
+  },
+  "secondary": {
+    "buy": {
+      "lockStatus": {
+        "id": 0,
+        "name": "None"
+      },
+      "lockDate": null,
+      "lockExpirationDate": null
+    }
+  },
+  "id": "197c0a86-e66b-4147-86df-8f08ce91477d"
+}

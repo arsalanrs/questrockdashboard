@@ -1,0 +1,217 @@
+{
+  "loanUuid": "197c0a86-e66b-4147-86df-8f08ce91477d",
+  "listUserId": "4bf96b45-2692-4b6b-b635-f606b73e92bc",
+  "summary": [
+    {
+      "path": "/integrations/loans/detail",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/197c0a86-e66b-4147-86df-8f08ce91477d",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/conditions",
+      "status": 200,
+      "keyCount": 5,
+      "dateKeys": [],
+      "keys": [
+        "id",
+        "status",
+        "status.code",
+        "status.description",
+        "status.name"
+      ]
+    },
+    {
+      "path": "/integrations/loans/documents",
+      "status": 200,
+      "keyCount": 16,
+      "dateKeys": [
+        "[].createdDate",
+        "[].effectiveDate"
+      ],
+      "keys": [
+        "[].conditions",
+        "[].createdDate",
+        "[].description",
+        "[].effectiveDate",
+        "[].finalizedBy",
+        "[].id",
+        "[].name",
+        "[].status",
+        "[].status.id",
+        "[].status.name",
+        "[].type",
+        "[].type.integrationId",
+        "[].type.name",
+        "[].type.type",
+        "[].type.type.id",
+        "[].type.type.name"
+      ]
+    },
+    {
+      "path": "/integrations/loans/milestones",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/tasks",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/fees",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/timeline",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/closingdisclosure",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/closing-disclosure",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/criticaldates",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/critical-dates",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/processingdates",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/processing-dates",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/dates",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/notes",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/events",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/history",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/lock",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    },
+    {
+      "path": "/integrations/loans/locks",
+      "status": 200,
+      "keyCount": 1,
+      "dateKeys": [],
+      "keys": [
+        "_raw"
+      ]
+    }
+  ]
+}

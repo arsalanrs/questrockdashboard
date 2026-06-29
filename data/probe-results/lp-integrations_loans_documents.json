@@ -1,0 +1,44 @@
+[
+  {
+    "createdDate": "2026-06-24T10:18:58Z",
+    "effectiveDate": "2026-06-24T00:00:00Z",
+    "status": {
+      "id": 1,
+      "name": "Unfinalized"
+    },
+    "type": {
+      "name": "Underwriting Approval",
+      "type": {
+        "id": 20,
+        "name": "Underwriting Approval"
+      },
+      "integrationId": "4d13db3f-eb46-4f77-b966-941f9a2845e4"
+    },
+    "finalizedBy": null,
+    "description": null,
+    "conditions": [],
+    "name": "Loan No. 260624002 - Donna Alps Status Change",
+    "id": "a06f65e8-d6d1-444b-8137-6e28bd62d73b"
+  },
+  {
+    "createdDate": "2026-06-24T10:24:33Z",
+    "effectiveDate": "2026-06-24T00:00:00Z",
+    "status": {
+      "id": 1,
+      "name": "Unfinalized"
+    },
+    "type": {
+      "name": "Credit Report and Liabilities",
+      "type": {
+        "id": 2,
+        "name": "Credit Report"
+      },
+      "integrationId": "2b0d9cd0-1947-45a8-8f4f-5f7344b0d6b0"
+    },
+    "finalizedBy": null,
+    "description": null,
+    "conditions": [],
+    "name": "CreditReport_DonnaAlps_20260624-142433458.pdf",
+    "id": "2478cd73-3d1d-49fe-98fc-29524baba10a"
+  }
+]

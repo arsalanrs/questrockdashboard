@@ -107,6 +107,15 @@ export type NormalizedLpLoanListItem = {
   propertyValueCents: number | null;
   ltvBps: number | null;
   fundedAt: string | null;
+  /** borrowers[].latestCreditReportIdentifier.date when present. */
+  creditReportRequestedAt: string | null;
+  /** estimatedClosingDate from list API (ISO date). */
+  estimatedClosingDate: string | null;
+  lockDate: string | null;
+  lockExpirationDate: string | null;
+  lockStatusName: string | null;
+  /** loanDates blob from list API (status history / lastModified). */
+  loanDatesJson: Record<string, unknown> | null;
 };
 
 function numToCents(v: unknown): number | null {
@@ -126,8 +135,64 @@ function loanAmountCentsFromRow(o: Record<string, unknown>): number | null {
   const cents = numToCents(o.loanAmountCents ?? o.loan_amount_cents);
   if (cents != null) return cents;
   return numToCents(
-    o.loanAmount ?? o.loan_amount ?? o.amount ?? o.baseLoanAmount ?? o.totalLoanAmount,
+    o.totalLoanAmount ??
+      o.loanAmount ??
+      o.loan_amount ??
+      o.amount ??
+      o.baseLoanAmount,
   );
+}
+
+function parseIsoTimestamp(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const t = Date.parse(String(value));
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
+
+function parseIsoDateOnly(value: unknown): string | null {
+  const iso = parseIsoTimestamp(value);
+  return iso ? iso.slice(0, 10) : null;
+}
+
+function creditReportDateFromRow(o: Record<string, unknown>): string | null {
+  const borrowers = o.borrowers;
+  if (!Array.isArray(borrowers)) return null;
+  for (const b of borrowers) {
+    if (!b || typeof b !== "object") continue;
+    const ident = (b as Record<string, unknown>).latestCreditReportIdentifier;
+    if (ident && typeof ident === "object") {
+      const date = (ident as Record<string, unknown>).date;
+      const parsed = parseIsoTimestamp(date);
+      if (parsed) return parsed;
+    }
+  }
+  return null;
+}
+
+function lockFieldsFromRow(o: Record<string, unknown>): {
+  lockDate: string | null;
+  lockExpirationDate: string | null;
+  lockStatusName: string | null;
+} {
+  const secondary = o.secondary;
+  if (!secondary || typeof secondary !== "object") {
+    return { lockDate: null, lockExpirationDate: null, lockStatusName: null };
+  }
+  const buy = (secondary as Record<string, unknown>).buy;
+  if (!buy || typeof buy !== "object") {
+    return { lockDate: null, lockExpirationDate: null, lockStatusName: null };
+  }
+  const bo = buy as Record<string, unknown>;
+  const lockStatus = bo.lockStatus;
+  const lockStatusName =
+    lockStatus && typeof lockStatus === "object"
+      ? strField(lockStatus as Record<string, unknown>, "name", "label")
+      : null;
+  return {
+    lockDate: parseIsoDateOnly(bo.lockDate),
+    lockExpirationDate: parseIsoDateOnly(bo.lockExpirationDate),
+    lockStatusName: lockStatusName || null,
+  };
 }
 
 function borrowerFromRow(o: Record<string, unknown>): {
@@ -251,6 +316,13 @@ export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanLi
     ltvBps = Math.round((loanAmountCents / propertyValueCents) * 10000);
   }
   const fundedAt = timestampFromStatus(statusRaw, statusAt);
+  const creditReportRequestedAt = creditReportDateFromRow(o);
+  const estimatedClosingDate = parseIsoDateOnly(o.estimatedClosingDate);
+  const { lockDate, lockExpirationDate, lockStatusName } = lockFieldsFromRow(o);
+  const loanDatesJson =
+    o.loanDates && typeof o.loanDates === "object"
+      ? (o.loanDates as Record<string, unknown>)
+      : null;
 
   return {
     id,
@@ -268,6 +340,12 @@ export function normalizeLendingPadLoanListRow(raw: unknown): NormalizedLpLoanLi
     propertyValueCents,
     ltvBps,
     fundedAt,
+    creditReportRequestedAt,
+    estimatedClosingDate,
+    lockDate,
+    lockExpirationDate,
+    lockStatusName,
+    loanDatesJson,
   };
 }
 

@@ -1,0 +1,8 @@
+{
+  "id": null,
+  "status": {
+    "code": 2,
+    "name": "Error",
+    "description": "The inbound request for a contact is disabled."
+  }
+}

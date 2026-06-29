@@ -208,6 +208,9 @@ function buildInsertPayload(
     property_value_cents: item.propertyValueCents,
     ltv_bps: item.ltvBps,
     funded_at: item.fundedAt,
+    credit_report_requested_at: item.creditReportRequestedAt,
+    closing_date: item.estimatedClosingDate,
+    lock_expiration_date: item.lockExpirationDate,
     updated_at: new Date().toISOString(),
   };
 }
@@ -217,6 +220,20 @@ function buildInsertPayload(
  * Keys that are null in the detail are omitted so we don't clobber existing
  * richer data (e.g. values that came from Shape).
  */
+function mergeListItemFields(
+  payload: Record<string, unknown>,
+  item: NormalizedLpLoanListItem,
+): Record<string, unknown> {
+  const map: Record<string, unknown> = { ...payload };
+  const setIf = (k: string, v: unknown) => {
+    if (v !== null && v !== undefined) map[k] = v;
+  };
+  setIf("credit_report_requested_at", item.creditReportRequestedAt);
+  setIf("closing_date", item.estimatedClosingDate);
+  setIf("lock_expiration_date", item.lockExpirationDate);
+  return map;
+}
+
 function mergeLoanDetail(
   payload: Record<string, unknown>,
   detail: NormalizedLpLoanDetail | null,
@@ -275,6 +292,9 @@ function buildUpdatePayload(
   if (item.propertyValueCents != null) p.property_value_cents = item.propertyValueCents;
   if (item.ltvBps != null) p.ltv_bps = item.ltvBps;
   if (item.fundedAt) p.funded_at = item.fundedAt;
+  if (item.creditReportRequestedAt) p.credit_report_requested_at = item.creditReportRequestedAt;
+  if (item.estimatedClosingDate) p.closing_date = item.estimatedClosingDate;
+  if (item.lockExpirationDate) p.lock_expiration_date = item.lockExpirationDate;
 
   if (existing.shape_record_id == null) {
     if (item.statusRaw) p.status_raw = item.statusRaw;
@@ -415,20 +435,21 @@ export async function runLendingPadLoansSync(
             ex,
             fixedAssignedLoName,
           );
-          const payload = { ...mergeLoanDetail(basePayload, detail), lp_last_synced_at: lpSyncedAt };
+          const payload = {
+            ...mergeListItemFields(mergeLoanDetail(basePayload, detail), item),
+            lp_last_synced_at: lpSyncedAt,
+          };
           const { error: upErr } = await admin.from("loans").update(payload).eq("id", ex.id);
           if (upErr) {
             result.errors.push(`update ${item.id}: ${upErr.message}`);
             continue;
           }
           upserted += 1;
-          if (detail) {
-            try {
-              await upsertRichLoanDataFromSync(admin, ex.id, detail, item);
-            } catch (e) {
-              const m = e instanceof Error ? e.message : String(e);
-              result.errors.push(`rich_data ${item.id}: ${m}`);
-            }
+          try {
+            await upsertRichLoanDataFromSync(admin, ex.id, detail, item);
+          } catch (e) {
+            const m = e instanceof Error ? e.message : String(e);
+            result.errors.push(`rich_data ${item.id}: ${m}`);
           }
           if (item.statusRaw && item.statusRaw !== prevLpStatus && stage) {
             try {
@@ -445,14 +466,17 @@ export async function runLendingPadLoansSync(
             assignedLoUserId,
             fixedAssignedLoName,
           );
-          const payload = { ...mergeLoanDetail(basePayload, detail), lp_last_synced_at: lpSyncedAt };
+          const payload = {
+            ...mergeListItemFields(mergeLoanDetail(basePayload, detail), item),
+            lp_last_synced_at: lpSyncedAt,
+          };
           const { data: ins, error: insErr } = await admin.from("loans").insert(payload).select("id").single();
           if (insErr) {
             result.errors.push(`insert ${item.id}: ${insErr.message}`);
             continue;
           }
           upserted += 1;
-          if (detail && ins?.id) {
+          if (ins?.id) {
             try {
               await upsertRichLoanDataFromSync(admin, ins.id as string, detail, item);
             } catch (e) {

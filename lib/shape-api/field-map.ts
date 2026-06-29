@@ -160,6 +160,7 @@ const API_TO_CSV: Record<string, string> = {
   doNotContact: "Do Not Contact",
   "Last Contacted": "Last Contacted",
   lastContacted: "Last Contacted",
+  last_contacted: "Last Contacted",
   "Last Contact Date": "Last Contacted",
   "Insellerate Ref ID": "Insellerate Ref ID",
   insellerateRefId: "Insellerate Ref ID",
@@ -182,6 +183,10 @@ const API_TO_CSV: Record<string, string> = {
   "Notes Sidebar AI Note": "Notes Sidebar AI Note",
   "recent_notes": "Recent Note",
   "Recent Note": "Recent Note",
+  game_plan_notes: "Game Plan Notes",
+  "Game Plan Notes": "Game Plan Notes",
+  initial_contact_attempted: "Initial Contact Attempted",
+  "Initial Contact Attempted": "Initial Contact Attempted",
 };
 
 /** Status field name in Shape API (account-specific; override via env or config). */

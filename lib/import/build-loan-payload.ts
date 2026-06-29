@@ -288,6 +288,8 @@ export function buildLoanPayloadFromRow(
     notes_sidebar: trimOrNull(r["Notes Sidebar"]),
     notes_sidebar_ai_note: trimOrNull(r["Notes Sidebar AI Note"]),
     recent_notes: trimOrNull(r["Recent Note"]),
+    game_plan_notes: trimOrNull(r["Game Plan Notes"]),
+    initial_contact_attempted: parseBool(r["Initial Contact Attempted"]) ?? false,
   };
   return compactPayload(payload);
 }
