@@ -492,7 +492,7 @@ function notesPreview(row: LoDashboardLoanRow): string {
   return row.game_plan_notes?.trim() || row.recent_notes?.trim() || row.notes_sidebar?.trim() || "—";
 }
 
-/** Strip HTML tags and collapse whitespace — Shape AI notes come back with <p> wrapping. */
+/** Strip HTML tags and collapse whitespace — Shape notes come back with <p> wrapping. */
 function stripHtmlTags(raw: string): string {
   return raw
     .replace(/<br\s*\/?>/gi, " ")
@@ -506,25 +506,63 @@ function stripHtmlTags(raw: string): string {
     .trim();
 }
 
-/** Pull clean next-action text from available note fields, smartly truncated. */
+/**
+ * Returns true when the text looks like raw Shape form metadata rather than
+ * a human note — e.g. POST body dumps, raw timestamps, field-value pairs.
+ */
+function isJunkNote(text: string): boolean {
+  // Form POST metadata (Shape stores raw API payload in some note fields)
+  if (/post_method\s*:/i.test(text)) return true;
+  if (/sourcehdn\s*:/i.test(text)) return true;
+  if (/crmrefld\s*:/i.test(text)) return true;
+  if (/leadtype\s*:/i.test(text)) return true;
+  if (/pageurl\s*:/i.test(text)) return true;
+  if (/shapeportal/i.test(text)) return true;
+  // Raw ISO timestamp dumps like "date: 2026-06-11T14:14:53.843Z investment_property: Y"
+  if (/date:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/i.test(text)) return true;
+  if (/investment_property\s*:/i.test(text)) return true;
+  if (/loan_type\s*:/i.test(text)) return true;
+  if (/property_picked\s*:/i.test(text)) return true;
+  // Shape internal IDs appended at the end (e.g. "PITCH SCHEDULED: Name 49317")
+  if (/[A-Z\s]+:\s*\w[\w\s]+\d{4,6}\s*$/.test(text) && text.split(" ").length < 6) return true;
+  return false;
+}
+
+/** Trim a clean note to a short readable snippet (≤ 130 chars). */
+function trimNote(plain: string, maxLen = 130): string {
+  const sentences = plain.match(/[^.!?\n]+[.!?]*/g) ?? [];
+  const two = sentences.slice(0, 2).join(" ").trim();
+  const result = two.length > 8 ? two : plain.trim();
+  return result.length > maxLen ? result.slice(0, maxLen - 1) + "…" : result;
+}
+
+/** Pull the best human-readable next-action text from available note fields. */
 function bestNextActionNote(row: LoDashboardLoanRow): string | null {
-  // Prefer Shape AI note — strip HTML, grab first two sentences
+  // Priority 1: notes_sidebar_ai_note — only if it's a real note (not form junk)
   const aiRaw = row.notes_sidebar_ai_note?.trim();
   if (aiRaw) {
     const plain = stripHtmlTags(aiRaw);
-    if (plain.length > 8) {
-      const sentences = plain.match(/[^.!?]+[.!?]*/g) ?? [];
-      const twoSentences = sentences.slice(0, 2).join(" ").trim();
-      if (twoSentences.length > 8) return twoSentences.length > 140 ? twoSentences.slice(0, 137) + "…" : twoSentences;
+    if (plain.length > 8 && !isJunkNote(plain)) {
+      return trimNote(plain);
     }
   }
 
-  // Fallback: recent notes (first sentence only)
-  const recentRaw = row.recent_notes?.trim() ?? row.game_plan_notes?.trim();
+  // Priority 2: recent_notes (LO call notes, transcript summaries)
+  const recentRaw = row.recent_notes?.trim();
   if (recentRaw) {
     const plain = stripHtmlTags(recentRaw);
-    const first = plain.split(/[.!?]\s+/)[0]?.trim();
-    if (first && first.length > 8) return first.length > 120 ? first.slice(0, 117) + "…" : first + ".";
+    if (plain.length > 8 && !isJunkNote(plain)) {
+      return trimNote(plain);
+    }
+  }
+
+  // Priority 3: game_plan_notes
+  const gameRaw = row.game_plan_notes?.trim();
+  if (gameRaw) {
+    const plain = stripHtmlTags(gameRaw);
+    if (plain.length > 8 && !isJunkNote(plain)) {
+      return trimNote(plain, 100);
+    }
   }
 
   return null;
