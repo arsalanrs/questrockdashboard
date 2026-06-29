@@ -10,6 +10,8 @@ import {
 } from "./turntime-milestones";
 import {
   approvedDateForDisplay,
+  closingDateForDisplay,
+  creditDateForDisplay,
   ctcDateForDisplay,
   pipedDateForDisplay,
 } from "@/lib/lendingpad/lp-milestone-dates";
@@ -618,7 +620,7 @@ export function formatShortDate(iso: string | null | undefined): string {
   return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
 }
 
-export { pipedDateForDisplay, approvedDateForDisplay, ctcDateForDisplay };
+export { pipedDateForDisplay, approvedDateForDisplay, ctcDateForDisplay, creditDateForDisplay, closingDateForDisplay };
 
 export function formatMoney(cents: number | null | undefined): string {
   if (!cents) return "—";

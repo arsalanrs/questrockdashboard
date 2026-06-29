@@ -48,4 +48,13 @@ describe("display date helpers", () => {
       }),
     ).toBe("2026-03-15T00:00:00Z");
   });
+
+  it("uses Shape last_status_change_at for CTC status", () => {
+    expect(
+      ctcDateForDisplay({
+        status_raw: "Clear to Close",
+        last_status_change_at: "2026-06-24T21:31:00+00:00",
+      }),
+    ).toBe("2026-06-24T21:31:00+00:00");
+  });
 });

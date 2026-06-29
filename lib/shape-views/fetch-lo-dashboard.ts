@@ -2,9 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { passesGlobalFilters } from "./global-filters";
 import { DEFAULT_WINDOW_DAYS, windowStartIso, type FetchShapeLoansOptions } from "./query-loans";
 import type { LoDashboardLoanRow } from "./lo-dashboard";
+import { mergeLoDashboardLoanRows } from "./merge-lo-dashboard-rows";
 
 export const LO_DASHBOARD_SELECT =
-  "id,shape_record_id,record_type,source,status_raw,portal_status_raw,lendingpad_status_raw,lendingpad_status_at,borrower_first_name,borrower_last_name,borrower_email,borrower_phone,assigned_loan_officer_user_id,assigned_loan_officer_name,lead_created_at,application_completed_at,conversion_date,shape_last_updated_at,last_status_change_at,last_contacted_at,funded_at,closed_at,lendingpad_loan_uuid,current_stage,loan_amount_cents,loan_type,loan_purpose,property_state,mailing_state,track,documentation_type,is_brokered,notes_sidebar,notes_sidebar_ai_note,recent_notes,game_plan_notes,initial_contact_attempted,credit_report_requested_at,verification_started_at,verification_completed_at,submitted_to_processing_at,processing_completed_at,submitted_to_uw_at,uw_decision_at,ctc_at,closing_date,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,credit_score_mid";
+  "id,shape_record_id,record_type,source,status_raw,portal_status_raw,lendingpad_status_raw,lendingpad_status_at,lendingpad_loan_number,borrower_first_name,borrower_last_name,borrower_email,borrower_phone,assigned_loan_officer_user_id,assigned_loan_officer_name,lead_created_at,application_completed_at,conversion_date,shape_last_updated_at,last_status_change_at,last_contacted_at,funded_at,closed_at,lendingpad_loan_uuid,current_stage,loan_amount_cents,loan_type,loan_purpose,property_state,mailing_state,track,documentation_type,is_brokered,notes_sidebar,notes_sidebar_ai_note,recent_notes,game_plan_notes,initial_contact_attempted,credit_report_requested_at,verification_started_at,verification_completed_at,submitted_to_processing_at,processing_completed_at,submitted_to_uw_at,uw_decision_at,ctc_at,closing_date,closing_scheduled_at,lock_expiration_date,finance_contingency_date,appraisal_contingency_date,credit_score_mid,lp_last_synced_at";
 
 export type LoDashboardRichData = {
   front_dti?: number | null;
@@ -74,7 +75,7 @@ export async function fetchLoDashboardLoans(
         })
       : loans.slice(0, maxRows);
 
-  return { loans: scoped.filter(passesGlobalFilters), error: null };
+  return { loans: mergeLoDashboardLoanRows(scoped.filter(passesGlobalFilters)), error: null };
 }
 
 export async function fetchRichLoanDataByIds(

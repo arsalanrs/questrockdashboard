@@ -1,6 +1,6 @@
 "use client";
 
-import { formatShortDate, formatMoney, stateForRow, borrowerDisplayName, pipedDateForDisplay, approvedDateForDisplay, ctcDateForDisplay } from "@/lib/shape-views/lo-dashboard";
+import { formatShortDate, formatMoney, stateForRow, borrowerDisplayName, pipedDateForDisplay, approvedDateForDisplay, ctcDateForDisplay, creditDateForDisplay, closingDateForDisplay } from "@/lib/shape-views/lo-dashboard";
 import type { PipelineLoanRow } from "@/lib/shape-views/lo-dashboard";
 import { BorrowerAvatar } from "./BorrowerAvatar";
 
@@ -147,7 +147,7 @@ export function LoansWorkspace({ loans, alertsOnly, onSelectLoan }: Props) {
                     <span className="text-[12px]">{loan.loan_purpose ?? "—"}</span>
                   </td>
                   <td className="lo-td">
-                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.credit_report_requested_at)}</span>
+                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(creditDateForDisplay(loan))}</span>
                   </td>
                   <td className="lo-td">
                     <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(pipedDateForDisplay(loan))}</span>
@@ -164,7 +164,7 @@ export function LoansWorkspace({ loans, alertsOnly, onSelectLoan }: Props) {
                     <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(ctcDateForDisplay(loan))}</span>
                   </td>
                   <td className="lo-td">
-                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.closing_date)}</span>
+                    <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(closingDateForDisplay(loan))}</span>
                   </td>
                   <td className="lo-td">
                     <span className="lo-muted text-[11px] whitespace-nowrap">{formatShortDate(loan.finance_contingency_date)}</span>

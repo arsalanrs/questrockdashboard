@@ -6,12 +6,12 @@ import { canViewAsLoanOfficer } from "@/lib/permissions";
 import { filterLoDashboardUsers } from "@/lib/dashboard/lo-selector";
 import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 import { LoCommandCenter } from "@/components/dashboard/lo/LoCommandCenter";
-import { buildPipelineLoans } from "@/lib/shape-views/lo-dashboard";
 import {
   fetchLoDashboardLoans,
   fetchRichLoanDataByIds,
   windowStartIso,
 } from "@/lib/shape-views/fetch-lo-dashboard";
+import { richLoanIdsForRows } from "@/lib/shape-views/merge-lo-dashboard-rows";
 
 export const revalidate = 60;
 
@@ -66,8 +66,14 @@ export default async function LoanOfficerDashboardPage({
 
   const { loans, error } = await fetchLoDashboardLoans(fetchClient, fetchOptions);
 
-  const pipelineIds = buildPipelineLoans(loans).map((loan) => loan.id);
-  const richByLoanId = await fetchRichLoanDataByIds(fetchClient, pipelineIds);
+  const richByLoanIdRaw = await fetchRichLoanDataByIds(fetchClient, richLoanIdsForRows(loans));
+  const richByLoanId = { ...richByLoanIdRaw };
+  for (const loan of loans) {
+    const alt = (loan as { _richLoanId?: string })._richLoanId;
+    if (alt && richByLoanId[alt] && !richByLoanId[loan.id]) {
+      richByLoanId[loan.id] = richByLoanId[alt];
+    }
+  }
 
   const loUsers = loUsersForSelector.length
     ? loUsersForSelector.map((u) => ({ id: u.id, full_name: u.full_name }))

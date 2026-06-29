@@ -319,9 +319,20 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
   // match against LP-only rows by normalised borrower name + lead_created_at ±30d.
   // This eliminates duplicate rows and connects LP conditions/docs to Shape leads.
   const PIPELINE_STATUSES_FOR_FUZZY = new Set([
-    "Piped", "Registered", "Processing", "Submitted", "Underwriting",
-    "Conditions Out", "Approval Conditions", "Clear to Close", "Closing",
-    "Package Out", "Signed Not Piped", "Package Back",
+    "Piped",
+    "Registered",
+    "Processing",
+    "Submitted",
+    "Underwriting",
+    "Verification",
+    "Application Taken",
+    "Conditions Out",
+    "Approval Conditions",
+    "Clear to Close",
+    "Closing",
+    "Package Out",
+    "Signed Not Piped",
+    "Package Back",
   ]);
 
   const unlinkedRecordIds = allLoansPayload
