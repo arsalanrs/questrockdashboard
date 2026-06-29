@@ -1,7 +1,16 @@
 import type { ShapeViewRule } from "./types";
+import { GREEN_LEAD_STATUSES } from "./lo-dashboard";
 import { isPreApplicationStatus } from "./record-type-normalize";
 
 export const APPLICATIONS_VIEWS: ShapeViewRule[] = [
+  {
+    id: "green-leads-pos",
+    label: "Green Leads (POS)",
+    category: "Applications",
+    recordTypes: ["Leads", "Applications"],
+    statuses: [...GREEN_LEAD_STATUSES],
+    sort: { field: "conversion", dir: "desc" },
+  },
   {
     id: "all-pre-applications-pos",
     label: "All Pre-Applications (POS)",

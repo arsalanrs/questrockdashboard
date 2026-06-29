@@ -83,10 +83,19 @@ describe("lo-dashboard", () => {
     expect(isUncontactedLead(baseRow({ status_raw: "Not Contacted", last_contacted_at: "2026-06-25T12:00:00.000Z" }))).toBe(true);
   });
 
-  it("limits green leads to Advanced and App Completed", () => {
-    expect(isGreenLead(baseRow({ status_raw: "App Sent" }))).toBe(false);
-    expect(isGreenLead(baseRow({ status_raw: "Advanced" }))).toBe(true);
-    expect(isGreenLead(baseRow({ status_raw: "App Completed" }))).toBe(true);
+  it("classifies POS and verification-doc statuses as green leads", () => {
+    for (const status of [
+      "App Sent",
+      "App Started",
+      "Verification Docs Requested",
+      "Verification Docs Received",
+      "App Completed",
+      "Advanced",
+    ]) {
+      expect(isGreenLead(baseRow({ status_raw: status, record_type: "Applications" }))).toBe(true);
+    }
+    expect(isGreenLead(baseRow({ status_raw: "New Lead" }))).toBe(false);
+    expect(isGreenLead(baseRow({ status_raw: "Contacted" }))).toBe(false);
   });
 
   it("defers verification track until verification starts", () => {

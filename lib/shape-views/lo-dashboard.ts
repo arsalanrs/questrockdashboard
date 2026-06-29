@@ -73,7 +73,17 @@ export type PipelineLoanRow = LoDashboardLoanRow & {
   notesPreview: string;
 };
 
-const GREEN_STATUSES = new Set(["App Completed", "Advanced"]);
+/** POS / early-app statuses Nikk tracks in the Green Leads queue (LO dashboard + Shape views). */
+export const GREEN_LEAD_STATUSES = [
+  "App Sent",
+  "App Started",
+  "App Completed",
+  "Advanced",
+  "Verification Docs Requested",
+  "Verification Docs Received",
+] as const;
+
+const GREEN_STATUSES = new Set<string>(GREEN_LEAD_STATUSES);
 
 const CLOSED_FAMILY = new Set(["Closed", "Funded", "Purchased"]);
 
@@ -83,8 +93,6 @@ const PRE_APP_LEAD_STATUSES = new Set([
   "Not Contacted",
   "Attempting Contact",
   "Contacted",
-  "App Sent",
-  "App Started",
 ]);
 
 /** LP list statuses before Application Taken when no pipeline dates exist. */
@@ -174,7 +182,13 @@ export function inferLeadPhase(row: LoDashboardLoanRow): TurntimePhaseKey {
   if (!status || status === "New Lead" || status === "Not Contacted" || status === "Attempting Contact") {
     return "verificationA";
   }
-  if (GREEN_STATUSES.has(status)) return "packageOutA";
+  if (GREEN_STATUSES.has(status)) {
+    if (status === "App Sent" || status === "App Started") return "verificationA";
+    if (status === "Verification Docs Requested" || status === "Verification Docs Received") {
+      return getVerificationTrack(row) === "Verification B" ? "verificationB" : "verificationA";
+    }
+    return "packageOutA";
+  }
   if (status.includes("Verification")) return getVerificationTrack(row) === "Verification B" ? "verificationB" : "verificationA";
   if (status.includes("Package")) return row.is_brokered ? "packageOutB" : "packageOutA";
   if (status.includes("Validation") || status.includes("Processing")) return "validation";
