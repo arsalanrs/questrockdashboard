@@ -79,10 +79,10 @@ function formatClosingDate(d: string) {
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[13px] font-semibold uppercase tracking-widest text-mutedForeground">
+      <span className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">
         {children}
       </span>
-      <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />
+      <div className="h-px flex-1 bg-[var(--lo-border)]" />
     </div>
   );
 }

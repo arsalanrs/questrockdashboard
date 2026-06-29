@@ -13,6 +13,7 @@ import { hasLendingPadReadConfig } from "@/lib/lendingpad/config";
 import { runLendingPadConditionsSync } from "@/lib/lendingpad/sync-conditions";
 import { runLendingPadDocumentsSync } from "@/lib/lendingpad/sync-documents";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
+import { runShapeLoansLpEnrichmentSync } from "@/lib/lendingpad/sync-enrich-shape-loans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +71,17 @@ async function handle(request: Request) {
     if (scope === "documents") {
       const documents = await runLendingPadDocumentsSync();
       return NextResponse.json({ loans: null, conditions: null, documents, scope: "documents" });
+    }
+    if (scope === "enrich") {
+      const maxRaw = searchParams.get("maxLoans");
+      const maxLoans = maxRaw ? Number(maxRaw) : undefined;
+      const probeExtra = searchParams.get("probeExtra") !== "0";
+      const enrich = await runShapeLoansLpEnrichmentSync({
+        maxLoans: Number.isFinite(maxLoans) ? maxLoans : undefined,
+        probeExtraEndpoints: probeExtra,
+        writeReport: false,
+      });
+      return NextResponse.json({ loans: null, conditions: null, documents: null, enrich, scope: "enrich" });
     }
 
     const loans = await runLendingPadLoansSync({ fetchDetail: !skipDetail });

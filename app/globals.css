@@ -251,24 +251,30 @@ html[data-theme="light"] .dashboard-logo-wrap {
 .accent-border { border-color: var(--accent-yellow); }
 .accent-glow   { box-shadow: 0 0 0 1px var(--accent-yellow-dim), 0 4px 24px var(--accent-yellow-dim); }
 
-/* ---- Dashboard card ---- */
+/* ---- Dashboard card (aligned with LO command center) ---- */
 .dash-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
+  background: var(--lo-card);
+  border: 1px solid var(--lo-border);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 8px 24px rgba(27, 42, 36, 0.06);
 }
+
+html[data-theme="dark"] .dash-card {
+  box-shadow: none;
+}
+
 .dash-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--lo-border);
 }
 .dash-card-title {
   font-size: 13px;
   font-weight: 600;
-  color: hsl(var(--foreground));
+  color: var(--lo-text);
 }
 
 /* ---- KPI card top-stripe color variants ---- */
@@ -296,8 +302,8 @@ html[data-theme="light"] .dashboard-logo-wrap {
   opacity: 0.7;
 }
 
-/* ---- Table shared styles ---- */
-.dt { /* "dashboard table" */
+/* ---- Table shared styles (manager / executive; LO uses .lo-table-wrap) ---- */
+.dt {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
@@ -308,23 +314,22 @@ html[data-theme="light"] .dashboard-logo-wrap {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-  opacity: 0.7;
+  color: var(--lo-muted);
   text-align: left;
-  background: rgba(255,255,255,0.025);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: var(--lo-surface-muted);
+  border-bottom: 1px solid var(--lo-border);
 }
 .dt thead th.r { text-align: right; }
 .dt tbody td {
   padding: 11px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  color: hsl(var(--foreground));
+  border-bottom: 1px solid var(--lo-border);
+  color: var(--lo-text);
   vertical-align: middle;
 }
 .dt tbody td.r { text-align: right; }
 .dt tbody tr:last-child td { border-bottom: none; }
 .dt tbody tr { transition: background 0.12s; }
-.dt tbody tr:hover { background: rgba(255,255,255,0.025); }
+.dt tbody tr:hover { background: var(--lo-accent-soft); }
 
 /* ---- Fade-up animation ---- */
 @keyframes qr-fade-up {

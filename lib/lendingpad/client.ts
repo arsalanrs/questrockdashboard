@@ -3,7 +3,7 @@
  * GET /integrations/list/loans: take must be 1–25 per LendingPad Web API guide.
  */
 import { getLendingPadReadConfig, parseLendingPadOfficersJson } from "./config";
-import { lendingPadGetJson, type LendingPadAuthContext } from "./auth-fetch";
+import { lendingPadGetJson, lendingPadGetRaw, type LendingPadAuthContext } from "./auth-fetch";
 import {
   parseLendingPadConditionsResponse,
   parseLendingPadDocumentsResponse,
@@ -109,8 +109,9 @@ export async function getLendingPadLoanDetail(
   for (const p of paths) {
     try {
       const path = p.includes(":uuid") ? p.replace(":uuid", loanUuid) : `${p}${q}`;
-      const json = await lendingPadGetJson(ctx, path);
-      const detail = parseLendingPadLoanDetailResponse(json);
+      const raw = await lendingPadGetRaw(ctx, path);
+      if (raw.kind !== "json" || raw.json == null) continue;
+      const detail = parseLendingPadLoanDetailResponse(raw.json);
       if (detail) return detail;
     } catch (err) {
       // 404 on this attempted path is fine — try the next one.

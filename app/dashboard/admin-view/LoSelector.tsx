@@ -40,14 +40,14 @@ export function LoSelector({ items, currentLo }: { items: SelectorItem[]; curren
             className={[
               "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-colors",
               active
-                ? "border-foreground bg-foreground text-background"
+                ? "lo-segment-active border-transparent shadow-sm"
                 : isUnassigned && item.total > 0
-                  ? "border-amber-500/60 bg-amber-50 text-foreground hover:border-amber-500 dark:bg-amber-950/20"
-                  : "border-border bg-card text-foreground hover:border-foreground/40",
+                  ? "lo-card border-amber-500/60 bg-amber-50/80 hover:border-amber-500 dark:bg-amber-950/20"
+                  : "lo-card lo-muted hover:border-[var(--lo-teal)]/40",
             ].join(" ")}
           >
-            <span className="text-sm font-semibold">{item.full_name ?? "Unknown"}</span>
-            <span className={["text-xs mt-0.5", active ? "text-background/70" : "text-mutedForeground"].join(" ")}>
+            <span className={["text-sm font-semibold", active ? "" : "lo-heading"].join(" ")}>{item.full_name ?? "Unknown"}</span>
+            <span className={["mt-0.5 text-xs", active ? "opacity-80" : "lo-muted"].join(" ")}>
               {item.total} total &middot; {item.pipeline} pipeline &middot; {item.prePipeline} pre-pipe
             </span>
           </button>

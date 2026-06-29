@@ -1,0 +1,120 @@
+import Image from "next/image";
+import { NavLink } from "@/components/NavLink";
+import { SyncButton } from "@/components/SyncButton";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { DashboardRealtime } from "@/components/DashboardRealtime";
+import { SignOutButton } from "@/components/SignOutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  canAccessAdmin,
+  canViewCloserDashboard,
+  canViewExecutiveDashboard,
+  canViewManagerDashboard,
+  canViewMonitor,
+  canViewProcessorDashboard,
+} from "@/lib/permissions";
+import type { AppRole } from "@/lib/current-user";
+
+export type DashboardShellUser = {
+  id: string;
+  full_name: string | null;
+  email: string;
+  role: AppRole;
+};
+
+type Props = {
+  children: React.ReactNode;
+  appUser: DashboardShellUser;
+  /** Wider main column for admin tools (imports, org setup). */
+  wideMain?: boolean;
+};
+
+export function DashboardShell({ children, appUser, wideMain = false }: Props) {
+  return (
+    <div className="dashboard-shell relative min-h-screen overflow-x-hidden">
+      <div className="dashboard-orbs pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div
+          className="orb"
+          style={{
+            top: "-120px",
+            left: "-80px",
+            width: "480px",
+            height: "480px",
+            background: "radial-gradient(circle, rgba(232,255,0,0.12) 0%, transparent 70%)",
+          }}
+        />
+        <div
+          className="orb"
+          style={{
+            top: "-60px",
+            right: "-100px",
+            width: "400px",
+            height: "400px",
+            background: "radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)",
+          }}
+        />
+        <div
+          className="orb"
+          style={{
+            top: "45%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "700px",
+            height: "300px",
+            background: "radial-gradient(ellipse, rgba(232,255,0,0.04) 0%, transparent 70%)",
+          }}
+        />
+      </div>
+
+      <header className="dashboard-header sticky top-0 z-30 border-b">
+        <div className="dashboard-header-accent absolute inset-x-0 bottom-0 h-px" />
+
+        <div className="relative mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-3">
+            <div className="dashboard-logo-wrap relative h-11 w-[180px] shrink-0">
+              <Image
+                src="/questrock-logo.png"
+                alt="QuestRock"
+                width={170}
+                height={44}
+                className="object-contain object-left"
+                priority
+                unoptimized
+              />
+            </div>
+            <div className="dashboard-brand-copy leading-tight hidden sm:block">
+              <div className="text-[13px] font-semibold tracking-tight">LO Command Center</div>
+              <div className="text-[11px] opacity-80">Questrock Mortgage</div>
+            </div>
+          </div>
+
+          <nav className="flex items-center gap-0.5">
+            <NavLink href="/dashboard/lo">Loan Officer</NavLink>
+            <NavLink href="/dashboard/concierge">Concierge</NavLink>
+            {canViewManagerDashboard(appUser.role) ? <NavLink href="/dashboard/manager">Manager</NavLink> : null}
+            {canViewMonitor(appUser.role) ? <NavLink href="/dashboard/monitor">Monitor</NavLink> : null}
+            {canViewProcessorDashboard(appUser.role) ? <NavLink href="/dashboard/processor">Processor</NavLink> : null}
+            {canViewCloserDashboard(appUser.role) ? <NavLink href="/dashboard/closer">Closer</NavLink> : null}
+            {canViewExecutiveDashboard(appUser.role) ? <NavLink href="/dashboard/executive">Executive</NavLink> : null}
+            {canAccessAdmin(appUser.role) ? <NavLink href="/dashboard/admin-view">Team View</NavLink> : null}
+            {canAccessAdmin(appUser.role) ? <NavLink href="/admin/import">Admin</NavLink> : null}
+            <span className="dashboard-user hidden md:inline rounded-lg px-3 py-1.5 text-[13px] font-medium">
+              {appUser.full_name ?? appUser.email}
+            </span>
+            <ThemeToggle />
+            <SyncButton />
+            <NotificationBell />
+            <SignOutButton />
+          </nav>
+        </div>
+      </header>
+
+      <main
+        className={`relative z-10 mx-auto px-6 py-6 ${wideMain ? "max-w-[1360px]" : "max-w-[1360px]"}`}
+      >
+        <DashboardRealtime userId={appUser.id} />
+        {children}
+      </main>
+    </div>
+  );
+}

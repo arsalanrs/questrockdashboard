@@ -61,10 +61,7 @@ function mergeLoanGroup(group: LoDashboardLoanRow[]): LoDashboardLoanRow {
   if (lpRow.lendingpad_loan_uuid) merged.lendingpad_loan_uuid = lpRow.lendingpad_loan_uuid;
   if (lpRow.lendingpad_status_raw) merged.lendingpad_status_raw = lpRow.lendingpad_status_raw;
   if (lpRow.lendingpad_status_at) merged.lendingpad_status_at = lpRow.lendingpad_status_at;
-  if (lpRow.lp_last_synced_at) {
-    (merged as LoDashboardLoanRow & { lp_last_synced_at?: string | null }).lp_last_synced_at =
-      lpRow.lp_last_synced_at;
-  }
+  if (lpRow.lp_last_synced_at) merged.lp_last_synced_at = lpRow.lp_last_synced_at;
   if (lpRow.loan_type && !merged.loan_type) merged.loan_type = lpRow.loan_type;
   if (lpRow.loan_purpose && !merged.loan_purpose) merged.loan_purpose = lpRow.loan_purpose;
   if (lpRow.credit_score_mid != null && merged.credit_score_mid == null) {

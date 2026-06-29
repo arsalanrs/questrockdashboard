@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { describe, it } from "vitest";
 import { resetOperationalLoans } from "@/lib/admin/reset-operational-loans";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
+import { runShapeLoansLpEnrichmentSync } from "@/lib/lendingpad/sync-enrich-shape-loans";
 import { runShapeApiSync } from "@/lib/shape-api/sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -40,11 +41,33 @@ describe("rebuild-shape-sync", () => {
     const result = await runShapeApiSync({ mode: "full", dateFrom: from, dateTo: to });
     console.log("Sync result:", result);
 
-    console.log("LendingPad list sync (required for pipeline dates)...");
+    console.log("LendingPad list sync (links UUIDs + list fields)...");
     const lp = await runLendingPadLoansSync({ fetchDetail: false });
-    console.log("LP sync:", {
+    console.log("LP list sync:", {
       loansUpserted: lp.loansUpserted,
       errors: lp.errors.length,
+    });
+
+    const { linkShapeLoansToLendingPad } = await import("@/lib/shape-api/link-shape-lp");
+    const link = await linkShapeLoansToLendingPad(admin);
+    console.log("Shape↔LP fuzzy link:", link);
+
+    console.log("Per-loan LP enrichment (detail, documents, conditions, endpoint probe)...");
+    const enrich = await runShapeLoansLpEnrichmentSync({
+      probeExtraEndpoints: false,
+      writeReport: true,
+    });
+    console.log("LP enrichment:", {
+      shapeLoans: enrich.shapeLoansConsidered,
+      withLpUuid: enrich.withLpUuid,
+      withoutLpUuid: enrich.withoutLpUuid,
+      detailParsed: enrich.detailParsed,
+      documentsWritten: enrich.documentsWritten,
+      conditionsWritten: enrich.conditionsWritten,
+      recommendCompanyReport: enrich.recommendCompanyReport,
+      recommendation: enrich.recommendation,
+      reportPath: enrich.reportPath,
+      errors: enrich.errors.length,
     });
 
     const { count: withName } = await admin
@@ -61,5 +84,5 @@ describe("rebuild-shape-sync", () => {
 
     console.log(`LO names: ${withName ?? 0} / ${total ?? 0}`);
     console.log(`LO user ids: ${withUser ?? 0} / ${total ?? 0}`);
-  }, 600_000);
+  }, 1_800_000);
 });

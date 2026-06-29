@@ -62,11 +62,12 @@ export default async function AdminImportPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Admin</h1>
-        <p className="text-sm text-mutedForeground">Import Shape KPI CSV into Supabase (raw + normalized loans).</p>
+        <p className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Admin</p>
+        <h1 className="lo-heading text-xl font-semibold">Import &amp; sync</h1>
+        <p className="lo-muted text-sm">Import Shape KPI CSV into Supabase (raw + normalized loans).</p>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-5 text-cardForeground">
+      <div className="lo-card p-5">
         <h2 className="text-sm font-semibold">Import: Shape KPI CSV</h2>
         <p className="mt-1 text-sm text-mutedForeground">
           Upload the exported report (e.g. <span className="font-mono">customreportcsv_*.csv</span>).

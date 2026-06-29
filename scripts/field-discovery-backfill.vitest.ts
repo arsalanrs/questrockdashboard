@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "vitest";
 import { runLendingPadLoansSync } from "@/lib/lendingpad/sync-loans";
+import { runShapeLoansLpEnrichmentSync } from "@/lib/lendingpad/sync-enrich-shape-loans";
 import { runShapeApiSync } from "@/lib/shape-api/sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -44,7 +45,35 @@ describe("field-discovery-backfill", () => {
       const shape = await runShapeApiSync({ mode: "full", dateFrom: from, dateTo: to });
       console.log("Shape result:", shape);
 
+      console.log("LP list sync after Shape (link UUIDs)...");
+      const lpAfterShape = await runLendingPadLoansSync({ fetchDetail: false });
+      console.log("LP list (post-Shape):", {
+        loansUpserted: lpAfterShape.loansUpserted,
+        errorCount: lpAfterShape.errors.length,
+      });
+
+      const { linkShapeLoansToLendingPad } = await import("@/lib/shape-api/link-shape-lp");
       const admin = createSupabaseAdminClient();
+      const link = await linkShapeLoansToLendingPad(admin);
+      console.log("Shape↔LP fuzzy link:", link);
+
+      console.log("Per-loan LP enrichment + endpoint probe report...");
+      const enrich = await runShapeLoansLpEnrichmentSync({
+        probeExtraEndpoints: true,
+        writeReport: true,
+      });
+      console.log("Enrichment report:", {
+        shapeLoans: enrich.shapeLoansConsidered,
+        withLpUuid: enrich.withLpUuid,
+        detailParsed: enrich.detailParsed,
+        documentsWritten: enrich.documentsWritten,
+        conditionsWritten: enrich.conditionsWritten,
+        endpointSummary: enrich.endpointSummary,
+        recommendCompanyReport: enrich.recommendCompanyReport,
+        recommendation: enrich.recommendation,
+        reportPath: enrich.reportPath,
+      });
+
       const { count: withGamePlan } = await admin
         .from("loans")
         .select("*", { count: "exact", head: true })

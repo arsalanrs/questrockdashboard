@@ -42,10 +42,12 @@ export type LoDashboardLoanRow = ShapeLoanRow & {
   uw_decision_at: string | null;
   ctc_at: string | null;
   closing_date: string | null;
+  closing_scheduled_at: string | null;
   lock_expiration_date: string | null;
   finance_contingency_date: string | null;
   appraisal_contingency_date: string | null;
   credit_score_mid: number | null;
+  lp_last_synced_at: string | null;
 };
 
 export type VerificationTrack = "Verification A" | "Verification B" | "Pending";

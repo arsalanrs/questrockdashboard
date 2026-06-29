@@ -10,6 +10,10 @@ import fs from "fs";
 import path from "path";
 import { detectChanges, type ActivityEvent, type ExistingLoanRow } from "@/lib/shape-api/change-detector";
 import type { ShapeBulkExportResponse } from "@/lib/shape-api/types";
+import {
+  linkShapeLoansToLendingPad,
+  PIPELINE_STATUSES_FOR_LP_FUZZY,
+} from "@/lib/shape-api/link-shape-lp";
 
 // Shape API returns "Referral Partners" (with 's'); CSV exports use "Referral Partner" (no 's').
 // Both are excluded. "Contact" is also excluded.
@@ -315,82 +319,13 @@ export async function runShapeApiSync(options: ShapeSyncOptions = {}): Promise<S
   }
 
   // ── Shape ↔ LP fuzzy UUID linking ─────────────────────────────────────────
-  // For Shape loans with no lendingpad_loan_uuid in pipeline stages, attempt to
-  // match against LP-only rows by normalised borrower name + lead_created_at ±30d.
-  // This eliminates duplicate rows and connects LP conditions/docs to Shape leads.
-  const PIPELINE_STATUSES_FOR_FUZZY = new Set([
-    "Piped",
-    "Registered",
-    "Processing",
-    "Submitted",
-    "Underwriting",
-    "Verification",
-    "Application Taken",
-    "Conditions Out",
-    "Approval Conditions",
-    "Clear to Close",
-    "Closing",
-    "Package Out",
-    "Signed Not Piped",
-    "Package Back",
-  ]);
-
   const unlinkedRecordIds = allLoansPayload
-    .filter((l) => !l.lendingpad_loan_uuid && PIPELINE_STATUSES_FOR_FUZZY.has(String(l.status_raw ?? "")))
+    .filter((l) => !l.lendingpad_loan_uuid && PIPELINE_STATUSES_FOR_LP_FUZZY.has(String(l.status_raw ?? "")))
     .map((l) => l.shape_record_id as number)
     .filter((id) => Number.isFinite(id));
 
   if (unlinkedRecordIds.length > 0) {
-    // Fetch the LP-only rows (no shape_record_id) that have a UUID
-    const { data: lpOnlyRows } = await admin
-      .from("loans")
-      .select("id,lendingpad_loan_uuid,borrower_first_name,borrower_last_name,lead_created_at")
-      .is("shape_record_id", null)
-      .not("lendingpad_loan_uuid", "is", null)
-      .limit(2000);
-
-    if (lpOnlyRows && lpOnlyRows.length > 0) {
-      function normName(first: string | null, last: string | null): string {
-        return `${String(first ?? "").trim()} ${String(last ?? "").trim()}`.toLowerCase().replace(/\s+/g, " ").trim();
-      }
-
-      // Fetch the unlinked Shape loans to get borrower names + dates
-      for (let i = 0; i < unlinkedRecordIds.length; i += 200) {
-        const chunk = unlinkedRecordIds.slice(i, i + 200);
-        const { data: shapeRows } = await admin
-          .from("loans")
-          .select("id,shape_record_id,borrower_first_name,borrower_last_name,lead_created_at")
-          .in("shape_record_id", chunk)
-          .is("lendingpad_loan_uuid", null);
-
-        for (const shapeRow of shapeRows ?? []) {
-          const shapeName = normName(shapeRow.borrower_first_name as string | null, shapeRow.borrower_last_name as string | null);
-          const shapeDate = shapeRow.lead_created_at ? new Date(shapeRow.lead_created_at as string).getTime() : null;
-          if (!shapeName || !shapeDate) continue;
-
-          const match = (lpOnlyRows as Array<{ id: string; lendingpad_loan_uuid: string; borrower_first_name: string | null; borrower_last_name: string | null; lead_created_at: string | null }>).find((lp) => {
-            const lpName = normName(lp.borrower_first_name, lp.borrower_last_name);
-            const lpDate = lp.lead_created_at ? new Date(lp.lead_created_at).getTime() : null;
-            if (lpName !== shapeName) return false;
-            if (!lpDate) return false;
-            return Math.abs(shapeDate - lpDate) <= 30 * 24 * 60 * 60 * 1000; // ±30 days
-          });
-
-          if (match) {
-            // Link Shape row to LP UUID
-            await admin
-              .from("loans")
-              .update({ lendingpad_loan_uuid: match.lendingpad_loan_uuid })
-              .eq("id", shapeRow.id as string);
-            // Remove the now-duplicate LP-only row
-            await admin.from("loans").delete().eq("id", match.id);
-            // Remove from lpOnlyRows to prevent double-matching
-            const idx = lpOnlyRows.findIndex((r) => r.id === match.id);
-            if (idx >= 0) lpOnlyRows.splice(idx, 1);
-          }
-        }
-      }
-    }
+    await linkShapeLoansToLendingPad(admin, { shapeRecordIds: unlinkedRecordIds });
   }
 
   // ── Fetch upserted loan IDs (we need the DB uuid for activity log FKs) ────

@@ -1,0 +1,583 @@
+{
+  "probedAt": "2026-06-29T20:24:10.978Z",
+  "summary": {
+    "shapeLoansTotal": 5215,
+    "pipelineLoansProcessed": 2,
+    "shapeLpLinks": {
+      "shapeCandidates": 3,
+      "linked": 2,
+      "duplicatesRemoved": 2
+    },
+    "withLpUuid": 2,
+    "withoutLpUuid": 1,
+    "enriched": 2,
+    "detailParsed": 0,
+    "documentsWritten": 3,
+    "conditionsWritten": 0,
+    "endpointSummary": {
+      "/integrations/loans/detail": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/20698c51-971a-4fb2-828b-86281e2532af": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 1
+      },
+      "/integrations/loans/conditions": {
+        "json": 2,
+        "html": 0,
+        "empty": 0,
+        "error": 0
+      },
+      "/integrations/loans/documents": {
+        "json": 2,
+        "html": 0,
+        "empty": 0,
+        "error": 0
+      },
+      "/integrations/loans/milestones": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/tasks": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/fees": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/timeline": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/closingdisclosure": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/closing-disclosure": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/criticaldates": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/critical-dates": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/processingdates": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/processing-dates": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/dates": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/notes": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/events": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/history": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/lock": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/locks": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 2
+      },
+      "/integrations/loans/229bde33-a698-4974-a53c-225c56be22cf": {
+        "json": 0,
+        "html": 0,
+        "empty": 0,
+        "error": 1
+      }
+    },
+    "recommendCompanyReport": true,
+    "recommendation": "LP detail/milestone endpoints return HTML or errors on this account. Use LendingPad company report export (process-export.ts) for full dates, DTI, notes, and milestone history.",
+    "errorCount": 0,
+    "sampleErrors": []
+  },
+  "samples": [
+    {
+      "loanId": "a947b915-730c-424f-bf4a-f5edf4e85b18",
+      "shapeRecordId": 58464,
+      "lendingpadLoanUuid": "20698c51-971a-4fb2-828b-86281e2532af",
+      "borrowerName": "Albert Silva",
+      "detailParsed": false,
+      "documentsCount": 1,
+      "conditionsCount": 0,
+      "endpointKinds": {
+        "/integrations/loans/detail": "error",
+        "/integrations/loans": "error",
+        "/integrations/loans/20698c51-971a-4fb2-828b-86281e2532af": "error",
+        "/integrations/loans/conditions": "json",
+        "/integrations/loans/documents": "json",
+        "/integrations/loans/milestones": "error",
+        "/integrations/loans/tasks": "error",
+        "/integrations/loans/fees": "error",
+        "/integrations/loans/timeline": "error",
+        "/integrations/loans/closingdisclosure": "error",
+        "/integrations/loans/closing-disclosure": "error",
+        "/integrations/loans/criticaldates": "error",
+        "/integrations/loans/critical-dates": "error",
+        "/integrations/loans/processingdates": "error",
+        "/integrations/loans/processing-dates": "error",
+        "/integrations/loans/dates": "error",
+        "/integrations/loans/notes": "error",
+        "/integrations/loans/events": "error",
+        "/integrations/loans/history": "error",
+        "/integrations/loans/lock": "error",
+        "/integrations/loans/locks": "error"
+      },
+      "linkedFromCache": true
+    },
+    {
+      "loanId": "3073456d-2664-4114-95e3-f56a833eb27d",
+      "shapeRecordId": null,
+      "lendingpadLoanUuid": "229bde33-a698-4974-a53c-225c56be22cf",
+      "borrowerName": "Michael Lee",
+      "detailParsed": false,
+      "documentsCount": 2,
+      "conditionsCount": 0,
+      "endpointKinds": {
+        "/integrations/loans/detail": "error",
+        "/integrations/loans": "error",
+        "/integrations/loans/229bde33-a698-4974-a53c-225c56be22cf": "error",
+        "/integrations/loans/conditions": "json",
+        "/integrations/loans/documents": "json",
+        "/integrations/loans/milestones": "error",
+        "/integrations/loans/tasks": "error",
+        "/integrations/loans/fees": "error",
+        "/integrations/loans/timeline": "error",
+        "/integrations/loans/closingdisclosure": "error",
+        "/integrations/loans/closing-disclosure": "error",
+        "/integrations/loans/criticaldates": "error",
+        "/integrations/loans/critical-dates": "error",
+        "/integrations/loans/processingdates": "error",
+        "/integrations/loans/processing-dates": "error",
+        "/integrations/loans/dates": "error",
+        "/integrations/loans/notes": "error",
+        "/integrations/loans/events": "error",
+        "/integrations/loans/history": "error",
+        "/integrations/loans/lock": "error",
+        "/integrations/loans/locks": "error"
+      }
+    }
+  ],
+  "loans": [
+    {
+      "loanId": "a947b915-730c-424f-bf4a-f5edf4e85b18",
+      "shapeRecordId": 58464,
+      "lendingpadLoanUuid": "20698c51-971a-4fb2-828b-86281e2532af",
+      "probe": [
+        {
+          "path": "/integrations/loans/detail",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/20698c51-971a-4fb2-828b-86281e2532af",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/conditions",
+          "status": 200,
+          "kind": "json",
+          "keyCount": 5,
+          "parsedCount": 0,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/documents",
+          "status": 200,
+          "kind": "json",
+          "keyCount": 16,
+          "parsedCount": 1,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/milestones",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/tasks",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/fees",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/timeline",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/closingdisclosure",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/closing-disclosure",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/criticaldates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/critical-dates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/processingdates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/processing-dates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/dates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/notes",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/events",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/history",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/lock",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/locks",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        }
+      ],
+      "detailParsed": false,
+      "documentsCount": 1,
+      "conditionsCount": 0,
+      "errors": []
+    },
+    {
+      "loanId": "3073456d-2664-4114-95e3-f56a833eb27d",
+      "shapeRecordId": null,
+      "lendingpadLoanUuid": "229bde33-a698-4974-a53c-225c56be22cf",
+      "probe": [
+        {
+          "path": "/integrations/loans/detail",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/229bde33-a698-4974-a53c-225c56be22cf",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/conditions",
+          "status": 200,
+          "kind": "json",
+          "keyCount": 5,
+          "parsedCount": 0,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/documents",
+          "status": 200,
+          "kind": "json",
+          "keyCount": 16,
+          "parsedCount": 2,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/milestones",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/tasks",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/fees",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/timeline",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/closingdisclosure",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/closing-disclosure",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/criticaldates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/critical-dates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/processingdates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/processing-dates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/dates",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/notes",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/events",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/history",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/lock",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        },
+        {
+          "path": "/integrations/loans/locks",
+          "status": 200,
+          "kind": "error",
+          "keyCount": 0,
+          "parsedCount": null,
+          "error": null
+        }
+      ],
+      "detailParsed": false,
+      "documentsCount": 2,
+      "conditionsCount": 0,
+      "errors": []
+    }
+  ]
+}

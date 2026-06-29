@@ -113,3 +113,34 @@ export async function upsertRichLoanDataFromSync(
     throw new Error(`rich_loan_data upsert: ${error.message}`);
   }
 }
+
+/** Merge LP API probe results into rich_loan_data.lp_raw_json.apiProbe */
+export async function upsertLpApiProbe(
+  admin: SupabaseClient,
+  loanId: string,
+  probe: Record<string, unknown>,
+): Promise<void> {
+  const { data: existing, error: readErr } = await admin
+    .from("rich_loan_data")
+    .select("lp_raw_json")
+    .eq("loan_id", loanId)
+    .maybeSingle();
+  if (readErr) throw new Error(`rich_loan_data read: ${readErr.message}`);
+
+  const prev =
+    existing?.lp_raw_json && typeof existing.lp_raw_json === "object"
+      ? (existing.lp_raw_json as Record<string, unknown>)
+      : {};
+  const payload: Record<string, unknown> = {
+    loan_id: loanId,
+    lp_raw_json: {
+      ...prev,
+      apiProbe: probe,
+    },
+    synced_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await admin.from("rich_loan_data").upsert(payload, { onConflict: "loan_id" });
+  if (error) throw new Error(`rich_loan_data apiProbe upsert: ${error.message}`);
+}

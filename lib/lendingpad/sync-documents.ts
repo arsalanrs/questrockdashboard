@@ -24,6 +24,52 @@ function syncMaxLoans(override?: number): number {
   return Number.isFinite(n) && n > 0 ? Math.min(n, 5000) : 500;
 }
 
+export async function syncDocumentsForLoan(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  loanId: string,
+  lpId: string,
+): Promise<{ written: number }> {
+  const docs = await getLendingPadLoanDocuments(lpId);
+  const dedup = new Map<string, (typeof docs)[0]>();
+  for (const d of docs) {
+    if (!dedup.has(d.id)) dedup.set(d.id, d);
+  }
+  const normalized = [...dedup.values()];
+  const keepIds = new Set(normalized.map((d) => d.id));
+
+  const { data: existing, error: exErr } = await admin
+    .from("loan_documents")
+    .select("id,external_id")
+    .eq("loan_id", loanId)
+    .eq("source", "lendingpad");
+  if (exErr) throw exErr;
+
+  for (const e of existing ?? []) {
+    const ext = (e as { external_id: string | null }).external_id;
+    if (ext && !keepIds.has(ext)) {
+      await admin.from("loan_documents").delete().eq("id", (e as { id: string }).id);
+    }
+  }
+
+  for (const d of normalized) {
+    const { error: upErr } = await admin.from("loan_documents").upsert(
+      {
+        loan_id: loanId,
+        source: "lendingpad",
+        external_id: d.id,
+        name: d.name,
+        category: d.category,
+        uploaded_at: d.uploadedAt,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "loan_id,source,external_id" },
+    );
+    if (upErr) throw upErr;
+  }
+
+  return { written: normalized.length };
+}
+
 export async function runLendingPadDocumentsSync(options?: { maxLoans?: number }): Promise<LendingPadDocumentsSyncResult> {
   const result: LendingPadDocumentsSyncResult = {
     loansConsidered: 0,
@@ -59,45 +105,8 @@ export async function runLendingPadDocumentsSync(options?: { maxLoans?: number }
     const lpId = row.lendingpad_loan_uuid?.trim();
     if (!lpId) continue;
     try {
-      const docs = await getLendingPadLoanDocuments(lpId);
-      const dedup = new Map<string, (typeof docs)[0]>();
-      for (const d of docs) {
-        if (!dedup.has(d.id)) dedup.set(d.id, d);
-      }
-      const normalized = [...dedup.values()];
-      const keepIds = new Set(normalized.map((d) => d.id));
-
-      const { data: existing, error: exErr } = await admin
-        .from("loan_documents")
-        .select("id,external_id")
-        .eq("loan_id", row.id)
-        .eq("source", "lendingpad");
-      if (exErr) throw exErr;
-
-      for (const e of existing ?? []) {
-        const ext = (e as { external_id: string | null }).external_id;
-        if (ext && !keepIds.has(ext)) {
-          await admin.from("loan_documents").delete().eq("id", (e as { id: string }).id);
-        }
-      }
-
-      for (const d of normalized) {
-        const { error: upErr } = await admin.from("loan_documents").upsert(
-          {
-            loan_id: row.id,
-            source: "lendingpad",
-            external_id: d.id,
-            name: d.name,
-            category: d.category,
-            uploaded_at: d.uploadedAt,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "loan_id,source,external_id" },
-        );
-        if (upErr) throw upErr;
-      }
-
-      result.documentsWritten += normalized.length;
+      const { written } = await syncDocumentsForLoan(admin, row.id, lpId);
+      result.documentsWritten += written;
       result.loansSynced += 1;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
