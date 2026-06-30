@@ -1,12 +1,15 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewExecutiveDashboard } from "@/lib/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ExecutiveFilters, type ExecLoan } from "@/components/dashboard/ExecutiveFilters";
+import { KpiCard } from "@/components/KpiCard";
 import { OpportunitiesPanel } from "@/components/executive/OpportunitiesPanel";
 import { ExecChat } from "@/components/executive/ExecChat";
 import { ExecNotifications, type ExecNotification } from "@/components/executive/ExecNotifications";
+import { LiveActivityFeed } from "@/components/executive/LiveActivityFeed";
 import { MlReadinessCard } from "@/components/executive/MlReadinessCard";
 import { DocumentHealthCard } from "@/components/executive/DocumentHealthCard";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
@@ -18,6 +21,7 @@ import { ExpandableRows } from "@/components/ExpandableRows";
 import { loadOpportunitiesPanelData } from "@/lib/signals/load-for-panel";
 import { loadMlReadiness } from "@/lib/signals/load-ml-readiness";
 import { loadDocumentHealth } from "@/lib/documents/load-document-health";
+import { formatCurrency } from "@/lib/metrics";
 
 // ─── Performance notes ────────────────────────────────────────────────────────
 // • persistLeadTiers() is NOT called here. It runs in the nightly cron only.
@@ -56,99 +60,33 @@ async function MlReadinessSection() {
 
 // ─── Live Activity Feed ───────────────────────────────────────────────────────
 
-type ActivityLogRow = {
-  id: string;
-  synced_at: string;
-  change_type: string;
-  field_name: string | null;
-  old_value: string | null;
-  new_value: string | null;
-  lo_name: string | null;
-  borrower_name: string | null;
-};
-
-const CHANGE_TYPE_LABELS: Record<string, string> = {
-  loan_created: "New Lead",
-  status_changed: "Status",
-  owner_changed: "Reassigned",
-  note_added: "Note",
-  field_changed: "Field",
-};
-
-function ActivityBadge({ type }: { type: string }) {
-  const label = CHANGE_TYPE_LABELS[type] ?? type;
-  const cls =
-    type === "loan_created" ? "pill-green"
-    : type === "status_changed" ? "pill-yellow"
-    : type === "owner_changed" ? "pill-blue"
-    : type === "note_added" ? "pill-blue"
-    : "pill-muted";
-  return (
-    <span className={`${cls} inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide`}>
-      {label}
-    </span>
-  );
-}
-
 async function LiveActivityFeedSection() {
   const admin = createSupabaseAdminClient();
   try {
     const { data } = await admin
       .from("shape_activity_log")
-      .select("id,synced_at,change_type,field_name,old_value,new_value,lo_name,borrower_name")
+      .select("id,synced_at,change_type,field_name,old_value,new_value,lo_name,borrower_name,loan_id,loans(shape_record_id)")
       .order("synced_at", { ascending: false })
       .limit(50);
 
-    const rows = (data ?? []) as ActivityLogRow[];
-    if (rows.length === 0) return null;
+    const rows = (data ?? []).map((row) => {
+      const loanRaw = row.loans as { shape_record_id: number | null } | { shape_record_id: number | null }[] | null;
+      const loan = Array.isArray(loanRaw) ? loanRaw[0] ?? null : loanRaw;
+      return {
+        id: row.id as string,
+        synced_at: row.synced_at as string,
+        change_type: row.change_type as string,
+        field_name: row.field_name as string | null,
+        old_value: row.old_value as string | null,
+        new_value: row.new_value as string | null,
+        lo_name: row.lo_name as string | null,
+        borrower_name: row.borrower_name as string | null,
+        shape_record_id: loan?.shape_record_id ?? null,
+      };
+    });
 
-    return (
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--color-green)" }} />
-          <span className="lo-heading text-sm font-semibold tracking-tight">Live Activity Feed</span>
-          <span className="lo-muted text-xs">— last 50 changes from Shape sync</span>
-        </div>
-        <div className="lo-table-shell">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th className="lo-th">Time</th>
-                <th className="lo-th">Type</th>
-                <th className="lo-th">Borrower</th>
-                <th className="lo-th">LO</th>
-                <th className="lo-th">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="lo-data-row">
-                  <td className="lo-muted lo-td font-mono text-xs">
-                    {new Date(row.synced_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                  <td className="lo-td">
-                    <ActivityBadge type={row.change_type} />
-                  </td>
-                  <td className="lo-heading lo-td text-xs font-semibold">{row.borrower_name || "—"}</td>
-                  <td className="lo-muted lo-td text-xs">{row.lo_name || "—"}</td>
-                  <td className="lo-muted lo-td max-w-xs truncate text-xs">
-                    {row.change_type === "status_changed"
-                      ? `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`
-                      : row.change_type === "owner_changed"
-                      ? `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`
-                      : row.change_type === "note_added"
-                      ? (row.new_value ?? "").slice(0, 80)
-                      : row.field_name
-                      ? `${row.field_name}: ${row.new_value ?? "—"}`
-                      : row.new_value ?? "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    );
+    if (rows.length === 0) return null;
+    return <LiveActivityFeed rows={rows} />;
   } catch {
     return null;
   }
@@ -158,6 +96,7 @@ async function LiveActivityFeedSection() {
 
 type ManagerScorecardData = {
   managerId: string;
+  teamId: string;
   managerName: string;
   teamName: string;
   totalActive: number;
@@ -237,6 +176,7 @@ async function ManagerScorecardsSection() {
 
       scorecards.push({
         managerId: mgr.id as string,
+        teamId: team.id as string,
         managerName: (mgr.full_name as string | null) ?? "Manager",
         teamName: (team.name as string) ?? "Team",
         totalActive: totalSla,
@@ -262,9 +202,10 @@ async function ManagerScorecardsSection() {
         <div className="lo-accent-text text-[11px] font-bold uppercase tracking-[0.14em]">Manager Scorecards</div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {scorecards.map((sc) => (
-            <div
+            <Link
               key={sc.managerId}
-              className="lo-card space-y-4 p-5"
+              href={`/dashboard/manager?team=${encodeURIComponent(sc.teamId)}`}
+              className="lo-card block space-y-4 p-5 transition-colors hover:border-[var(--lo-teal)]"
               style={sc.slaRed > 0 ? { borderColor: "var(--color-red)" } : undefined}
             >
               <div>
@@ -303,7 +244,7 @@ async function ManagerScorecardsSection() {
                   />
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
@@ -328,6 +269,7 @@ export default async function ExecutiveDashboardPage() {
     opportunities,
     { data: notificationRows },
     { data: queueRaw, error: queueErr },
+    { count: slaRedCount },
   ] = await Promise.all([
     // One query for both ExecutiveFilters AND tier breakdown.
     // lead_tier is included so we compute tier stats from the same dataset.
@@ -366,6 +308,11 @@ export default async function ExecutiveDashboardPage() {
       .select("id,loan_id,tier,status,assignment_method,created_at,assigned_to,error_message")
       .order("created_at", { ascending: false })
       .limit(40),
+
+    admin
+      .from("v_lead_sla_status")
+      .select("*", { count: "exact", head: true })
+      .eq("sla_color", "red"),
   ]);
 
   if (loansErr) throw loansErr;
@@ -454,6 +401,17 @@ export default async function ExecutiveDashboardPage() {
     payload: (r.payload ?? {}) as Record<string, unknown>,
   }));
 
+  const execLoans = ((loans ?? []) as unknown as ExecLoan[]);
+  const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const activePipelineCount = execLoans.filter(
+    (l) => l.current_stage && !TERMINAL.has(l.current_stage) && !TERMINAL_STATUS.has(l.status_raw ?? ""),
+  ).length;
+  const fundedMtdExec = execLoans.filter((l) => {
+    const end = l.closed_at;
+    return end && new Date(end) >= monthStartDate;
+  });
+  const mtdVolumeExec = fundedMtdExec.reduce((n, l) => n + (l.loan_amount_cents ?? 0), 0);
+
   return (
     <div className="qr-dashboard-page animate-fade-up">
       <DashboardPageHeader
@@ -462,6 +420,29 @@ export default async function ExecutiveDashboardPage() {
         description="All-company visibility · signals · AI command center"
         actions={<ExecNotifications initial={notifications} />}
       />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <KpiCard label="Active Pipeline" value={activePipelineCount} color="yellow" />
+        <KpiCard
+          label="Funded MTD"
+          value={fundedMtdExec.length}
+          sub={formatCurrency(mtdVolumeExec)}
+          color="green"
+          subColor="up"
+        />
+        <KpiCard
+          label="SLA Critical"
+          value={slaRedCount ?? 0}
+          color={(slaRedCount ?? 0) > 0 ? "red" : "green"}
+          subColor={(slaRedCount ?? 0) > 0 ? "down" : "up"}
+        />
+        <KpiCard
+          label="Unassigned"
+          value={unassignedExecLoans.length}
+          color={unassignedExecLoans.length > 0 ? "red" : "green"}
+          sub={unassignedExecLoans.length > 0 ? "needs routing" : "all assigned"}
+        />
+      </div>
 
       <LeadTierOverview stats={tierStats} />
 

@@ -4,6 +4,7 @@ import { SyncButton } from "@/components/SyncButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { DashboardRealtime } from "@/components/DashboardRealtime";
 import { SignOutButton } from "@/components/SignOutButton";
+import { CommandPalette } from "@/components/CommandPalette";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   canAccessAdmin,
@@ -113,6 +114,7 @@ export function DashboardShell({ children, appUser, wideMain = false }: Props) {
         className={`relative z-10 mx-auto px-6 py-6 ${wideMain ? "max-w-[1360px]" : "max-w-[1360px]"}`}
       >
         <DashboardRealtime userId={appUser.id} />
+        <CommandPalette />
         {children}
       </main>
     </div>

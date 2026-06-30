@@ -3,9 +3,9 @@ export type ThemeMode = "light" | "dark";
 export const THEME_STORAGE_KEY = "qr-dashboard-theme";
 
 export function getStoredTheme(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return stored === "light" ? "light" : "dark";
+  return stored === "dark" ? "dark" : "light";
 }
 
 export function applyTheme(mode: ThemeMode) {

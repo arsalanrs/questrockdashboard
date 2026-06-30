@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { SparkLine } from "@/components/charts/SparkLine";
 
 type KpiColor = "yellow" | "red" | "green" | "amber" | "blue" | "muted";
 
@@ -26,6 +27,7 @@ export function KpiCard({
   sub,
   color = "muted",
   subColor,
+  trend,
   className,
 }: {
   label: string;
@@ -33,6 +35,7 @@ export function KpiCard({
   sub?: React.ReactNode;
   color?: KpiColor;
   subColor?: "up" | "down" | "neutral";
+  trend?: number[];
   className?: string;
 }) {
   const subClass =
@@ -46,6 +49,9 @@ export function KpiCard({
     <div className={cn("kpi-card lo-card", STRIPE_CLASS[color], className)}>
       <div className="kpi-card-label">{label}</div>
       <div className={cn("kpi-card-value", VALUE_CLASS[color])}>{value}</div>
+      {trend && trend.length > 1 ? (
+        <SparkLine data={trend} color="var(--lo-teal)" height={36} />
+      ) : null}
       {sub != null ? <div className={cn("kpi-card-sub", subClass)}>{sub}</div> : null}
     </div>
   );

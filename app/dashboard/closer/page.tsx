@@ -1,14 +1,9 @@
 import { notFound } from "next/navigation";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { CloserQueue } from "@/components/dashboard/closer/CloserQueue";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewCloserDashboard } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-const CLOSING_STAGES = ["clear_to_close", "closing"] as const;
-const STAGE_LABEL: Record<string, string> = {
-  clear_to_close: "Clear to Close",
-  closing: "Closing",
-};
 
 type LoanRow = {
   id: string;
@@ -28,7 +23,7 @@ export default async function CloserDashboardPage() {
   const { data: loans, error } = await supabase
     .from("loans")
     .select("id,shape_record_id,borrower_first_name,borrower_last_name,current_stage,closing_date,assigned_loan_officer_name")
-    .in("current_stage", [...CLOSING_STAGES])
+    .in("current_stage", ["clear_to_close", "closing"])
     .order("closing_date", { ascending: true, nullsFirst: false })
     .limit(500);
 
@@ -42,10 +37,6 @@ export default async function CloserDashboardPage() {
   }
 
   const rows = (loans ?? []) as unknown as LoanRow[];
-  const byStage = new Map<string, number>();
-  rows.forEach((l) => {
-    if (l.current_stage) byStage.set(l.current_stage, (byStage.get(l.current_stage) ?? 0) + 1);
-  });
 
   return (
     <div className="qr-dashboard-page animate-fade-up">
@@ -54,57 +45,7 @@ export default async function CloserDashboardPage() {
         title="Closer Queue"
         description={`${appUser.full_name} · Files clear to close or in closing`}
       />
-
-      <section className="space-y-2">
-        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">By stage</div>
-        <div className="flex flex-wrap gap-2">
-          {CLOSING_STAGES.map((s) => (
-            <div key={s} className="lo-mini-stat">
-              <div>
-                <div className="lo-mini-stat-label">{STAGE_LABEL[s] ?? s}</div>
-                <div className="lo-mini-stat-value">{byStage.get(s) ?? 0}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="space-y-2">
-        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Queue</div>
-        <div className="lo-card lo-table-wrap">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th className="lo-th">Loan #</th>
-                <th className="lo-th">Borrower</th>
-                <th className="lo-th">Stage</th>
-                <th className="lo-th">Closing Date</th>
-                <th className="lo-th">Assigned LO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((l) => (
-                <tr key={l.id} className="lo-data-row">
-                  <td className="lo-td font-mono text-xs">{l.shape_record_id ?? "—"}</td>
-                  <td className="lo-td lo-name-text">
-                    {l.borrower_first_name ?? ""} {l.borrower_last_name ?? ""}
-                  </td>
-                  <td className="lo-td">{STAGE_LABEL[l.current_stage ?? ""] ?? l.current_stage ?? "—"}</td>
-                  <td className="lo-td">{l.closing_date ?? "—"}</td>
-                  <td className="lo-td">{l.assigned_loan_officer_name ?? "—"}</td>
-                </tr>
-              ))}
-              {rows.length === 0 ? (
-                <tr>
-                  <td className="lo-muted lo-td px-3 py-6 text-center text-sm" colSpan={5}>
-                    No files in closing queue.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <CloserQueue rows={rows} />
     </div>
   );
 }

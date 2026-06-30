@@ -22,6 +22,7 @@ import { evaluateIntradayRules } from "@/lib/sla/time-rules";
 import { shapeLeadUrl } from "@/lib/shape-link";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { EscalateButton, ResolveButton } from "@/components/monitor/EscalateButton";
+import { MonitorInsightsPanel } from "@/components/monitor/MonitorInsightsPanel";
 import { Badge } from "@/components/Badge";
 import { StatCard } from "@/components/StatCard";
 import { etMidnightIso, etTodayDate } from "@/lib/date-utils";
@@ -131,6 +132,7 @@ export default async function MonitorPage() {
     { data: activityRows },
     { data: todayLoans },
     { data: openEscalations },
+    { count: greenSlaCount },
   ] = await Promise.all([
     // SLA view — all non-green loans for this user's scope
     supabase
@@ -163,6 +165,11 @@ export default async function MonitorPage() {
       .is("resolved_at", null)
       .order("created_at", { ascending: false })
       .limit(50),
+
+    supabase
+      .from("v_lead_sla_status")
+      .select("*", { count: "exact", head: true })
+      .eq("sla_color", "green"),
   ]);
 
   // ── Today's touch counts (loan_id → touch_count) ──────────────────────────
@@ -263,6 +270,27 @@ export default async function MonitorPage() {
     };
   });
   loRows.sort((a, b) => a.touchPct - b.touchPct); // lowest contact rate first
+
+  const loNameToUserId = new Map<string, string>();
+  for (const l of todayOnlyLoans) {
+    const name = (l.assigned_loan_officer_name as string | null) ?? "Unassigned";
+    const uid = l.assigned_loan_officer_user_id as string | null;
+    if (uid && !loNameToUserId.has(name)) loNameToUserId.set(name, uid);
+  }
+
+  const loInsightRows = loRows.map((lo) => ({
+    loName: lo.loName,
+    loUserId: loNameToUserId.get(lo.loName) ?? null,
+    touchPct: lo.touchPct,
+    touched: lo.touched,
+    total: lo.newLeads,
+  }));
+
+  const slaSnapshot = [
+    { label: "Red", value: redLoans.length, color: "var(--color-red)" },
+    { label: "Yellow", value: yellowLoans.length, color: "var(--color-amber)" },
+    { label: "Green", value: greenSlaCount ?? 0, color: "var(--color-green)" },
+  ];
 
   // ── Summary counts ────────────────────────────────────────────────────────
   const totalNewToday = todayOnlyLoans.length;
@@ -443,6 +471,7 @@ export default async function MonitorPage() {
         <SectionHeading count={redLoans.length} critical={redLoans.length > 0}>
           SLA Red List
         </SectionHeading>
+        <MonitorInsightsPanel loRows={[]} slaSnapshot={slaSnapshot} showLo={false} />
         <TableWrapper>
           <thead>
             <tr>
@@ -458,10 +487,18 @@ export default async function MonitorPage() {
             {redLoans.length === 0 && (
               <EmptyRow cols={6} msg="No red SLA violations right now." />
             )}
-            {redLoans.map((r) => (
-              <tr key={r.loan_id as string} className="hover:bg-white/[0.02] transition-colors">
+            {redLoans.map((r) => {
+              const borrowerUrl = shapeLeadUrl(r.shape_record_id as number | null);
+              return (
+              <tr key={r.loan_id as string} className="lo-data-row">
                 <Td>
-                  <span className="font-medium text-foreground">{r.borrower_name as string}</span>
+                  {borrowerUrl ? (
+                    <a href={borrowerUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-foreground hover:underline">
+                      {r.borrower_name as string}
+                    </a>
+                  ) : (
+                    <span className="font-medium text-foreground">{r.borrower_name as string}</span>
+                  )}
                 </Td>
                 <Td><span className="text-mutedForeground">{(r.lo_name as string | null) ?? "Unassigned"}</span></Td>
                 <Td><span className="text-xs text-mutedForeground">{(r.status_raw as string | null) ?? "—"}</span></Td>
@@ -484,7 +521,8 @@ export default async function MonitorPage() {
                   </div>
                 </Td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </TableWrapper>
         {yellowLoans.length > 0 && (
@@ -510,9 +548,19 @@ export default async function MonitorPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {yellowLoans.map((r) => (
-                    <tr key={r.loan_id as string} className="hover:bg-white/[0.02] transition-colors">
-                      <Td><span className="font-medium text-foreground">{r.borrower_name as string}</span></Td>
+                  {yellowLoans.map((r) => {
+                    const borrowerUrl = shapeLeadUrl(r.shape_record_id as number | null);
+                    return (
+                    <tr key={r.loan_id as string} className="lo-data-row">
+                      <Td>
+                        {borrowerUrl ? (
+                          <a href={borrowerUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-foreground hover:underline">
+                            {r.borrower_name as string}
+                          </a>
+                        ) : (
+                          <span className="font-medium text-foreground">{r.borrower_name as string}</span>
+                        )}
+                      </Td>
                       <Td><span className="text-mutedForeground">{(r.lo_name as string | null) ?? "Unassigned"}</span></Td>
                       <Td><span className="text-xs text-mutedForeground">{(r.status_raw as string | null) ?? "—"}</span></Td>
                       <Td>
@@ -534,7 +582,8 @@ export default async function MonitorPage() {
                         </div>
                       </Td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </TableWrapper>
             </div>
@@ -545,62 +594,9 @@ export default async function MonitorPage() {
       {/* ── Section 4: LO Accountability Grid ─────────────────────────────── */}
       <div className="space-y-3">
         <SectionHeading>LO Accountability — Today</SectionHeading>
-        {loRows.length === 0 ? (
-          <div className="rounded-xl p-6 text-center text-sm text-mutedForeground" style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
-            No activity recorded today yet.
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {loRows.map((lo) => (
-              <div
-                key={lo.loName}
-                className="rounded-xl p-4"
-                style={{
-                  background: "rgba(255,255,255,0.02)",
-                  border: `1px solid ${lo.touchPct < 40 ? "rgba(239,68,68,0.25)" : lo.touchPct < 75 ? "rgba(245,158,11,0.2)" : "rgba(34,197,94,0.15)"}`,
-                }}
-              >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div className="text-sm font-semibold text-foreground leading-tight">{lo.loName}</div>
-                  <div
-                    className="text-lg font-bold tabular-nums"
-                    style={{ color: contactRateColor(lo.touchPct) }}
-                  >
-                    {lo.touchPct}%
-                  </div>
-                </div>
-
-                {/* Contact rate bar */}
-                <div className="mb-3 h-1.5 w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(lo.touchPct, 100)}%`, background: contactRateColor(lo.touchPct) }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-sm font-bold tabular-nums text-foreground">{lo.newLeads}</div>
-                    <div className="text-[10px] text-mutedForeground">New</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold tabular-nums text-foreground">{lo.touched}</div>
-                    <div className="text-[10px] text-mutedForeground">Touched</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold tabular-nums text-foreground">{lo.notes}</div>
-                    <div className="text-[10px] text-mutedForeground">Notes</div>
-                  </div>
-                </div>
-
-                {lo.lastActivityAt && (
-                  <div className="mt-2 text-[10px] text-mutedForeground">
-                    Last active: {fmtTime(lo.lastActivityAt)} ET
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        <MonitorInsightsPanel loRows={loInsightRows} slaSnapshot={[]} showSla={false} />
+        {loRows.length === 0 && (
+          <div className="dash-card lo-muted px-4 py-6 text-center text-sm">No activity recorded today yet.</div>
         )}
       </div>
 

@@ -31,7 +31,7 @@ function SunIcon() {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [theme, setTheme] = useState<ThemeMode>("light");
 
   useEffect(() => {
     setTheme(getStoredTheme());

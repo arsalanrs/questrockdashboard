@@ -1,4 +1,5 @@
 import { differenceInCalendarDays, format, startOfDay } from "date-fns";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Badge } from "@/components/Badge";
@@ -6,6 +7,8 @@ import { KpiCard } from "@/components/KpiCard";
 import { SourceBadge } from "@/components/SourceBadge";
 import { ExpandableRows } from "@/components/ExpandableRows";
 import { NotMovingTabs, type StuckLoan, type BasicLoan } from "@/components/dashboard/NotMovingTabs";
+import { ManagerChartsPanel } from "@/components/dashboard/manager/ManagerChartsPanel";
+import { WhoHasWhatTable, type LoCardRow } from "@/components/dashboard/manager/WhoHasWhatTable";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { ShapePipelineNav } from "@/components/dashboard/ShapePipelineNav";
 import { ShapeViewTable } from "@/components/dashboard/ShapeViewTable";
@@ -225,7 +228,7 @@ function LoCard({
 export default async function ManagerDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; view?: string; lo?: string }>;
+  searchParams: Promise<{ category?: string; view?: string; lo?: string; team?: string }>;
 }) {
   const { appUser } = await requireCurrentUser();
   if (!canViewManagerDashboard(appUser.role)) notFound();
@@ -234,6 +237,7 @@ export default async function ManagerDashboardPage({
   const now = new Date();
   const { category, viewId } = parseShapePipelineSearchParams(params, now);
   const selectedLoId = params.lo?.trim() || null;
+  const selectedTeamId = params.team?.trim() || null;
   const activeShapeView = getViewById(viewId, now);
 
   const supabase = await createSupabaseServerClient();
@@ -242,7 +246,7 @@ export default async function ManagerDashboardPage({
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const ninetyDaysIso = ninetyDaysAgo.toISOString();
 
-  const [{ data: slaRows, error: slaError }, { data: teamRows, error: teamErr }, { data: loans, error: loansErr }, { data: activeLoUsers }] =
+  const [{ data: slaRows, error: slaError }, { data: teamRows, error: teamErr }, { data: loans, error: loansErr }, { data: activeLoUsers }, { data: teamMemberRows }] =
     await Promise.all([
       supabase.from("sla_thresholds").select("stage,max_days"),
       supabase.from("teams").select("id,name,manager_user_id"),
@@ -260,6 +264,9 @@ export default async function ManagerDashboardPage({
         .select("id,full_name")
         .in("role", ["loan_officer", "manager"])
         .eq("is_active", true),
+      selectedTeamId
+        ? supabase.from("team_members").select("user_id").eq("team_id", selectedTeamId)
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
   if (slaError) throw slaError;
@@ -275,6 +282,7 @@ export default async function ManagerDashboardPage({
   const shapeViewRows = filterLoansForView(shapeLoans, viewId, now);
   const shapeExtraParams: Record<string, string | undefined> = {};
   if (selectedLoId) shapeExtraParams.lo = selectedLoId;
+  if (selectedTeamId) shapeExtraParams.team = selectedTeamId;
 
   const teams = (teamRows ?? []).filter((t) => t.manager_user_id === appUser.id);
   if (!teams.length && appUser.role === "manager") {
@@ -418,13 +426,23 @@ export default async function ManagerDashboardPage({
   // This filters out executives (Bill, Ray, Nikk), deactivated users
   // (Jessica Sherard etc.), and unknown legacy names.
   const allowedUserIds = new Set((activeLoUsers ?? []).map((u) => u.id as string));
+  const teamMemberIds = selectedTeamId
+    ? new Set((teamMemberRows ?? []).map((m) => m.user_id as string))
+    : null;
+  const scopedUserIds = teamMemberIds
+    ? new Set([...allowedUserIds].filter((id) => teamMemberIds.has(id)))
+    : allowedUserIds;
+  const scopedLoUsers = teamMemberIds
+    ? (activeLoUsers ?? []).filter((u) => teamMemberIds.has(u.id as string))
+    : (activeLoUsers ?? []);
   const allowedNamesNorm = new Set(
-    (activeLoUsers ?? []).map((u) => (u.full_name as string ?? "").trim().toLowerCase())
+    scopedLoUsers.map((u) => (u.full_name as string ?? "").trim().toLowerCase())
   );
 
   const perLo = new Map<
     string,
     {
+      loId: string | null;
       name: string;
       active: number;
       stuck: number;
@@ -440,12 +458,13 @@ export default async function ManagerDashboardPage({
     const loNameRaw = (l.assigned_loan_officer_name ?? "").trim();
     const loNameNorm = loNameRaw.toLowerCase();
 
-    if (loId && !allowedUserIds.has(loId)) continue;
+    if (loId && !scopedUserIds.has(loId)) continue;
     if (!loId && (!loNameNorm || !allowedNamesNorm.has(loNameNorm))) continue;
 
     const key = loId ?? loNameRaw;
     const name = loNameRaw || "Unassigned";
     const row = perLo.get(key) ?? {
+      loId: scopedUserIds.has(key) ? key : null,
       name,
       active: 0,
       stuck: 0,
@@ -496,11 +515,14 @@ export default async function ManagerDashboardPage({
   }).length;
   const lpSyncedCount = activeLoans.filter((l) => !!l.lendingpad_loan_uuid).length;
 
-  const teamLabel = teams.map((t) => t.name).join(", ") || "All teams";
+  const teamLabel = selectedTeamId
+    ? ((teamRows ?? []).find((t) => t.id === selectedTeamId)?.name as string | undefined) ?? "Team"
+    : teams.map((t) => t.name).join(", ") || "All teams";
 
   // ── SLA view data (from 15-min sync) ─────────────────────────────────────
   type SlaViewRow = {
     loan_id: string;
+    shape_record_id: number | null;
     borrower_name: string | null;
     lo_name: string | null;
     status_raw: string | null;
@@ -523,13 +545,13 @@ export default async function ManagerDashboardPage({
 
   let slaAlerts: SlaViewRow[] = [];
   let dailyActivity: DailyActivityRow[] = [];
-  let unassignedLoans: Array<{ id: string; borrower_first_name: string | null; borrower_last_name: string | null; status_raw: string | null; current_stage: string | null; lead_created_at: string | null }> = [];
+  let unassignedLoans: Array<{ id: string; shape_record_id: number | null; borrower_first_name: string | null; borrower_last_name: string | null; status_raw: string | null; current_stage: string | null; lead_created_at: string | null }> = [];
 
   try {
     const [slaRes, activityRes, unassignedRes] = await Promise.all([
       supabase
         .from("v_lead_sla_status")
-        .select("loan_id,borrower_name,lo_name,status_raw,current_stage,sla_color,sla_breach_type,hours_since_last_activity,lead_created_at,touched_today")
+        .select("loan_id,shape_record_id,borrower_name,lo_name,status_raw,current_stage,sla_color,sla_breach_type,hours_since_last_activity,lead_created_at,touched_today")
         .in("sla_color", ["red", "yellow"])
         .order("sla_color", { ascending: true })
         .order("hours_since_last_activity", { ascending: false })
@@ -540,7 +562,7 @@ export default async function ManagerDashboardPage({
         .order("loans_touched_today", { ascending: false }),
       supabase
         .from("loans")
-        .select("id,borrower_first_name,borrower_last_name,status_raw,current_stage,lead_created_at")
+        .select("id,shape_record_id,borrower_first_name,borrower_last_name,status_raw,current_stage,lead_created_at")
         .is("assigned_loan_officer_user_id", null)
         .not("current_stage", "in", '("funded","closing")')
         .not("status_raw", "in", '("Funded","Duplicate","Bad Lead","Do Not Contact")')
@@ -700,6 +722,32 @@ export default async function ManagerDashboardPage({
     .sort((a, b) => b.total - a.total)
     .slice(0, 15);
 
+  const PIPELINE_FUNNEL = [
+    { stage: "new_lead", label: "New Lead" },
+    { stage: "verification", label: "Verification" },
+    { stage: "esign_out", label: "eSign Out" },
+    { stage: "processing", label: "Processing" },
+    { stage: "underwriting", label: "Underwriting" },
+    { stage: "conditions", label: "Conditions" },
+    { stage: "clear_to_close", label: "CTC" },
+    { stage: "closing", label: "Closing" },
+  ] as const;
+
+  const funnelStages = PIPELINE_FUNNEL.map(({ stage, label }) => ({
+    label,
+    count: activeLoans.filter((l) => l.current_stage === stage).length,
+  }));
+
+  const slaHealthChartData = stageHealthBars.map((s) => ({
+    label: s.label,
+    value: s.pct,
+  }));
+
+  const leadSourcesChartData = sourceRows.slice(0, 10).map((r) => ({
+    label: r.source.length > 22 ? `${r.source.slice(0, 20)}…` : r.source,
+    value: r.total,
+  }));
+
   // ── LO initials helper ───────────────────────────────────────────────────
   function loInitials(name: string): string {
     return name.split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
@@ -721,11 +769,18 @@ export default async function ManagerDashboardPage({
     return { label: "At Risk", color: "red" };
   }
 
-  const PILL_STYLES = {
-    green: { background: "rgba(34,197,94,0.10)",  color: "#22C55E" },
-    amber: { background: "rgba(245,158,11,0.10)", color: "#F59E0B" },
-    red:   { background: "rgba(255,75,75,0.12)",  color: "#FF4B4B" },
-  };
+  const whoHasWhatRows: LoCardRow[] = loCards.map((r, i) => ({
+    loId: r.loId,
+    name: r.name,
+    active: r.active,
+    stuck: r.stuck,
+    closingThisWeek: r.closingThisWeek,
+    mtdLoans: r.mtdLoans,
+    mtdVolumeCents: r.mtdVolumeCents,
+    health: loHealth(r.stuck, r.active),
+    avatar: LO_AVATAR_COLORS[i % LO_AVATAR_COLORS.length],
+    initials: loInitials(r.name),
+  }));
 
   return (
     <div className="qr-dashboard-page animate-fade-up">
@@ -740,10 +795,10 @@ export default async function ManagerDashboardPage({
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionHeading>Shape Pipeline</SectionHeading>
-          {(activeLoUsers ?? []).length > 0 && (
+          {(scopedLoUsers ?? []).length > 0 && (
             <Suspense fallback={null}>
               <LoFilterSelector
-                users={(activeLoUsers ?? []) as Array<{ id: string; full_name: string | null }>}
+                users={scopedLoUsers as Array<{ id: string; full_name: string | null }>}
                 selectedLoId={selectedLoId}
               />
             </Suspense>
@@ -802,6 +857,8 @@ export default async function ManagerDashboardPage({
           subColor={unassignedLoans.length > 0 ? "down" : "up"}
         />
       </div>
+
+      <ManagerChartsPanel funnelStages={funnelStages} slaHealth={[]} leadSources={[]} />
 
       {/* ── Main bento grid ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 anim-d2">
@@ -883,35 +940,8 @@ export default async function ManagerDashboardPage({
 
           {/* SLA Health bars */}
           {stageHealthBars.length > 0 && (
-            <div className="dash-card">
-              <div className="dash-card-header">
-                <span className="dash-card-title">Stage SLA Health</span>
-                <span className="lo-muted text-[11px]">% on time</span>
-              </div>
-              <div className="flex flex-col gap-3 px-4 py-4">
-                {stageHealthBars.map((s) => (
-                  <div key={s.label} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-medium">{s.label}</span>
-                      <span
-                        className="text-[12px] font-semibold tabular-nums"
-                        style={{ color: s.pct >= 80 ? "#22C55E" : s.pct >= 60 ? "#F59E0B" : "#FF4B4B" }}
-                      >
-                        {s.pct}%
-                      </span>
-                    </div>
-                    <div className="h-[4px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${s.pct}%`,
-                          background: s.pct >= 80 ? "var(--color-green)" : s.pct >= 60 ? "var(--color-amber)" : "var(--color-red)",
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="dash-card p-2">
+              <ManagerChartsPanel funnelStages={[]} slaHealth={slaHealthChartData} leadSources={[]} />
             </div>
           )}
         </div>
@@ -997,7 +1027,7 @@ export default async function ManagerDashboardPage({
                     : ["New Lead", "Not Contacted", "Attempting Contact"].includes(l.status_raw ?? "") ? "#FF4B4B"
                     : "hsl(215 14% 60%)";
                   return (
-                    <tr key={l.id}>
+                    <tr key={l.id} className="lo-data-row">
                       <td className="font-medium">{borrowerName(l)}</td>
                       <td><SourceBadge source={l.source} /></td>
                       <td>
@@ -1031,67 +1061,9 @@ export default async function ManagerDashboardPage({
           <span className="text-[11px] text-mutedForeground">{loCards.length} active LOs</span>
         </div>
         {loCards.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[12px] text-mutedForeground">No active loan officers found.</div>
+          <div className="lo-muted px-4 py-8 text-center text-[12px]">No active loan officers found.</div>
         ) : (
-          <table className="dt">
-            <thead>
-              <tr>
-                <th>Loan Officer</th>
-                <th className="r">Active</th>
-                <th className="r">Stuck</th>
-                <th className="r">Closing</th>
-                <th className="r">Funded MTD</th>
-                <th className="r">Volume MTD</th>
-                <th className="r">Health</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loCards.map((r, i) => {
-                const av = LO_AVATAR_COLORS[i % LO_AVATAR_COLORS.length];
-                const health = loHealth(r.stuck, r.active);
-                return (
-                  <tr key={r.name}>
-                    <td>
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                          style={{ background: av.bg, color: av.text }}
-                        >
-                          {loInitials(r.name)}
-                        </div>
-                        <span className="font-medium">{r.name}</span>
-                      </div>
-                    </td>
-                    <td className="r font-semibold tabular-nums">{r.active}</td>
-                    <td className="r tabular-nums">
-                      <span style={{ color: r.stuck > 0 ? "#FF4B4B" : "hsl(210 20% 96%)", fontWeight: r.stuck > 0 ? 600 : 400 }}>
-                        {r.stuck}
-                      </span>
-                    </td>
-                    <td className="r tabular-nums">
-                      <span style={{ color: r.closingThisWeek > 0 ? "#F59E0B" : undefined }}>
-                        {r.closingThisWeek}
-                      </span>
-                    </td>
-                    <td className="r tabular-nums">
-                      <span style={{ color: r.mtdLoans > 0 ? "#22C55E" : undefined }}>
-                        {r.mtdLoans}
-                      </span>
-                    </td>
-                    <td className="r tabular-nums text-[12px]">{formatCurrency(r.mtdVolumeCents)}</td>
-                    <td className="r">
-                      <span
-                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={PILL_STYLES[health.color]}
-                      >
-                        {health.label}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <WhoHasWhatTable rows={whoHasWhatRows} />
         )}
       </div>
 
@@ -1111,8 +1083,11 @@ export default async function ManagerDashboardPage({
               const total = lo.active;
               const pct = total > 0 ? Math.round((touched / total) * 100) : 0;
               const clr = total === 0 ? "var(--lo-muted)" : pct >= 60 ? "var(--color-green)" : pct >= 30 ? "var(--color-amber)" : "var(--color-red)";
+              const loHref = lo.loId
+                ? `/dashboard/manager?lo=${encodeURIComponent(lo.loId)}${selectedTeamId ? `&team=${encodeURIComponent(selectedTeamId)}` : ""}`
+                : `/dashboard/manager?lo=${encodeURIComponent(lo.name)}${selectedTeamId ? `&team=${encodeURIComponent(selectedTeamId)}` : ""}`;
               return (
-                <div key={lo.name} className="lo-card flex flex-col gap-3 p-3.5">
+                <Link key={lo.name} href={loHref} className="lo-card flex flex-col gap-3 p-3.5 transition-colors hover:border-[var(--lo-teal)]">
                   <div className="flex items-start justify-between gap-2">
                     <div className="lo-heading text-[13px] font-semibold leading-tight">{lo.name}</div>
                     <div className="text-right">
@@ -1145,7 +1120,7 @@ export default async function ManagerDashboardPage({
                       <div className="lo-muted text-[10px]">New</div>
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -1171,12 +1146,15 @@ export default async function ManagerDashboardPage({
                 <th className="r">Hours Idle</th>
                 <th>Violation</th>
                 <th>Touched Today</th>
+                <th className="r">Shape</th>
               </tr>
             </thead>
             <tbody>
-              <ExpandableRows max={6} label="alerts" colSpan={6}>
-                {slaAlerts.map((row) => (
-                  <tr key={row.loan_id} style={{ background: row.sla_color === "red" ? "color-mix(in srgb, var(--lo-card) 92%, #ff4b4b)" : "color-mix(in srgb, var(--lo-card) 94%, #f59e0b)" }}>
+              <ExpandableRows max={6} label="alerts" colSpan={7}>
+                {slaAlerts.map((row) => {
+                  const shapeUrl = shapeLeadUrl(row.shape_record_id);
+                  return (
+                  <tr key={row.loan_id} className="lo-data-row" style={{ background: row.sla_color === "red" ? "color-mix(in srgb, var(--lo-card) 92%, #ff4b4b)" : "color-mix(in srgb, var(--lo-card) 94%, #f59e0b)" }}>
                     <td className="font-medium">{row.borrower_name || "—"}</td>
                     <td className="lo-muted">{row.lo_name || "Unassigned"}</td>
                     <td className="lo-muted">{row.current_stage?.replace(/_/g, " ") ?? "—"}</td>
@@ -1193,8 +1171,14 @@ export default async function ManagerDashboardPage({
                         ? <span style={{ color: "var(--color-green)", fontSize: "12px", fontWeight: 600 }}>Yes</span>
                         : <span style={{ color: "var(--color-red)", fontSize: "12px", fontWeight: 600 }}>No</span>}
                     </td>
+                    <td className="r">
+                      {shapeUrl ? (
+                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">Open ↗</a>
+                      ) : "—"}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </ExpandableRows>
             </tbody>
           </table>
@@ -1257,12 +1241,15 @@ export default async function ManagerDashboardPage({
                 <th>Status</th>
                 <th>Stage</th>
                 <th>Created</th>
+                <th className="r">Shape</th>
               </tr>
             </thead>
             <tbody>
-              <ExpandableRows max={5} label="leads" colSpan={5}>
-                {unassignedLoans.map((l) => (
-                  <tr key={l.id} style={{ background: "color-mix(in srgb, var(--lo-card) 92%, #ff4b4b)" }}>
+              <ExpandableRows max={5} label="leads" colSpan={6}>
+                {unassignedLoans.map((l) => {
+                  const shapeUrl = shapeLeadUrl(l.shape_record_id);
+                  return (
+                  <tr key={l.id} className="lo-data-row" style={{ background: "color-mix(in srgb, var(--lo-card) 92%, #ff4b4b)" }}>
                     <td className="font-medium">
                       {[l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—"}
                     </td>
@@ -1274,8 +1261,14 @@ export default async function ManagerDashboardPage({
                     <td className="lo-muted font-mono text-[11px]">
                       {l.lead_created_at ? format(new Date(l.lead_created_at), "MMM d, h:mm a") : "—"}
                     </td>
+                    <td className="r">
+                      {shapeUrl ? (
+                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">Open ↗</a>
+                      ) : "—"}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </ExpandableRows>
             </tbody>
           </table>
@@ -1283,36 +1276,8 @@ export default async function ManagerDashboardPage({
       )}
 
       {/* ── Source Attribution ─────────────────────────────────────────────── */}
-      {sourceRows.length > 0 && (
-        <div className="dash-card">
-          <div className="dash-card-header">
-            <span className="dash-card-title">Lead Sources</span>
-          </div>
-          <table className="dt">
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th className="text-right">Total</th>
-                <th className="text-right">New Today</th>
-                <th className="text-right">SLA Red</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sourceRows.map((r) => (
-                <tr key={r.source}>
-                  <td className="font-medium">{r.source}</td>
-                  <td className="text-right font-mono text-[12px]">{r.total}</td>
-                  <td className="text-right font-mono text-[12px]" style={{ color: r.newToday > 0 ? "#22C55E" : undefined }}>
-                    {r.newToday > 0 ? `+${r.newToday}` : "—"}
-                  </td>
-                  <td className="text-right font-mono text-[12px]" style={{ color: r.slaRed > 0 ? "#FF4B4B" : undefined }}>
-                    {r.slaRed > 0 ? r.slaRed : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {leadSourcesChartData.length > 0 && (
+        <ManagerChartsPanel funnelStages={[]} slaHealth={[]} leadSources={leadSourcesChartData} />
       )}
     </div>
   );
