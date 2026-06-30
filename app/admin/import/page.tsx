@@ -60,16 +60,24 @@ export default async function AdminImportPage({ searchParams }: Props) {
   (teams ?? []).forEach((t) => teamNameById.set(t.id, t.name));
 
   return (
-    <div className="qr-dashboard-page">
-      <div className="space-y-1">
-        <p className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Admin</p>
-        <h1 className="lo-heading text-xl font-semibold sm:text-2xl">Import &amp; sync</h1>
-        <p className="lo-muted text-sm">Import Shape KPI CSV into Supabase (raw + normalized loans).</p>
+    <div className="qr-dashboard-page ops-dashboard animate-fade-up">
+      <div className="ops-page-head">
+        <div>
+          <div className="ops-eyebrow">
+            <span className="ops-eyebrow-pulse" aria-hidden />
+            Admin tools
+          </div>
+          <h1 className="ops-page-title">Import &amp; Sync</h1>
+          <p className="ops-page-sub">Import Shape KPI CSV into Supabase (raw + normalized loans).</p>
+        </div>
       </div>
 
-      <div className="lo-card p-5">
-        <h2 className="lo-heading text-sm font-semibold">Import: Shape KPI CSV</h2>
-        <p className="lo-muted mt-1 text-sm">
+      <section className="ops-section p-5">
+        <h2 className="ops-section-title mb-1">
+          <span className="icon" aria-hidden>↑</span>
+          Import: Shape KPI CSV
+        </h2>
+        <p className="lo-muted text-sm">
           Upload the exported report (e.g. <span className="font-mono">customreportcsv_*.csv</span>).
         </p>
 
@@ -202,11 +210,14 @@ export default async function AdminImportPage({ searchParams }: Props) {
         <p className="mt-4 text-xs text-mutedForeground">
           Requires <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span> on the server.
         </p>
-      </div>
+      </section>
 
-      <div className="rounded-lg border border-border bg-card p-5 text-cardForeground">
-        <h2 className="text-sm font-semibold">Mock data</h2>
-        <p className="mt-1 text-sm text-mutedForeground">
+      <section className="ops-section p-5">
+        <h2 className="ops-section-title mb-1">
+          <span className="icon" aria-hidden>◇</span>
+          Mock data
+        </h2>
+        <p className="lo-muted text-sm">
           Generate/enrich fields that aren’t in the Shape KPI export (stages, conditions, closing dates).
         </p>
 
@@ -262,11 +273,14 @@ export default async function AdminImportPage({ searchParams }: Props) {
             </div>
           </form>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-lg border border-border bg-card p-5 text-cardForeground">
-        <h2 className="text-sm font-semibold">Org setup</h2>
-        <p className="mt-1 text-sm text-mutedForeground">
+      <section className="ops-section p-5">
+        <h2 className="ops-section-title mb-1">
+          <span className="icon" aria-hidden>◇</span>
+          Org setup
+        </h2>
+        <p className="lo-muted text-sm">
           Seed initial users/teams for demo. Creates auth users with <span className="font-mono">example.invalid</span> emails and a
           shared password.
         </p>
@@ -436,7 +450,7 @@ export default async function AdminImportPage({ searchParams }: Props) {
             </table>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

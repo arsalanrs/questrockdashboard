@@ -115,31 +115,36 @@ export default async function AdminViewPage({ searchParams }: { searchParams: Pr
       : `Team view — ${selectedUser?.full_name ?? "LO"}`;
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <div>
-        <p className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Admin</p>
-        <h1 className="lo-heading text-xl font-semibold tracking-tight">Team View</h1>
-        <p className="lo-muted mt-1 text-sm">
-          Select a loan officer to open their command center. Unassigned leads need an LO in Shape.
-        </p>
+    <div className="ops-dashboard flex min-w-0 flex-col gap-4 animate-fade-up">
+      <div className="ops-page-head">
+        <div>
+          <div className="ops-eyebrow">
+            <span className="ops-eyebrow-pulse" aria-hidden />
+            Admin · team oversight
+          </div>
+          <h1 className="ops-page-title">Team View</h1>
+          <p className="ops-page-sub">
+            Select a loan officer to open their command center. Unassigned leads need an LO in Shape.
+          </p>
+        </div>
       </div>
 
       <LoSelector items={selectorItems} currentLo={selectedLo} />
 
       {selectedLo === "unassigned" && loans.length > 0 ? (
-        <div className="lo-card border-amber-500/30 bg-amber-50/80 px-4 py-3 text-sm dark:bg-amber-950/20">
-          <p className="font-medium text-amber-900 dark:text-amber-200">
+        <div className="ops-section border-amber-200 bg-amber-50/50 px-5 py-3">
+          <p className="font-medium" style={{ color: "var(--amber-700)" }}>
             {loans.length} lead{loans.length !== 1 ? "s" : ""} not assigned to any loan officer
           </p>
-          <p className="lo-muted mt-1 text-amber-800 dark:text-amber-300/90">
+          <p className="lo-muted mt-1 text-sm">
             Assign these in Shape so they appear on the correct LO dashboard.
           </p>
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Failed to load loans: {error}
+        <div className="ops-section px-5 py-3" style={{ borderColor: "var(--color-red)" }}>
+          <p className="text-sm" style={{ color: "var(--color-red)" }}>Failed to load loans: {error}</p>
         </div>
       ) : null}
 

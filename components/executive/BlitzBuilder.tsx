@@ -70,51 +70,48 @@ export function BlitzBuilder() {
   }
 
   return (
-    <section className="dash-card p-4">
-      <div className="mb-3 text-[11px] uppercase tracking-wider text-mutedForeground">Blitz</div>
-      <h2 className="text-base font-semibold">Assignment preview &amp; execute</h2>
-      <p className="mt-1 text-xs text-mutedForeground">
-        Loans must have <code className="rounded bg-muted px-1">auto_assign_eligible = true</code> and matching{" "}
-        <code className="rounded bg-muted px-1">lead_tier</code>. Configure pools via{" "}
-        <code className="rounded bg-muted px-1">EXEC_AUTO_ASSIGNMENT_JSON</code>.
-      </p>
+    <section className="exec-section" style={{ marginBottom: 0 }}>
+      <div className="exec-section-body p-0">
+        <div className="exec-blitz-box">
+          <div className="exec-blitz-title">⚡ Blitz Builder</div>
+          <div className="exec-blitz-sub">Preview before bulk-assigning RED/ORANGE tier leads</div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-mutedForeground">Tier</span>
+      <div className="mt-4 flex flex-wrap items-end gap-3 relative z-[1]">
+        <label className="flex flex-col gap-1 text-xs text-[rgba(244,239,221,0.7)]">
+          <span>Tier</span>
           <select
             value={tier}
             onChange={(e) => setTier(e.target.value as "RED" | "ORANGE")}
-            className="rounded border border-border bg-transparent px-2 py-1"
+            className="rounded border border-[rgba(255,255,255,0.2)] bg-[rgba(0,0,0,0.2)] px-2 py-1 text-[#F4EFDD]"
           >
             <option value="RED">RED</option>
             <option value="ORANGE">ORANGE</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-mutedForeground">Limit</span>
+        <label className="flex flex-col gap-1 text-xs text-[rgba(244,239,221,0.7)]">
+          <span>Limit</span>
           <input
             type="number"
             min={1}
             max={100}
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value) || 20)}
-            className="w-24 rounded border border-border bg-transparent px-2 py-1"
+            className="w-24 rounded border border-[rgba(255,255,255,0.2)] bg-[rgba(0,0,0,0.2)] px-2 py-1 text-[#F4EFDD]"
           />
         </label>
         <button
           type="button"
           onClick={() => void runPreview()}
           disabled={loading}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          className="exec-blitz-btn text-xs disabled:opacity-50"
         >
-          {loading ? "Preview…" : "Preview"}
+          {loading ? "Preview…" : "Preview blitz"}
         </button>
         <button
           type="button"
           onClick={() => void runExecute()}
           disabled={execLoading || rows.length === 0}
-          className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-500/15 disabled:opacity-50"
+          className="rounded-md border border-[rgba(255,255,255,0.25)] px-3 py-1.5 text-xs font-semibold text-[#F4EFDD] hover:bg-[rgba(255,255,255,0.08)] disabled:opacity-50"
         >
           {execLoading ? "Executing…" : "Confirm execute"}
         </button>
@@ -128,9 +125,9 @@ export function BlitzBuilder() {
       )}
 
       {rows.length > 0 && (
-        <div className="mt-4 overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[640px] text-left text-xs">
-            <thead className="border-b border-border bg-muted/40 text-[11px] uppercase text-mutedForeground">
+        <div className="relative z-[1] mt-4 overflow-x-auto rounded-md border border-[rgba(255,255,255,0.15)]">
+          <table className="w-full min-w-[640px] text-left text-xs text-[#F4EFDD]">
+            <thead className="border-b border-[rgba(255,255,255,0.15)] text-[11px] uppercase opacity-70">
               <tr>
                 <th className="px-2 py-2">Borrower</th>
                 <th className="px-2 py-2">Amount</th>
@@ -141,18 +138,20 @@ export function BlitzBuilder() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.loanId} className="border-b border-border/80">
+                <tr key={r.loanId} className="border-b border-[rgba(255,255,255,0.08)]">
                   <td className="px-2 py-2">{r.borrowerDisplay ?? "—"}</td>
                   <td className="px-2 py-2 tabular-nums">{fmt$(r.loanAmountCents)}</td>
                   <td className="px-2 py-2">{r.currentLoName ?? "—"}</td>
                   <td className="px-2 py-2 font-medium">{r.proposedName}</td>
-                  <td className="px-2 py-2 text-mutedForeground">{r.assignmentMethod}</td>
+                  <td className="px-2 py-2 opacity-70">{r.assignmentMethod}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+        </div>
+      </div>
     </section>
   );
 }

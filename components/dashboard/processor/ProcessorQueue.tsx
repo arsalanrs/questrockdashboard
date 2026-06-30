@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/Badge";
-import { DataTable } from "@/components/DataTable";
 import { shapeLeadUrl } from "@/lib/shape-link";
 
 type SlaStatus = "On Track" | "At Risk" | "Exceeded";
@@ -15,6 +14,7 @@ export type ProcessorLoanRow = {
   borrower_last_name: string | null;
   current_stage: string | null;
   loan_type: string | null;
+  loan_amount_cents: number | null;
   is_restructure_hold: boolean;
   assigned_loan_officer_name: string | null;
   hours: number | null;
@@ -23,11 +23,13 @@ export type ProcessorLoanRow = {
   openConditions: number;
 };
 
-type SummaryCard = {
+type SummaryDef = {
   id: string;
   label: string;
-  filter: (row: ProcessorLoanRow) => boolean;
-  exceeded: (rows: ProcessorLoanRow[]) => boolean;
+  stages: string[];
+  useRestructure?: boolean;
+  tone: string;
+  icon: string;
 };
 
 const STAGE_LABEL: Record<string, string> = {
@@ -41,218 +43,319 @@ const STAGE_LABEL: Record<string, string> = {
   clear_to_close: "Clear to Close",
 };
 
-const SLA_BADGE_VARIANT: Record<SlaStatus, "green" | "yellow" | "red"> = {
-  "On Track": "green",
-  "At Risk": "yellow",
-  Exceeded: "red",
+const STAGE_BADGE: Record<string, "red" | "yellow" | "green" | "default"> = {
+  conditions: "red",
+  approval_conditions: "red",
+  underwriting: "red",
+  clear_to_close: "yellow",
+  processing: "default",
+  submission: "default",
+  esign_out: "green",
 };
+
+const TILE_DEFS: SummaryDef[] = [
+  { id: "esign", label: "New from eSign", stages: ["esign_out"], tone: "t1", icon: "✉" },
+  { id: "processing", label: "In Processing", stages: ["processing", "submission"], tone: "t2", icon: "📄" },
+  { id: "uw", label: "Underwriting", stages: ["underwriting"], tone: "t3", icon: "🏷" },
+  { id: "conditions", label: "Conditions", stages: ["conditions", "approval_conditions"], tone: "t4", icon: "☑" },
+  { id: "prectc", label: "Pre-CTC", stages: ["clear_to_close"], tone: "t5", icon: "🚩" },
+  { id: "restructure", label: "Restructure Hold", stages: [], useRestructure: true, tone: "t6", icon: "⏸" },
+];
+
+function borrower(l: ProcessorLoanRow) {
+  return [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—";
+}
+
+function initials(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function fmtLoanSub(l: ProcessorLoanRow): string {
+  const type = l.loan_type ?? "Loan";
+  if (l.loan_amount_cents == null) return type;
+  const dollars = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(l.loan_amount_cents / 100);
+  return `${type} · ${dollars}`;
+}
+
+function avatarFor(sla: SlaStatus): { bg: string; color: string } {
+  if (sla === "Exceeded") return { bg: "#FCEEEC", color: "#A33B2E" };
+  if (sla === "At Risk") return { bg: "#FCF3E3", color: "#96631A" };
+  return { bg: "#EAF1F7", color: "#244E76" };
+}
+
+function hrsClass(sla: SlaStatus): string {
+  if (sla === "Exceeded") return "danger";
+  if (sla === "At Risk") return "warn";
+  return "ok";
+}
+
+function matchesTile(row: ProcessorLoanRow, tile: SummaryDef): boolean {
+  if (tile.useRestructure) return row.is_restructure_hold;
+  return !row.is_restructure_hold && tile.stages.includes(row.current_stage ?? "");
+}
+
+type ChecklistItem = {
+  id: string;
+  title: string;
+  status: string;
+};
+
+function GamePlanChecklist({ loanId }: { loanId: string }) {
+  const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/loans/${loanId}/checklist`)
+      .then((r) => r.json())
+      .then((j) => setItems(j.checklist ?? []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, [loanId]);
+
+  if (loading) return <p className="lo-muted text-sm">Loading game plan…</p>;
+  if (items.length === 0) {
+    return <p className="lo-muted text-sm">No checklist items yet for this file.</p>;
+  }
+
+  return (
+    <div>
+      {items.slice(0, 12).map((item) => {
+        const done = item.status === "received" || item.status === "waived";
+        return (
+          <div key={item.id} className={cn("proc-check-row", done && "done")}>
+            <div className="proc-check-icon">{done ? "✓" : ""}</div>
+            <div className="proc-check-label">{item.title}</div>
+            {!done && item.status === "pending" && (
+              <div className="text-[11px] font-semibold" style={{ color: "var(--color-red)" }}>Pending</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 type Props = {
   loans: ProcessorLoanRow[];
-  summaryCards: Array<{ id: string; label: string; stages: string[]; useRestructure?: boolean }>;
+  processorName: string;
 };
 
-export function ProcessorQueue({ loans, summaryCards }: Props) {
+export function ProcessorQueue({ loans, processorName }: Props) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<ProcessorLoanRow | null>(null);
-
-  const cards: SummaryCard[] = useMemo(
-    () =>
-      summaryCards.map((c) => ({
-        id: c.id,
-        label: c.label,
-        filter: (row) => {
-          if (c.useRestructure) return row.is_restructure_hold;
-          return !row.is_restructure_hold && c.stages.includes(row.current_stage ?? "");
-        },
-        exceeded: (rows) => {
-          const subset = rows.filter((r) => {
-            if (c.useRestructure) return r.is_restructure_hold;
-            return !r.is_restructure_hold && c.stages.includes(r.current_stage ?? "");
-          });
-          return subset.some((l) => l.slaStatus === "Exceeded");
-        },
-      })),
-    [summaryCards],
-  );
+  const [slideOpen, setSlideOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (!activeFilter) return loans;
-    const card = cards.find((c) => c.id === activeFilter);
-    return card ? loans.filter(card.filter) : loans;
-  }, [loans, activeFilter, cards]);
+    const tile = TILE_DEFS.find((t) => t.id === activeFilter);
+    return tile ? loans.filter((r) => matchesTile(r, tile)) : loans;
+  }, [loans, activeFilter]);
 
-  const borrower = (l: ProcessorLoanRow) =>
-    [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—";
+  function openSlide(row: ProcessorLoanRow) {
+    setSelected(row);
+    setSlideOpen(true);
+  }
+
+  function closeSlide() {
+    setSlideOpen(false);
+    setSelected(null);
+  }
+
 
   return (
     <>
-      <section className="space-y-2">
-        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Pipeline Overview</div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <button
-            type="button"
-            onClick={() => setActiveFilter(null)}
-            className={cn(
-              "lo-mini-stat text-left transition-colors",
-              activeFilter === null && "ring-2 ring-[var(--lo-teal)]",
-            )}
-          >
-            <div>
-              <div className="lo-mini-stat-label">All queues</div>
-              <div className="lo-mini-stat-value">{loans.length}</div>
-            </div>
-          </button>
-          {cards.map((card) => {
-            const count = loans.filter(card.filter).length;
-            const exceeded = card.exceeded(loans);
-            return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => setActiveFilter(card.id)}
-                className={cn(
-                  "lo-mini-stat text-left transition-colors hover:border-[var(--lo-teal)]",
-                  activeFilter === card.id && "ring-2 ring-[var(--lo-teal)]",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
-                    exceeded ? "bg-red-500" : "bg-emerald-500",
-                  )}
-                />
-                <div className="min-w-0">
-                  <div className="lo-mini-stat-label truncate">{card.label}</div>
-                  <div className="lo-mini-stat-value">{count}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="space-y-2">
-        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Work Queue</div>
-        <DataTable
-          rows={filtered}
-          rowKey={(r) => r.id}
-          onRowClick={setSelected}
-          maxHeight="480px"
-          emptyMessage="No files in this queue."
-          columns={[
-            { key: "queue", label: "Queue", sortable: true },
-            {
-              key: "shape_record_id",
-              label: "Loan #",
-              sortable: true,
-              render: (r) => <span className="font-mono text-xs">{r.shape_record_id ?? "—"}</span>,
-            },
-            {
-              key: "borrower",
-              label: "Borrower",
-              sortable: true,
-              sortValue: (r) => borrower(r),
-              render: (r) => <span className="lo-name-text">{borrower(r)}</span>,
-            },
-            { key: "loan_type", label: "Type", sortable: true },
-            {
-              key: "current_stage",
-              label: "Stage",
-              sortable: true,
-              render: (r) => STAGE_LABEL[r.current_stage ?? ""] ?? r.current_stage ?? "—",
-            },
-            {
-              key: "hours",
-              label: "Hours",
-              sortable: true,
-              align: "right",
-              sortValue: (r) => r.hours ?? -1,
-              render: (r) => <span className="tabular-nums">{r.hours ?? "—"}</span>,
-            },
-            {
-              key: "openConditions",
-              label: "Conditions",
-              sortable: true,
-              align: "right",
-            },
-            { key: "assigned_loan_officer_name", label: "LO", sortable: true },
-            {
-              key: "slaStatus",
-              label: "SLA",
-              sortable: true,
-              render: (r) => <Badge variant={SLA_BADGE_VARIANT[r.slaStatus]}>{r.slaStatus}</Badge>,
-            },
-            {
-              key: "actions",
-              label: "Actions",
-              align: "right",
-              render: (r) => {
-                const url = shapeLeadUrl(r.shape_record_id);
-                return url ? (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="lo-link-chip shape"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Shape ↗
-                  </a>
-                ) : (
-                  "—"
-                );
-              },
-            },
-          ]}
-        />
-      </section>
-
-      <section className="lo-card p-5">
-        <h2 className="lo-heading text-sm font-semibold">Game Plan</h2>
-        {!selected ? (
-          <p className="lo-muted mt-2 text-sm">Click a row in the queue to view file details and next steps.</p>
-        ) : (
-          <div className="mt-3 space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="lo-heading text-base font-semibold">{borrower(selected)}</p>
-                <p className="lo-muted text-sm">
-                  {selected.queue} · {STAGE_LABEL[selected.current_stage ?? ""] ?? selected.current_stage ?? "—"}
-                </p>
-              </div>
-              {shapeLeadUrl(selected.shape_record_id) ? (
-                <a
-                  href={shapeLeadUrl(selected.shape_record_id)!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="lo-link-chip shape"
-                >
-                  Open in Shape ↗
-                </a>
-              ) : null}
-            </div>
-            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <div className="lo-detail-cell rounded-lg p-2">
-                <dt className="lo-muted text-[10px] uppercase">Loan #</dt>
-                <dd className="lo-heading font-mono">{selected.shape_record_id ?? "—"}</dd>
-              </div>
-              <div className="lo-detail-cell rounded-lg p-2">
-                <dt className="lo-muted text-[10px] uppercase">Hours in stage</dt>
-                <dd className="lo-heading tabular-nums">{selected.hours ?? "—"}</dd>
-              </div>
-              <div className="lo-detail-cell rounded-lg p-2">
-                <dt className="lo-muted text-[10px] uppercase">Open conditions</dt>
-                <dd className="lo-heading tabular-nums">{selected.openConditions}</dd>
-              </div>
-              <div className="lo-detail-cell rounded-lg p-2">
-                <dt className="lo-muted text-[10px] uppercase">SLA</dt>
-                <dd><Badge variant={SLA_BADGE_VARIANT[selected.slaStatus]}>{selected.slaStatus}</Badge></dd>
-              </div>
-            </dl>
+      <div className="ops-page-head">
+        <div>
+          <div className="ops-eyebrow">
+            <span className="ops-eyebrow-pulse" aria-hidden />
+            {loans.length} files in queue
           </div>
-        )}
+          <h1 className="ops-page-title">Processor Queue</h1>
+          <p className="ops-page-sub">{processorName} · sorted worst-first by hours in stage</p>
+        </div>
+      </div>
+
+      <div className="ops-stat-grid">
+        {TILE_DEFS.map((tile) => {
+          const count = loans.filter((r) => matchesTile(r, tile)).length;
+          const active = activeFilter === tile.id;
+          return (
+            <button
+              key={tile.id}
+              type="button"
+              className={cn("ops-stat-tile", tile.tone, active && "active")}
+              onClick={() => setActiveFilter(activeFilter === tile.id ? null : tile.id)}
+            >
+              <div className="icon" aria-hidden>{tile.icon}</div>
+              <p className="n">{count}</p>
+              <p className="l">{tile.label}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <section className="ops-section">
+        <div className="ops-section-head">
+          <h2 className="ops-section-title">
+            <span className="icon" aria-hidden>☰</span>
+            Sortable Queue
+          </h2>
+          <span className="ops-section-meta">
+            <span className="ops-sort-note">↓ Worst SLA first</span>
+          </span>
+        </div>
+        <table className="dt">
+          <thead>
+            <tr>
+              <th>Borrower</th>
+              <th>LO</th>
+              <th>Stage</th>
+              <th>Queue</th>
+              <th className="r">Hrs in stage</th>
+              <th>Conditions</th>
+              <th>SLA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="lo-muted px-6 py-8 text-center text-sm">
+                  No files in this queue.
+                </td>
+              </tr>
+            )}
+            {filtered.map((row) => {
+              const name = borrower(row);
+              const av = avatarFor(row.slaStatus);
+              const stageKey = row.current_stage ?? "";
+              const badgeVariant = STAGE_BADGE[stageKey] ?? "default";
+              const isSelected = selected?.id === row.id;
+              return (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    row.slaStatus === "Exceeded" && "row-critical",
+                    isSelected && slideOpen && "selected",
+                  )}
+                  onClick={() => openSlide(row)}
+                >
+                  <td>
+                    <div className="ops-name-cell">
+                      <div className="ops-avatar" style={{ background: av.bg, color: av.color }}>
+                        {initials(name)}
+                      </div>
+                      <div>
+                        <div className="ops-name-main">{name}</div>
+                        <div className="ops-name-sub">{fmtLoanSub(row)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="lo-muted text-[12px]">{row.assigned_loan_officer_name ?? "—"}</td>
+                  <td>
+                    <Badge variant={badgeVariant}>
+                      {STAGE_LABEL[stageKey] ?? stageKey.replace(/_/g, " ")}
+                    </Badge>
+                  </td>
+                  <td className="lo-muted text-[12px]">{row.queue}</td>
+                  <td className={cn("r ops-hrs", hrsClass(row.slaStatus))}>
+                    {row.hours != null ? `${row.hours}h` : "—"}
+                  </td>
+                  <td>
+                    <span className="ops-cond-count">☑ {row.openConditions} open</span>
+                  </td>
+                  <td>
+                    <Badge variant={row.slaStatus === "Exceeded" ? "red" : row.slaStatus === "At Risk" ? "yellow" : "green"}>
+                      {row.slaStatus === "On Track" ? "On track" : row.slaStatus}
+                    </Badge>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </section>
+
+      <div className={cn("proc-overlay", slideOpen && "open")} onClick={closeSlide} aria-hidden />
+      <div className={cn("proc-slideover", slideOpen && "open")} role="dialog" aria-modal="true">
+        {!selected ? (
+          <div className="proc-so-empty">
+            <span style={{ fontSize: 38, opacity: 0.5 }}>☝</span>
+            <div>Click a row to view its Game Plan</div>
+          </div>
+        ) : (
+          <>
+            <div className="proc-so-head">
+              <button type="button" className="proc-so-close" onClick={closeSlide} aria-label="Close">
+                ✕
+              </button>
+              {(() => {
+                const av = avatarFor(selected.slaStatus);
+                const name = borrower(selected);
+                const shapeUrl = shapeLeadUrl(selected.shape_record_id);
+                return (
+                  <>
+                    <div className="proc-so-avatar" style={{ background: av.bg, color: av.color }}>
+                      {initials(name)}
+                    </div>
+                    <p className="proc-so-name">{name}</p>
+                    <p className="proc-so-meta">{fmtLoanSub(selected)}</p>
+                    <p className="proc-so-meta">LO: {selected.assigned_loan_officer_name ?? "—"}</p>
+                    {shapeUrl ? (
+                      <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="proc-so-shape">
+                        Open in Shape ↗
+                      </a>
+                    ) : null}
+                  </>
+                );
+              })()}
+            </div>
+            <div className="proc-so-body">
+              <div className="proc-so-stat-row">
+                <div className="proc-so-stat">
+                  <div className="l">Stage</div>
+                  <div className="v" style={{ fontSize: 14 }}>
+                    {STAGE_LABEL[selected.current_stage ?? ""] ?? selected.current_stage ?? "—"}
+                  </div>
+                </div>
+                <div className="proc-so-stat">
+                  <div className="l">Hours in stage</div>
+                  <div className="v">{selected.hours != null ? `${selected.hours}h` : "—"}</div>
+                </div>
+                <div className="proc-so-stat">
+                  <div className="l">SLA</div>
+                  <div
+                    className="v"
+                    style={{
+                      fontSize: 13,
+                      color:
+                        selected.slaStatus === "Exceeded"
+                          ? "var(--red-700)"
+                          : selected.slaStatus === "At Risk"
+                            ? "var(--amber-700)"
+                            : "var(--emerald-600)",
+                    }}
+                  >
+                    {selected.slaStatus}
+                  </div>
+                </div>
+                <div className="proc-so-stat">
+                  <div className="l">Open conditions</div>
+                  <div className="v">{selected.openConditions}</div>
+                </div>
+              </div>
+              <p className="proc-checklist-title">Game Plan</p>
+              <GamePlanChecklist loanId={selected.id} />
+            </div>
+          </>
+        )}
+      </div>
     </>
   );
 }

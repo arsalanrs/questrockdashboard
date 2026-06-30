@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { CloserQueue } from "@/components/dashboard/closer/CloserQueue";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewCloserDashboard } from "@/lib/permissions";
@@ -39,13 +38,8 @@ export default async function CloserDashboardPage() {
   const rows = (loans ?? []) as unknown as LoanRow[];
 
   return (
-    <div className="qr-dashboard-page animate-fade-up">
-      <DashboardPageHeader
-        eyebrow="Operations"
-        title="Closer Queue"
-        description={`${appUser.full_name} · Files clear to close or in closing`}
-      />
-      <CloserQueue rows={rows} />
+    <div className="qr-dashboard-page ops-dashboard animate-fade-up">
+      <CloserQueue rows={rows} closerName={appUser.full_name ?? "Closer"} />
     </div>
   );
 }

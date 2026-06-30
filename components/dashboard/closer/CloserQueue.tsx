@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { cn } from "@/lib/cn";
-import { DataTable } from "@/components/DataTable";
+import { Badge } from "@/components/Badge";
 import { shapeLeadUrl } from "@/lib/shape-link";
 
 export type CloserLoanRow = {
@@ -21,131 +21,167 @@ const STAGE_LABEL: Record<string, string> = {
   closing: "Closing",
 };
 
-const CLOSING_STAGES = ["clear_to_close", "closing"] as const;
+const CLOSING_STAGES = [
+  { key: "clear_to_close", label: "Clear to Close", tone: "t7", icon: "✓" },
+  { key: "closing", label: "Closing", tone: "t8", icon: "🔑" },
+] as const;
 
-function closingTone(dateStr: string | null): { className: string; label: string } {
-  if (!dateStr) return { className: "lo-muted", label: "—" };
+function borrower(r: CloserLoanRow) {
+  return [r.borrower_first_name, r.borrower_last_name].filter(Boolean).join(" ") || "—";
+}
+
+function initials(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function closingMeta(dateStr: string | null): { className: string; label: string; badge: "red" | "yellow" | "green" } {
+  if (!dateStr) return { className: "ok", label: "—", badge: "green" };
   const days = differenceInCalendarDays(new Date(dateStr), new Date());
-  if (days < 0) return { className: "text-[var(--color-red)] font-semibold", label: dateStr };
-  if (days <= 3) return { className: "text-[var(--color-amber)] font-semibold", label: dateStr };
-  return { className: "text-[var(--color-green)] font-semibold", label: dateStr };
+  const label = format(new Date(dateStr), "MMM d, yyyy");
+  if (days < 0) return { className: "danger", label: `${label} (${Math.abs(days)}d late)`, badge: "red" };
+  if (days <= 3) return { className: "warn", label: `${label} (${days}d)`, badge: "yellow" };
+  return { className: "ok", label, badge: "green" };
 }
 
 type Props = {
   rows: CloserLoanRow[];
+  closerName: string;
 };
 
-export function CloserQueue({ rows }: Props) {
+export function CloserQueue({ rows, closerName }: Props) {
   const [stageFilter, setStageFilter] = useState<string | null>(null);
-
-  const byStage = useMemo(() => {
-    const m = new Map<string, number>();
-    rows.forEach((l) => {
-      if (l.current_stage) m.set(l.current_stage, (m.get(l.current_stage) ?? 0) + 1);
-    });
-    return m;
-  }, [rows]);
 
   const filtered = useMemo(() => {
     if (!stageFilter) return rows;
     return rows.filter((r) => r.current_stage === stageFilter);
   }, [rows, stageFilter]);
 
-  const borrower = (r: CloserLoanRow) =>
-    [r.borrower_first_name, r.borrower_last_name].filter(Boolean).join(" ") || "—";
-
   return (
     <>
-      <section className="space-y-2">
-        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">By stage</div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setStageFilter(null)}
-            className={cn(
-              "lo-mini-stat transition-colors",
-              stageFilter === null && "ring-2 ring-[var(--lo-teal)]",
-            )}
-          >
-            <div>
-              <div className="lo-mini-stat-label">All</div>
-              <div className="lo-mini-stat-value">{rows.length}</div>
-            </div>
-          </button>
-          {CLOSING_STAGES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStageFilter(s)}
-              className={cn(
-                "lo-mini-stat transition-colors hover:border-[var(--lo-teal)]",
-                stageFilter === s && "ring-2 ring-[var(--lo-teal)]",
-              )}
-            >
-              <div>
-                <div className="lo-mini-stat-label">{STAGE_LABEL[s] ?? s}</div>
-                <div className="lo-mini-stat-value">{byStage.get(s) ?? 0}</div>
-              </div>
-            </button>
-          ))}
+      <div className="ops-page-head">
+        <div>
+          <div className="ops-eyebrow">
+            <span className="ops-eyebrow-pulse" aria-hidden />
+            {rows.length} files to close
+          </div>
+          <h1 className="ops-page-title">Closer Queue</h1>
+          <p className="ops-page-sub">{closerName} · sorted by closing date</p>
         </div>
-      </section>
+      </div>
 
-      <section className="space-y-2">
-        <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Queue</div>
-        <DataTable
-          rows={filtered}
-          rowKey={(r) => r.id}
-          maxHeight="520px"
-          emptyMessage="No files in closing queue."
-          columns={[
-            {
-              key: "shape_record_id",
-              label: "Loan #",
-              sortable: true,
-              render: (r) => <span className="font-mono text-xs">{r.shape_record_id ?? "—"}</span>,
-            },
-            {
-              key: "borrower",
-              label: "Borrower",
-              sortable: true,
-              sortValue: (r) => borrower(r),
-              render: (r) => <span className="lo-name-text">{borrower(r)}</span>,
-            },
-            {
-              key: "current_stage",
-              label: "Stage",
-              sortable: true,
-              render: (r) => STAGE_LABEL[r.current_stage ?? ""] ?? r.current_stage ?? "—",
-            },
-            {
-              key: "closing_date",
-              label: "Closing Date",
-              sortable: true,
-              sortValue: (r) => r.closing_date ?? "",
-              render: (r) => {
-                const t = closingTone(r.closing_date);
-                return <span className={t.className}>{t.label}</span>;
-              },
-            },
-            { key: "assigned_loan_officer_name", label: "Assigned LO", sortable: true },
-            {
-              key: "actions",
-              label: "Actions",
-              align: "right",
-              render: (r) => {
-                const url = shapeLeadUrl(r.shape_record_id);
-                return url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">
-                    Shape ↗
-                  </a>
-                ) : (
-                  "—"
-                );
-              },
-            },
-          ]}
-        />
+      <div className="ops-stat-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <button
+          type="button"
+          className={cn("ops-stat-tile t2", stageFilter === null && "active")}
+          onClick={() => setStageFilter(null)}
+        >
+          <div className="icon" aria-hidden>📋</div>
+          <p className="n">{rows.length}</p>
+          <p className="l">All closing files</p>
+        </button>
+        {CLOSING_STAGES.map((s) => {
+          const count = rows.filter((r) => r.current_stage === s.key).length;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              className={cn("ops-stat-tile", s.tone, stageFilter === s.key && "active")}
+              onClick={() => setStageFilter(stageFilter === s.key ? null : s.key)}
+            >
+              <div className="icon" aria-hidden>{s.icon}</div>
+              <p className="n">{count}</p>
+              <p className="l">{s.label}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <section className="ops-section">
+        <div className="ops-section-head">
+          <h2 className="ops-section-title">
+            <span className="icon" aria-hidden>☰</span>
+            Closing Queue
+          </h2>
+          <span className="ops-section-meta">Soonest closing first</span>
+        </div>
+        <table className="dt">
+          <thead>
+            <tr>
+              <th>Borrower</th>
+              <th>Stage</th>
+              <th>Closing Date</th>
+              <th>Assigned LO</th>
+              <th className="r">Shape</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={5} className="lo-muted px-6 py-8 text-center text-sm">
+                  No files in closing queue.
+                </td>
+              </tr>
+            )}
+            {filtered.map((row) => {
+              const name = borrower(row);
+              const closing = closingMeta(row.closing_date);
+              const av =
+                closing.badge === "red"
+                  ? { bg: "#FCEEEC", color: "#A33B2E" }
+                  : closing.badge === "yellow"
+                    ? { bg: "#FCF3E3", color: "#96631A" }
+                    : { bg: "#E9F4ED", color: "#1F7A4D" };
+              const url = shapeLeadUrl(row.shape_record_id);
+              return (
+                <tr
+                  key={row.id}
+                  className={closing.badge === "red" ? "row-critical" : undefined}
+                  onClick={() => url && window.open(url, "_blank")}
+                >
+                  <td>
+                    <div className="ops-name-cell">
+                      <div className="ops-avatar" style={{ background: av.bg, color: av.color }}>
+                        {initials(name)}
+                      </div>
+                      <div>
+                        <div className="ops-name-main">{name}</div>
+                        <div className="ops-name-sub font-mono text-[11px]">
+                          #{row.shape_record_id ?? "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <Badge variant={row.current_stage === "closing" ? "green" : "yellow"}>
+                      {STAGE_LABEL[row.current_stage ?? ""] ?? row.current_stage ?? "—"}
+                    </Badge>
+                  </td>
+                  <td>
+                    <span className={cn("ops-hrs", closing.className)}>{closing.label}</span>
+                  </td>
+                  <td className="lo-muted text-[12px]">{row.assigned_loan_officer_name ?? "—"}</td>
+                  <td className="r">
+                    {url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="lo-link-chip shape"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Open ↗
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </section>
     </>
   );

@@ -426,34 +426,62 @@ export function OpportunitiesPanel({ signals, loRollups, lastRunAt }: Props) {
   const loNames = useMemo(() => loRollups.map((l) => l.loName), [loRollups]);
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-wider text-mutedForeground">
-            Deal detection signal library — from your data
-          </div>
-          <h2 className="mt-0.5 text-lg font-semibold">Opportunities</h2>
-          <p className="text-xs text-mutedForeground">
-            {signals.length} active signal{signals.length === 1 ? "" : "s"} · last run {formatRelative(lastRunAt)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={filterLo}
-            onChange={(e) => setFilterLo(e.target.value)}
-            className="rounded border border-border bg-transparent px-2 py-1 text-xs"
-          >
-            <option value="">All LOs</option>
-            {loNames.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
+    <section className="exec-section" style={{ marginBottom: 0 }}>
+      <div className="exec-section-head">
+        <h2 className="exec-section-title">
+          <span className="icon" aria-hidden>💡</span>
+          Opportunities
+        </h2>
+        <span className="exec-pill-ai">✦ AI Signals</span>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-3">
+        <p className="lo-muted text-xs">
+          {signals.length} active signal{signals.length === 1 ? "" : "s"} · last run {formatRelative(lastRunAt)}
+        </p>
+        <select
+          value={filterLo}
+          onChange={(e) => setFilterLo(e.target.value)}
+          className="exec-select-pill text-xs"
+        >
+          <option value="">All LOs</option>
+          {loNames.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="exec-opp-list" style={{ paddingTop: 12 }}>
+        {filtered.slice(0, 5).map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setSelected(s)}
+            className="exec-opp-card w-full text-left"
+          >
+            <div className="exec-opp-score">
+              <span className="n">{s.priority * 20 + 14}</span>
+              <span className="l">Score</span>
+            </div>
+            <div className="exec-opp-body">
+              <p className="exec-opp-title">
+                {s.borrowerName ?? "Borrower"} — {SIGNAL_LABEL[s.signalType] ?? s.signalType}
+              </p>
+              <span className="exec-opp-sub">{s.reason}</span>
+            </div>
+            <span className="exec-opp-tag">{s.category}</span>
+            <span className="text-xs font-semibold" style={{ color: "var(--green-700)" }}>
+              Open ↗
+            </span>
+          </button>
+        ))}
+        {filtered.length === 0 && (
+          <p className="lo-muted py-6 text-center text-sm">No opportunities match the current filter.</p>
+        )}
+      </div>
+
+      <div className="space-y-4 border-t border-[var(--border-soft)] p-4">
         {/* Stalled pipeline — easiest wins */}
         <div className="rounded-lg border border-orange-500/30 bg-card p-4">
           <div className="mb-3 flex items-center gap-2">

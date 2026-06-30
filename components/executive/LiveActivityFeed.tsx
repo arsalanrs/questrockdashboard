@@ -15,35 +15,58 @@ export type ActivityLogRow = {
   shape_record_id?: number | null;
 };
 
-const CHANGE_TYPE_LABELS: Record<string, string> = {
-  loan_created: "New Lead",
-  status_changed: "Status",
-  owner_changed: "Reassigned",
-  note_added: "Note",
-  field_changed: "Field",
-};
+function dotColor(type: string): string {
+  if (type === "loan_created" || type === "status_changed") return "var(--color-green)";
+  if (type === "note_added" || type === "field_changed") return "#2e6190";
+  if (type === "owner_changed") return "var(--gold-600)";
+  return "var(--color-red)";
+}
 
-function ActivityBadge({ type }: { type: string }) {
-  const label = CHANGE_TYPE_LABELS[type] ?? type;
-  const cls =
-    type === "loan_created" ? "pill-green"
-    : type === "status_changed" ? "pill-yellow"
-    : type === "owner_changed" ? "pill-blue"
-    : type === "note_added" ? "pill-blue"
-    : "pill-muted";
+function feedSummary(row: ActivityLogRow): React.ReactNode {
+  const lo = row.lo_name ?? "Someone";
+  const borrower = row.borrower_name ?? "a lead";
+  if (row.change_type === "status_changed") {
+    return (
+      <>
+        <b>{lo}</b> moved {borrower} to <b>{row.new_value ?? "new status"}</b>
+      </>
+    );
+  }
+  if (row.change_type === "note_added") {
+    return (
+      <>
+        <b>{lo}</b> added note on {borrower}
+      </>
+    );
+  }
+  if (row.change_type === "loan_created") {
+    return (
+      <>
+        <b>{lo}</b> received new lead {borrower}
+      </>
+    );
+  }
+  if (row.change_type === "owner_changed") {
+    return (
+      <>
+        <b>{borrower}</b> reassigned to <b>{row.new_value ?? "—"}</b>
+      </>
+    );
+  }
   return (
-    <span className={`${cls} inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide`}>
-      {label}
-    </span>
+    <>
+      <b>{lo}</b> updated {borrower}
+    </>
   );
 }
 
-function detailText(row: ActivityLogRow) {
-  if (row.change_type === "status_changed") return `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`;
-  if (row.change_type === "owner_changed") return `${row.old_value ?? "?"} → ${row.new_value ?? "?"}`;
-  if (row.change_type === "note_added") return (row.new_value ?? "").slice(0, 80);
-  if (row.field_name) return `${row.field_name}: ${row.old_value ?? ""} → ${row.new_value ?? ""}`;
-  return row.new_value ?? "—";
+function relativeMins(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.round(hrs / 24)}d`;
 }
 
 export function LiveActivityFeed({ rows }: { rows: ActivityLogRow[] }) {
@@ -56,65 +79,48 @@ export function LiveActivityFeed({ rows }: { rows: ActivityLogRow[] }) {
       (r) =>
         (r.borrower_name ?? "").toLowerCase().includes(q) ||
         (r.lo_name ?? "").toLowerCase().includes(q) ||
-        (r.change_type ?? "").toLowerCase().includes(q) ||
-        detailText(r).toLowerCase().includes(q),
+        (r.change_type ?? "").toLowerCase().includes(q),
     );
   }, [rows, query]);
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--color-green)" }} />
-          <span className="lo-heading text-sm font-semibold tracking-tight">Live Activity Feed</span>
-          <span className="lo-muted text-xs">— last {rows.length} changes</span>
-        </div>
+    <section className="exec-section" style={{ marginBottom: 0 }}>
+      <div className="exec-section-head">
+        <h2 className="exec-section-title">
+          <span className="icon" aria-hidden>〰</span>
+          Live Activity
+        </h2>
+        <span className="exec-section-meta">Shape field changes</span>
+      </div>
+      <div className="exec-section-body" style={{ paddingTop: 6 }}>
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter activity…"
-          className="lo-input ml-auto h-9 max-w-xs rounded-lg px-3 text-sm"
+          className="exec-chat-input mb-3 w-full max-w-sm"
         />
-      </div>
-      <div className="lo-table-shell max-h-[360px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              <th className="lo-th">Time</th>
-              <th className="lo-th">Type</th>
-              <th className="lo-th">Borrower</th>
-              <th className="lo-th">LO</th>
-              <th className="lo-th">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => {
-              const shapeUrl = shapeLeadUrl(row.shape_record_id ?? null);
-              return (
-                <tr key={row.id} className="lo-data-row">
-                  <td className="lo-muted lo-td font-mono text-xs">
-                    {new Date(row.synced_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                  <td className="lo-td">
-                    <ActivityBadge type={row.change_type} />
-                  </td>
-                  <td className="lo-td">
-                    {shapeUrl ? (
-                      <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="lo-heading text-xs font-semibold hover:underline">
-                        {row.borrower_name || "—"}
-                      </a>
-                    ) : (
-                      <span className="lo-heading text-xs font-semibold">{row.borrower_name || "—"}</span>
-                    )}
-                  </td>
-                  <td className="lo-muted lo-td text-xs">{row.lo_name || "—"}</td>
-                  <td className="lo-muted lo-td max-w-xs truncate text-xs">{detailText(row)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {filtered.slice(0, 12).map((row) => {
+          const url = shapeLeadUrl(row.shape_record_id ?? null);
+          return (
+            <div key={row.id} className="exec-feed-row">
+              <span className="exec-feed-dot" style={{ background: dotColor(row.change_type) }} />
+              <span className="exec-feed-text">
+                {url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    {feedSummary(row)}
+                  </a>
+                ) : (
+                  feedSummary(row)
+                )}
+              </span>
+              <span className="exec-feed-time">{relativeMins(row.synced_at)}</span>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <p className="lo-muted py-4 text-center text-sm">No activity matches your filter.</p>
+        )}
       </div>
     </section>
   );

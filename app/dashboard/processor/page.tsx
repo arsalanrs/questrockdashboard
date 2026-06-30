@@ -1,6 +1,5 @@
 import { differenceInHours } from "date-fns";
 import { notFound } from "next/navigation";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { ProcessorQueue } from "@/components/dashboard/processor/ProcessorQueue";
 import { requireCurrentUser } from "@/lib/current-user";
 import { canViewProcessorDashboard } from "@/lib/permissions";
@@ -32,6 +31,7 @@ type LoanRow = {
   borrower_last_name: string | null;
   current_stage: string | null;
   loan_type: string | null;
+  loan_amount_cents: number | null;
   is_restructure_hold: boolean;
   assigned_loan_officer_name: string | null;
   loan_stage_events: Array<{ entered_at: string }> | null;
@@ -71,15 +71,6 @@ function resolveQueue(loan: LoanRow): Queue {
   }
 }
 
-const SUMMARY_CARDS = [
-  { id: "esign", label: "New from eSign", stages: ["esign_out"] },
-  { id: "processing", label: "In Processing", stages: ["processing", "submission"] },
-  { id: "uw", label: "In Underwriting", stages: ["underwriting"] },
-  { id: "conditions", label: "Conditions Review", stages: ["conditions", "approval_conditions"] },
-  { id: "prectc", label: "Pre-CTC", stages: ["clear_to_close"] },
-  { id: "restructure", label: "Restructure Hold", stages: [], useRestructure: true },
-];
-
 const SLA_SORT_WEIGHT: Record<SlaStatus, number> = {
   Exceeded: 0,
   "At Risk": 1,
@@ -96,7 +87,7 @@ export default async function ProcessorDashboardPage() {
     supabase
       .from("loans")
       .select(
-        "id,shape_record_id,borrower_first_name,borrower_last_name,current_stage,loan_type,is_restructure_hold,assigned_loan_officer_name,loan_stage_events(entered_at),conditions(status)",
+        "id,shape_record_id,borrower_first_name,borrower_last_name,current_stage,loan_type,loan_amount_cents,is_restructure_hold,assigned_loan_officer_name,loan_stage_events(entered_at),conditions(status)",
       )
       .in("current_stage", [...RELEVANT_STAGES])
       .limit(500),
@@ -139,13 +130,11 @@ export default async function ProcessorDashboardPage() {
   });
 
   return (
-    <div className="qr-dashboard-page animate-fade-up">
-      <DashboardPageHeader
-        eyebrow="Operations"
-        title="Processor Queue"
-        description={`${appUser.full_name} · Questrock File Flow`}
+    <div className="qr-dashboard-page proc-dashboard animate-fade-up">
+      <ProcessorQueue
+        loans={enriched.slice(0, 100)}
+        processorName={appUser.full_name ?? "Processor"}
       />
-      <ProcessorQueue loans={enriched.slice(0, 100)} summaryCards={SUMMARY_CARDS} />
     </div>
   );
 }

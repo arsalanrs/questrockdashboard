@@ -8,8 +8,8 @@ import { SourceBadge } from "@/components/SourceBadge";
 import { ExpandableRows } from "@/components/ExpandableRows";
 import { NotMovingTabs, type StuckLoan, type BasicLoan } from "@/components/dashboard/NotMovingTabs";
 import { ManagerChartsPanel } from "@/components/dashboard/manager/ManagerChartsPanel";
+import { ManagerNotMovingBento, type BentoCategory } from "@/components/dashboard/manager/ManagerNotMovingBento";
 import { WhoHasWhatTable, type LoCardRow } from "@/components/dashboard/manager/WhoHasWhatTable";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { ShapePipelineNav } from "@/components/dashboard/ShapePipelineNav";
 import { ShapeViewTable } from "@/components/dashboard/ShapeViewTable";
 import { LoFilterSelector } from "@/components/dashboard/LoFilterSelector";
@@ -79,17 +79,6 @@ function formatClosingDate(d: string) {
 }
 
 // ─── Small inline components ────────────────────────────────────────────────
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">
-        {children}
-      </span>
-      <div className="h-px flex-1 bg-[var(--lo-border)]" />
-    </div>
-  );
-}
 
 function EmptyRow({ cols, message }: { cols: number; message: string }) {
   return (
@@ -672,10 +661,14 @@ export default async function ManagerDashboardPage({
     }));
 
   // Contact rate color
-  const contactRateColor = contactRatePct == null ? "#E8FF00"
-    : contactRatePct >= 70 ? "#22C55E"
-    : contactRatePct >= 50 ? "#F59E0B"
-    : "#FF4B4B";
+  const contactRateColor =
+    contactRatePct == null
+      ? "var(--lo-muted)"
+      : contactRatePct >= 70
+        ? "var(--color-green)"
+        : contactRatePct >= 50
+          ? "var(--color-amber)"
+          : "var(--color-red)";
 
   const prePipeStalledBasic: BasicLoan[] = prePipeStalled.map((l) => ({
     id: l.id,
@@ -754,11 +747,12 @@ export default async function ManagerDashboardPage({
   }
 
   const LO_AVATAR_COLORS = [
-    { bg: "rgba(96,165,250,0.12)",  text: "#60A5FA" },
-    { bg: "rgba(34,197,94,0.12)",   text: "#22C55E" },
-    { bg: "rgba(232,255,0,0.10)",   text: "#E8FF00" },
-    { bg: "rgba(245,158,11,0.12)",  text: "#F59E0B" },
-    { bg: "rgba(167,139,250,0.12)", text: "#a78bfa" },
+    { bg: "var(--green-800)", text: "#F4EFDD" },
+    { bg: "var(--green-700)", text: "#F4EFDD" },
+    { bg: "var(--green-600)", text: "#F4EFDD" },
+    { bg: "var(--green-500)", text: "#F4EFDD" },
+    { bg: "var(--gold-600)", text: "#F4EFDD" },
+    { bg: "var(--green-900)", text: "#F4EFDD" },
   ];
 
   function loHealth(stuck: number, active: number): { label: string; color: "green" | "amber" | "red" } {
@@ -782,19 +776,74 @@ export default async function ManagerDashboardPage({
     initials: loInitials(r.name),
   }));
 
-  return (
-    <div className="qr-dashboard-page animate-fade-up">
-      <DashboardPageHeader
-        eyebrow="Manager"
-        title="Pipeline"
-        description={teamLabel}
-        meta={format(new Date(), "EEE MMM d, yyyy")}
-      />
+  const notMovingFlagged =
+    stuckLoans.length + untouchedLeads.length + signedNoAppraisal.length;
 
-      {/* ── Shape Pipeline (Nikk views) ─────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionHeading>Shape Pipeline</SectionHeading>
+  const notMovingBento: BentoCategory[] = [
+    {
+      key: "stuck",
+      title: "SLA Exceeded",
+      tone: "red",
+      count: stuckLoans.length,
+      rows: stuckLoans.slice(0, 4).map((l) => ({
+        id: l.id,
+        name: borrowerName(l),
+        meta: `${l.daysOverSla}d over`,
+        href: shapeLeadUrl(l.shape_record_id),
+      })),
+    },
+    {
+      key: "untouched",
+      title: "Untouched 24h+",
+      tone: "amber",
+      count: untouchedLeads.length,
+      rows: untouchedLeads.slice(0, 4).map((l) => ({
+        id: l.id,
+        name: borrowerName(l),
+        meta: "24h+",
+        href: shapeLeadUrl(l.shape_record_id),
+      })),
+    },
+    {
+      key: "pitched",
+      title: "Pitched, Waiting",
+      tone: "muted",
+      count: pitchedWaiting.length,
+      rows: pitchedWaiting.slice(0, 4).map((l) => ({
+        id: l.id,
+        name: borrowerName(l),
+        meta: l.status_raw ?? "waiting",
+        href: shapeLeadUrl(l.shape_record_id),
+      })),
+    },
+    {
+      key: "noappraisal",
+      title: "Signed, No Appraisal",
+      tone: "green",
+      count: signedNoAppraisal.length,
+      rows: signedNoAppraisal.slice(0, 4).map((l) => ({
+        id: l.id,
+        name: borrowerName(l),
+        meta: "no appraisal",
+        href: shapeLeadUrl(l.shape_record_id),
+      })),
+    },
+  ];
+
+  return (
+    <div className="qr-dashboard-page mgr-dashboard animate-fade-up">
+      <div className="mgr-page-head">
+        <div>
+          <div className="mgr-eyebrow">
+            <span className="mgr-eyebrow-pulse" aria-hidden />
+            Manager · live pipeline
+          </div>
+          <h1 className="mgr-page-title">Pipeline — {teamLabel}</h1>
+          <p className="mgr-page-sub">
+            {format(new Date(), "EEEE, MMMM d")} · {loCards.length} active LOs · 90-day window
+          </p>
+        </div>
+        <div className="mgr-head-actions">
           {(scopedLoUsers ?? []).length > 0 && (
             <Suspense fallback={null}>
               <LoFilterSelector
@@ -804,23 +853,10 @@ export default async function ManagerDashboardPage({
             </Suspense>
           )}
         </div>
-        {activeShapeView && (
-          <p className="lo-muted -mt-1 text-xs">
-            {activeShapeView.label} · {shapeViewRows.length} records · 90-day window
-          </p>
-        )}
-        <ShapePipelineNav
-          basePath="/dashboard/manager"
-          category={category}
-          activeViewId={viewId}
-          viewCounts={shapeViewCounts}
-          extraParams={shapeExtraParams}
-        />
-        <ShapeViewTable rows={shapeViewRows} viewId={viewId} showLoColumn={!selectedLoId} />
-      </section>
+      </div>
 
       {/* ── KPI strip ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 anim-d1">
+      <div className="mgr-kpi-row anim-d1">
         <KpiCard
           label="Active Pipeline"
           value={activeLoans.length}
@@ -858,61 +894,128 @@ export default async function ManagerDashboardPage({
         />
       </div>
 
-      <ManagerChartsPanel funnelStages={funnelStages} slaHealth={[]} leadSources={[]} />
+      <ManagerChartsPanel
+        unified
+        funnelStages={funnelStages}
+        slaHealth={slaHealthChartData}
+        leadSources={leadSourcesChartData}
+      />
 
-      {/* ── Main bento grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 anim-d2">
-
-        {/* What's Not Moving — 8 cols */}
-        <div className="lg:col-span-8 dash-card">
-          <div className="dash-card-header">
-            <div className="flex items-center gap-2.5">
-              <span className="dash-card-title">What&apos;s Not Moving</span>
-              {(stuckLoans.length + untouchedLeads.length + signedNoAppraisal.length) > 0 && (
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-                  style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}
-                >
-                  {stuckLoans.length + untouchedLeads.length + signedNoAppraisal.length}
-                </span>
-              )}
-            </div>
-          </div>
-          <NotMovingTabs
-            stuckLoans={stuckLoansProps}
-            untouchedLeads={toBasic(untouchedLeads)}
-            notContactedStuck={toBasic(notContactedStuck)}
-            pitchedWaiting={toBasic(pitchedWaiting)}
-            prePipeStalled={prePipeStalledBasic}
-            signedNoAppraisal={toBasic(signedNoAppraisal)}
-          />
+      {/* ── What's Not Moving ─────────────────────────────────────────────── */}
+      <section className="mgr-section anim-d2">
+        <div className="mgr-section-head">
+          <h2 className="mgr-section-title">What&apos;s Not Moving</h2>
+          {notMovingFlagged > 0 && (
+            <span className="mgr-count-pill">{notMovingFlagged} flagged</span>
+          )}
         </div>
+        <div className="mgr-section-body">
+          <ManagerNotMovingBento categories={notMovingBento} />
+          <details className="mgr-details mgr-bento-expand">
+            <summary className="lo-muted flex cursor-pointer items-center gap-2 py-3 text-[12px] font-medium">
+              <svg className="mgr-details-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              View full lists by category
+            </summary>
+            <NotMovingTabs
+              stuckLoans={stuckLoansProps}
+              untouchedLeads={toBasic(untouchedLeads)}
+              notContactedStuck={toBasic(notContactedStuck)}
+              pitchedWaiting={toBasic(pitchedWaiting)}
+              prePipeStalled={prePipeStalledBasic}
+              signedNoAppraisal={toBasic(signedNoAppraisal)}
+            />
+          </details>
+        </div>
+      </section>
 
-        {/* Right column — 4 cols */}
-        <div className="flex flex-col gap-4 lg:col-span-4">
-
-          {/* What's Late — Overdue closings */}
-          <div className="dash-card">
-            <div className="dash-card-header">
-              <span className="dash-card-title">What&apos;s Late</span>
-              {overdueClosings.length > 0 && (
-                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
-                  {overdueClosings.length} overdue
-                </span>
-              )}
+      {/* ── Calling list + Late closings ──────────────────────────────────── */}
+      <div className="mgr-grid-2 anim-d3">
+        {callingTodayLoans.length > 0 ? (
+          <section className="mgr-section">
+            <div className="mgr-section-head">
+              <h2 className="mgr-section-title">Who Are We Calling Today?</h2>
+              <span className="mgr-section-meta">{callingTodayLoans.length} leads · CTC → Conditions → New</span>
             </div>
+            <div className="mgr-section-body p-0">
+              <table className="dt">
+                <thead>
+                  <tr>
+                    <th>Borrower</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Owner</th>
+                    <th>Phone</th>
+                    <th className="r">Shape</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ExpandableRows max={6} label="leads" colSpan={6}>
+                    {callingTodayLoans.map((l) => {
+                      const url = shapeLeadUrl(l.shape_record_id);
+                      const statusColor =
+                        ["Clear to Close", "Closing"].includes(l.status_raw ?? "") ? "var(--color-green)"
+                        : ["Conditions Out", "Approval Conditions"].includes(l.status_raw ?? "") ? "var(--color-amber)"
+                        : ["New Lead", "Not Contacted", "Attempting Contact"].includes(l.status_raw ?? "") ? "var(--color-red)"
+                        : "var(--lo-muted)";
+                      return (
+                        <tr key={l.id} className="lo-data-row">
+                          <td className="font-medium">{borrowerName(l)}</td>
+                          <td><SourceBadge source={l.source} /></td>
+                          <td>
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "var(--lo-chip-bg)", color: statusColor }}>
+                              {l.status_raw ?? stageLabel(l.current_stage)}
+                            </span>
+                          </td>
+                          <td className="lo-muted text-[12px]">{l.assigned_loan_officer_name ?? "—"}</td>
+                          <td className="lo-muted text-[12px]">
+                            {l.borrower_phone ? (
+                              <a href={`tel:${l.borrower_phone}`} className="hover:underline">{l.borrower_phone}</a>
+                            ) : "—"}
+                          </td>
+                          <td className="r">
+                            {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">Open ↗</a>
+                              : <span className="lo-muted font-mono text-[11px]">{l.shape_record_id ?? "—"}</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </ExpandableRows>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : (
+          <section className="mgr-section">
+            <div className="mgr-section-head">
+              <h2 className="mgr-section-title">Who Are We Calling Today?</h2>
+            </div>
+            <div className="lo-muted mgr-section-body px-6 py-8 text-center text-sm">
+              No priority calls queued for today.
+            </div>
+          </section>
+        )}
+
+        <section className="mgr-section">
+          <div className="mgr-section-head">
+            <h2 className="mgr-section-title">What&apos;s Late</h2>
+            {overdueClosings.length > 0 && (
+              <span className="mgr-count-pill">{overdueClosings.length} overdue</span>
+            )}
+          </div>
+          <div className="mgr-section-body px-5 pb-4">
             {overdueClosings.length === 0 && atRiskClosings.length === 0 ? (
-              <div className="flex items-center gap-2 px-4 py-5 text-[12px]" style={{ color: "hsl(215 14% 45%)" }}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" opacity={0.5}>
+              <div className="lo-muted flex items-center gap-2 py-4 text-[12px]">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" opacity={0.5} aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 No overdue or at-risk closings
               </div>
             ) : (
-              <div>
+              <>
                 {overdueClosings.slice(0, 4).map((l) => (
-                  <div key={l.id} className="alert-row">
-                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--color-red)" }} />
+                  <div key={l.id} className="mgr-late-row">
                     <div className="min-w-0 flex-1">
                       <div className="lo-heading truncate text-[12.5px] font-semibold">{borrowerName(l)}</div>
                       <div className="lo-muted mt-0.5 text-[11px]">
@@ -923,8 +1026,7 @@ export default async function ManagerDashboardPage({
                   </div>
                 ))}
                 {atRiskClosings.slice(0, 3).map((l) => (
-                  <div key={l.id} className="alert-row">
-                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--color-amber)" }} />
+                  <div key={l.id} className="mgr-late-row">
                     <div className="min-w-0 flex-1">
                       <div className="lo-heading truncate text-[12.5px] font-semibold">{borrowerName(l)}</div>
                       <div className="lo-muted mt-0.5 text-[11px]">
@@ -934,209 +1036,157 @@ export default async function ManagerDashboardPage({
                     <span className="pill-amber shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold">{l.daysLeft}d left</span>
                   </div>
                 ))}
-              </div>
+              </>
             )}
           </div>
-
-          {/* SLA Health bars */}
-          {stageHealthBars.length > 0 && (
-            <div className="dash-card p-2">
-              <ManagerChartsPanel funnelStages={[]} slaHealth={slaHealthChartData} leadSources={[]} />
-            </div>
-          )}
-        </div>
+        </section>
       </div>
-
-      {/* ── Manager Scorecard strip ──────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="kpi-card-label">Contact Rate</div>
-          <div className="flex items-end gap-2">
-            <span className="kpi-card-value" style={{ color: contactRateColor }}>
-              {contactRatePct != null ? `${contactRatePct}%` : "—"}
-            </span>
-            <span className="lo-muted mb-0.5 text-[11px]">
-              {contactedCount} / {notContactedCount}
-            </span>
-          </div>
-          <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
-            <div className="h-full rounded-full" style={{ width: `${contactRatePct ?? 0}%`, background: contactRateColor }} />
-          </div>
-        </div>
-        <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="kpi-card-label">SLA Status</div>
-          <div className="flex items-center gap-3">
-            <div className="text-center">
-              <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-red)" }}>{slaRedCount}</div>
-              <div className="lo-muted text-[10px]">Red</div>
-            </div>
-            <div className="h-6 w-px" style={{ background: "var(--lo-border)" }} />
-            <div className="text-center">
-              <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-amber)" }}>{slaYellowCount}</div>
-              <div className="lo-muted text-[10px]">Yellow</div>
-            </div>
-            <div className="h-6 w-px" style={{ background: "var(--lo-border)" }} />
-            <div className="text-center">
-              <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-green)" }}>{Math.max(0, activeLoans.length - slaRedCount - slaYellowCount)}</div>
-              <div className="lo-muted text-[10px]">Green</div>
-            </div>
-          </div>
-        </div>
-        <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="kpi-card-label">Piped &amp; Pumped</div>
-          <div className="kpi-card-value kpi-value-yellow">{pipedCount}</div>
-          <div className="lo-muted text-[11px]">in pipeline funnel</div>
-        </div>
-        <div className="dash-card flex flex-col gap-2 p-4">
-          <div className="kpi-card-label">LOs Active Today</div>
-          <div className="kpi-card-value" style={{ color: losTouchedToday > 0 ? "var(--color-green)" : "var(--color-red)" }}>
-            {losTouchedToday}
-          </div>
-          <div className="lo-muted text-[11px]">{totalLoansTouchedToday} loans touched</div>
-        </div>
-      </div>
-
-      {/* ── Who Are We Calling Today? ─────────────────────────────────────── */}
-      {callingTodayLoans.length > 0 && (
-        <div className="dash-card">
-          <div className="dash-card-header">
-            <div className="flex items-center gap-2">
-              <span className="dash-card-title">Who Are We Calling Today?</span>
-              <span className="pill-yellow rounded-full px-2 py-0.5 text-[10px] font-bold">{callingTodayLoans.length}</span>
-            </div>
-            <span className="lo-muted text-[11px]">Priority: CTC → Conditions → New Leads → Appointments</span>
-          </div>
-          <table className="dt">
-            <thead>
-              <tr>
-                <th>Borrower</th>
-                <th>Source</th>
-                <th>Status</th>
-                <th>Owner</th>
-                <th>Phone</th>
-                <th className="r">Shape</th>
-              </tr>
-            </thead>
-            <tbody>
-              <ExpandableRows max={6} label="leads" colSpan={6}>
-                {callingTodayLoans.map((l) => {
-                  const url = shapeLeadUrl(l.shape_record_id);
-                  const statusColor =
-                    ["Clear to Close", "Closing"].includes(l.status_raw ?? "") ? "#22C55E"
-                    : ["Conditions Out", "Approval Conditions"].includes(l.status_raw ?? "") ? "#F59E0B"
-                    : ["New Lead", "Not Contacted", "Attempting Contact"].includes(l.status_raw ?? "") ? "#FF4B4B"
-                    : "hsl(215 14% 60%)";
-                  return (
-                    <tr key={l.id} className="lo-data-row">
-                      <td className="font-medium">{borrowerName(l)}</td>
-                      <td><SourceBadge source={l.source} /></td>
-                      <td>
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "var(--lo-chip-bg)", color: statusColor }}>
-                          {l.status_raw ?? stageLabel(l.current_stage)}
-                        </span>
-                      </td>
-                      <td className="lo-muted text-[12px]">{l.assigned_loan_officer_name ?? "—"}</td>
-                      <td className="lo-muted text-[12px]">
-                        {l.borrower_phone ? (
-                          <a href={`tel:${l.borrower_phone}`} className="hover:underline">{l.borrower_phone}</a>
-                        ) : "—"}
-                      </td>
-                      <td className="r">
-                        {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">Open ↗</a>
-                          : <span className="lo-muted font-mono text-[11px]">{l.shape_record_id ?? "—"}</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </ExpandableRows>
-            </tbody>
-          </table>
-        </div>
-      )}
 
       {/* ── Who Has What ─────────────────────────────────────────────────── */}
-      <div className="dash-card anim-d3">
-        <div className="dash-card-header">
-          <span className="dash-card-title">Who Has What</span>
-          <span className="text-[11px] text-mutedForeground">{loCards.length} active LOs</span>
+      <section className="mgr-section anim-d4">
+        <div className="mgr-section-head">
+          <h2 className="mgr-section-title">Who Has What</h2>
+          <span className="mgr-section-meta">{loCards.length} active LOs</span>
         </div>
-        {loCards.length === 0 ? (
-          <div className="lo-muted px-4 py-8 text-center text-[12px]">No active loan officers found.</div>
-        ) : (
-          <WhoHasWhatTable rows={whoHasWhatRows} />
-        )}
-      </div>
+        <div className="mgr-section-body p-0">
+          {loCards.length === 0 ? (
+            <div className="lo-muted px-4 py-8 text-center text-[12px]">No active loan officers found.</div>
+          ) : (
+            <WhoHasWhatTable rows={whoHasWhatRows} />
+          )}
+        </div>
+      </section>
 
-      {/* ── Contact Rate Today ────────────────────────────────────────────── */}
-      {dailyActivity.length > 0 && (
-        <div className="dash-card anim-d4">
-          <div className="dash-card-header">
-            <span className="dash-card-title">Contact Rate Today</span>
-            <span className="text-[11px] text-mutedForeground">{losTouchedToday} LOs active · {totalLoansTouchedToday} loans touched</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            {loCards.map((lo) => {
-              const activity = dailyActivity.find(
-                (a) => (a.lo_name ?? "").toLowerCase() === lo.name.toLowerCase(),
-              );
-              const touched = activity?.loans_touched_today ?? 0;
-              const total = lo.active;
-              const pct = total > 0 ? Math.round((touched / total) * 100) : 0;
-              const clr = total === 0 ? "var(--lo-muted)" : pct >= 60 ? "var(--color-green)" : pct >= 30 ? "var(--color-amber)" : "var(--color-red)";
-              const loHref = lo.loId
-                ? `/dashboard/manager?lo=${encodeURIComponent(lo.loId)}${selectedTeamId ? `&team=${encodeURIComponent(selectedTeamId)}` : ""}`
-                : `/dashboard/manager?lo=${encodeURIComponent(lo.name)}${selectedTeamId ? `&team=${encodeURIComponent(selectedTeamId)}` : ""}`;
-              return (
-                <Link key={lo.name} href={loHref} className="lo-card flex flex-col gap-3 p-3.5 transition-colors hover:border-[var(--lo-teal)]">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="lo-heading text-[13px] font-semibold leading-tight">{lo.name}</div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold tabular-nums" style={{ color: clr }}>{pct}%</div>
-                      <div className="lo-muted text-[10px]">touch rate</div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="mb-1.5 h-[3px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: clr }} />
-                    </div>
-                    <div className="lo-muted flex justify-between text-[10px]">
-                      <span>{touched} touched</span>
-                      <span>{total} active</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 border-t pt-2.5 text-center" style={{ borderColor: "var(--lo-border)" }}>
-                    <div>
-                      <div className="lo-heading text-[12px] font-semibold">{activity?.status_changes_today ?? 0}</div>
-                      <div className="lo-muted text-[10px]">Status</div>
-                    </div>
-                    <div>
-                      <div className="lo-heading text-[12px] font-semibold">{activity?.notes_today ?? 0}</div>
-                      <div className="lo-muted text-[10px]">Notes</div>
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-semibold" style={{ color: (activity?.new_leads_today ?? 0) > 0 ? "var(--color-green)" : "var(--lo-text)" }}>
-                        {activity?.new_leads_today ?? 0}
+      {/* ── Contact rate + Scorecard ──────────────────────────────────────── */}
+      <div className="mgr-grid-2">
+        {dailyActivity.length > 0 ? (
+          <section className="mgr-section">
+            <div className="mgr-section-head">
+              <h2 className="mgr-section-title">Contact Rate Today</h2>
+              <span className="mgr-section-meta">{losTouchedToday} LOs active · {totalLoansTouchedToday} touched</span>
+            </div>
+            <div className="mgr-lo-grid">
+              {loCards.map((lo) => {
+                const activity = dailyActivity.find(
+                  (a) => (a.lo_name ?? "").toLowerCase() === lo.name.toLowerCase(),
+                );
+                const touched = activity?.loans_touched_today ?? 0;
+                const total = lo.active;
+                const pct = total > 0 ? Math.round((touched / total) * 100) : 0;
+                const clr = total === 0 ? "var(--lo-muted)" : pct >= 60 ? "var(--color-green)" : pct >= 30 ? "var(--color-amber)" : "var(--color-red)";
+                const loHref = lo.loId
+                  ? `/dashboard/manager?lo=${encodeURIComponent(lo.loId)}${selectedTeamId ? `&team=${encodeURIComponent(selectedTeamId)}` : ""}`
+                  : `/dashboard/manager?lo=${encodeURIComponent(lo.name)}${selectedTeamId ? `&team=${encodeURIComponent(selectedTeamId)}` : ""}`;
+                return (
+                  <Link key={lo.name} href={loHref} className="mgr-lo-card">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="lo-heading text-[13px] font-semibold leading-tight">{lo.name}</div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold tabular-nums" style={{ color: clr }}>{pct}%</div>
+                        <div className="lo-muted text-[10px]">touch rate</div>
                       </div>
-                      <div className="lo-muted text-[10px]">New</div>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
+                    <div className="mt-3">
+                      <div className="mb-1.5 h-[3px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: clr }} />
+                      </div>
+                      <div className="lo-muted flex justify-between text-[10px]">
+                        <span>{touched} touched</span>
+                        <span>{total} active</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-1 border-t pt-2.5 text-center" style={{ borderColor: "var(--lo-border)" }}>
+                      <div>
+                        <div className="lo-heading text-[12px] font-semibold">{activity?.status_changes_today ?? 0}</div>
+                        <div className="lo-muted text-[10px]">Status</div>
+                      </div>
+                      <div>
+                        <div className="lo-heading text-[12px] font-semibold">{activity?.notes_today ?? 0}</div>
+                        <div className="lo-muted text-[10px]">Notes</div>
+                      </div>
+                      <div>
+                        <div className="text-[12px] font-semibold" style={{ color: (activity?.new_leads_today ?? 0) > 0 ? "var(--color-green)" : "var(--lo-text)" }}>
+                          {activity?.new_leads_today ?? 0}
+                        </div>
+                        <div className="lo-muted text-[10px]">New</div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          <section className="mgr-section">
+            <div className="mgr-section-head">
+              <h2 className="mgr-section-title">Contact Rate Today</h2>
+            </div>
+            <div className="lo-muted mgr-section-body px-6 py-8 text-center text-sm">No activity data for today.</div>
+          </section>
+        )}
+
+        <section className="mgr-section">
+          <div className="mgr-section-head">
+            <h2 className="mgr-section-title">Manager Scorecard</h2>
+            <span className="mgr-section-meta">Today&apos;s pulse</span>
           </div>
-        </div>
-      )}
+          <div className="mgr-score-strip">
+            <div className="mgr-score-mini">
+              <div className="lbl">Contact Rate</div>
+              <div className="val" style={{ color: contactRateColor }}>
+                {contactRatePct != null ? `${contactRatePct}%` : "—"}
+              </div>
+              <div className="lo-muted text-[10px]">{contactedCount} / {notContactedCount}</div>
+              <div className="mt-1 h-[3px] overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
+                <div className="h-full rounded-full" style={{ width: `${contactRatePct ?? 0}%`, background: contactRateColor }} />
+              </div>
+            </div>
+            <div className="mgr-score-mini">
+              <div className="lbl">SLA Status</div>
+              <div className="flex items-center gap-3 pt-1">
+                <div className="text-center">
+                  <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-red)" }}>{slaRedCount}</div>
+                  <div className="lo-muted text-[10px]">Red</div>
+                </div>
+                <div className="h-6 w-px" style={{ background: "var(--lo-border)" }} />
+                <div className="text-center">
+                  <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-amber)" }}>{slaYellowCount}</div>
+                  <div className="lo-muted text-[10px]">Yellow</div>
+                </div>
+                <div className="h-6 w-px" style={{ background: "var(--lo-border)" }} />
+                <div className="text-center">
+                  <div className="text-xl font-bold tabular-nums" style={{ color: "var(--color-green)" }}>{Math.max(0, activeLoans.length - slaRedCount - slaYellowCount)}</div>
+                  <div className="lo-muted text-[10px]">Green</div>
+                </div>
+              </div>
+            </div>
+            <div className="mgr-score-mini">
+              <div className="lbl">Piped &amp; Pumped</div>
+              <div className="val" style={{ color: "var(--gold-600)" }}>{pipedCount}</div>
+              <div className="lo-muted text-[10px]">in pipeline funnel</div>
+            </div>
+            <div className="mgr-score-mini">
+              <div className="lbl">LOs Active Today</div>
+              <div className="val" style={{ color: losTouchedToday > 0 ? "var(--color-green)" : "var(--color-red)" }}>
+                {losTouchedToday}
+              </div>
+              <div className="lo-muted text-[10px]">{totalLoansTouchedToday} loans touched</div>
+            </div>
+          </div>
+        </section>
+      </div>
 
       {/* ── SLA Alerts ───────────────────────────────────────────────────── */}
       {slaAlerts.length > 0 && (
-        <div className="dash-card">
-          <div className="dash-card-header">
+        <section className="mgr-section">
+          <div className="mgr-section-head">
+            <h2 className="mgr-section-title">SLA Alerts</h2>
             <div className="flex items-center gap-2">
-              <span className="dash-card-title">SLA Alerts</span>
-              {slaRedCount > 0 && <span className="pill-red rounded-full px-2 py-0.5 text-[10px] font-bold">{slaRedCount} critical</span>}
+              {slaRedCount > 0 && <span className="mgr-count-pill">{slaRedCount} critical</span>}
               {slaYellowCount > 0 && <span className="pill-amber rounded-full px-2 py-0.5 text-[10px] font-bold">{slaYellowCount} at risk</span>}
             </div>
           </div>
+          <div className="mgr-section-body p-0">
           <table className="dt">
             <thead>
               <tr>
@@ -1182,15 +1232,17 @@ export default async function ManagerDashboardPage({
               </ExpandableRows>
             </tbody>
           </table>
-        </div>
+          </div>
+        </section>
       )}
 
       {/* ── Daily Activity by LO ──────────────────────────────────────────── */}
       {dailyActivity.length > 0 && (
-        <div className="dash-card">
-          <div className="dash-card-header">
-            <span className="dash-card-title">Today&apos;s Activity by LO</span>
+        <section className="mgr-section">
+          <div className="mgr-section-head">
+            <h2 className="mgr-section-title">Today&apos;s Activity by LO</h2>
           </div>
+          <div className="mgr-section-body p-0">
           <table className="dt">
             <thead>
               <tr>
@@ -1209,7 +1261,7 @@ export default async function ManagerDashboardPage({
                   <td className="r font-mono text-[12px]">{row.loans_touched_today}</td>
                   <td className="r font-mono text-[12px]">{row.status_changes_today}</td>
                   <td className="r font-mono text-[12px]">{row.notes_today}</td>
-                  <td className="r font-mono text-[12px]" style={{ color: row.new_leads_today > 0 ? "#22C55E" : undefined }}>
+                  <td className="r font-mono text-[12px]" style={{ color: row.new_leads_today > 0 ? "var(--color-green)" : undefined }}>
                     {row.new_leads_today}
                   </td>
                   <td className="lo-muted text-[12px]">
@@ -1221,18 +1273,18 @@ export default async function ManagerDashboardPage({
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </section>
       )}
 
       {/* ── Unassigned Leads ─────────────────────────────────────────────── */}
       {unassignedLoans.length > 0 && (
-        <div className="dash-card" style={{ borderColor: "var(--color-red)" }}>
-          <div className="dash-card-header">
-            <div className="flex items-center gap-2">
-              <span className="dash-card-title">Unassigned Leads</span>
-              <span className="pill-red rounded-full px-2 py-0.5 text-[10px] font-bold">{unassignedLoans.length}</span>
-            </div>
+        <section className="mgr-section" style={{ borderColor: "var(--color-red)" }}>
+          <div className="mgr-section-head">
+            <h2 className="mgr-section-title">Unassigned Leads</h2>
+            <span className="mgr-count-pill">{unassignedLoans.length}</span>
           </div>
+          <div className="mgr-section-body p-0">
           <table className="dt">
             <thead>
               <tr>
@@ -1272,13 +1324,36 @@ export default async function ManagerDashboardPage({
               </ExpandableRows>
             </tbody>
           </table>
-        </div>
+          </div>
+        </section>
       )}
 
-      {/* ── Source Attribution ─────────────────────────────────────────────── */}
-      {leadSourcesChartData.length > 0 && (
-        <ManagerChartsPanel funnelStages={[]} slaHealth={[]} leadSources={leadSourcesChartData} />
-      )}
+      {/* ── Shape Pipeline (collapsible) ─────────────────────────────────── */}
+      <details className="mgr-section mgr-details">
+        <summary className="mgr-section-head cursor-pointer">
+          <div className="flex items-center gap-2">
+            <svg className="mgr-details-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <h2 className="mgr-section-title">Shape Pipeline</h2>
+          </div>
+          {activeShapeView && (
+            <span className="mgr-section-meta">
+              {activeShapeView.label} · {shapeViewRows.length} records
+            </span>
+          )}
+        </summary>
+        <div className="mgr-section-body flex flex-col gap-3 px-5 pb-5">
+          <ShapePipelineNav
+            basePath="/dashboard/manager"
+            category={category}
+            activeViewId={viewId}
+            viewCounts={shapeViewCounts}
+            extraParams={shapeExtraParams}
+          />
+          <ShapeViewTable rows={shapeViewRows} viewId={viewId} showLoColumn={!selectedLoId} />
+        </div>
+      </details>
     </div>
   );
 }

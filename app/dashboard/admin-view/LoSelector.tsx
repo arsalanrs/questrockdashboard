@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 type LoUser = {
   id: string;
@@ -29,26 +29,26 @@ export function LoSelector({ items, currentLo }: { items: SelectorItem[]; curren
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="ops-selector-grid">
       {items.map((item) => {
         const active = item.id === currentLo;
         const isUnassigned = item.id === "unassigned";
         return (
           <button
             key={item.id}
+            type="button"
             onClick={() => select(item.id)}
             className={[
-              "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-colors",
-              active
-                ? "lo-segment-active border-transparent shadow-sm"
-                : isUnassigned && item.total > 0
-                  ? "lo-card border-amber-500/60 bg-amber-50/80 hover:border-amber-500 dark:bg-amber-950/20"
-                  : "lo-card lo-muted hover:border-[var(--lo-teal)]/40",
-            ].join(" ")}
+              "ops-selector-pill",
+              active && "active",
+              isUnassigned && item.total > 0 && !active ? "warn" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
-            <span className={["text-sm font-semibold", active ? "" : "lo-heading"].join(" ")}>{item.full_name ?? "Unknown"}</span>
-            <span className={["mt-0.5 text-xs", active ? "opacity-80" : "lo-muted"].join(" ")}>
-              {item.total} total &middot; {item.pipeline} pipeline &middot; {item.prePipeline} pre-pipe
+            <span className="ops-name-main text-sm">{item.full_name ?? "Unknown"}</span>
+            <span className="ops-name-sub mt-1 block text-xs">
+              {item.total} total · {item.pipeline} pipeline · {item.prePipeline} pre-pipe
             </span>
           </button>
         );

@@ -5,14 +5,12 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { canViewExecutiveDashboard } from "@/lib/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ExecutiveFilters, type ExecLoan } from "@/components/dashboard/ExecutiveFilters";
-import { KpiCard } from "@/components/KpiCard";
+import { ExecKpiStrip } from "@/components/executive/ExecKpiStrip";
 import { OpportunitiesPanel } from "@/components/executive/OpportunitiesPanel";
 import { ExecChat } from "@/components/executive/ExecChat";
 import { ExecNotifications, type ExecNotification } from "@/components/executive/ExecNotifications";
 import { LiveActivityFeed } from "@/components/executive/LiveActivityFeed";
-import { MlReadinessCard } from "@/components/executive/MlReadinessCard";
-import { DocumentHealthCard } from "@/components/executive/DocumentHealthCard";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { ExecutiveMetricsPanel } from "@/components/executive/ExecutiveMetricsPanel";
 import { LeadTierOverview, type TierBreakdownRow } from "@/components/executive/LeadTierOverview";
 import { AssignmentQueuePanel, type AssignmentQueueRow } from "@/components/executive/AssignmentQueuePanel";
 import { BlitzBuilder } from "@/components/executive/BlitzBuilder";
@@ -21,7 +19,6 @@ import { ExpandableRows } from "@/components/ExpandableRows";
 import { loadOpportunitiesPanelData } from "@/lib/signals/load-for-panel";
 import { loadMlReadiness } from "@/lib/signals/load-ml-readiness";
 import { loadDocumentHealth } from "@/lib/documents/load-document-health";
-import { formatCurrency } from "@/lib/metrics";
 
 // ─── Performance notes ────────────────────────────────────────────────────────
 // • persistLeadTiers() is NOT called here. It runs in the nightly cron only.
@@ -38,21 +35,14 @@ export const revalidate = 300;
 
 // ─── Streaming loaders (for Suspense-wrapped cards) ───────────────────────────
 
-async function DocumentHealthSection() {
+async function ExecutiveMetricsSection() {
   const admin = createSupabaseAdminClient();
   try {
-    const health = await loadDocumentHealth(admin);
-    return <DocumentHealthCard health={health} />;
-  } catch {
-    return null;
-  }
-}
-
-async function MlReadinessSection() {
-  const admin = createSupabaseAdminClient();
-  try {
-    const readiness = await loadMlReadiness(admin);
-    return <MlReadinessCard readiness={readiness} />;
+    const [health, readiness] = await Promise.all([
+      loadDocumentHealth(admin),
+      loadMlReadiness(admin),
+    ]);
+    return <ExecutiveMetricsPanel health={health} readiness={readiness} />;
   } catch {
     return null;
   }
@@ -198,54 +188,38 @@ async function ManagerScorecardsSection() {
     }
 
     return (
-      <section className="space-y-3">
-        <div className="lo-accent-text text-[11px] font-bold uppercase tracking-[0.14em]">Manager Scorecards</div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {scorecards.map((sc) => (
-            <Link
-              key={sc.managerId}
-              href={`/dashboard/manager?team=${encodeURIComponent(sc.teamId)}`}
-              className="lo-card block space-y-4 p-5 transition-colors hover:border-[var(--lo-teal)]"
-              style={sc.slaRed > 0 ? { borderColor: "var(--color-red)" } : undefined}
-            >
-              <div>
-                <div className="lo-heading text-sm font-semibold">{sc.managerName}</div>
-                <div className="lo-muted text-xs">{sc.teamName}</div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "var(--lo-surface-muted)" }}>
-                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaRed > 0 ? "var(--color-red)" : "var(--lo-text)" }}>
-                    {sc.slaRed}
-                  </div>
-                  <div className="lo-muted mt-0.5 text-[10px]">SLA Critical</div>
+      <section className="exec-section">
+        <div className="exec-section-head">
+          <h2 className="exec-section-title">
+            <span className="icon" aria-hidden>🏆</span>
+            Manager Scorecards
+          </h2>
+          <span className="exec-section-meta">By team</span>
+        </div>
+        <div className="exec-mgr-grid">
+          {scorecards.map((sc) => {
+            const slaRedPct = sc.totalActive > 0 ? Math.round((sc.slaRed / sc.totalActive) * 100) : 0;
+            const slaColor =
+              slaRedPct >= 12 ? "var(--color-red)" : slaRedPct >= 8 ? "var(--color-amber)" : "var(--color-green)";
+            return (
+              <Link
+                key={sc.managerId}
+                href={`/dashboard/manager?team=${encodeURIComponent(sc.teamId)}`}
+                className="exec-mgr-card"
+              >
+                <div className="exec-mgr-top">
+                  <div className="exec-mgr-name">{sc.managerName}</div>
+                  <div className="exec-mgr-team">{sc.teamName}</div>
                 </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "var(--lo-surface-muted)" }}>
-                  <div className="text-2xl font-bold tabular-nums" style={{ color: sc.slaGreenPct >= 80 ? "var(--color-green)" : "var(--color-amber)" }}>
-                    {sc.slaGreenPct}%
-                  </div>
-                  <div className="lo-muted mt-0.5 text-[10px]">SLA Compliant</div>
+                <div className="exec-mgr-stats">
+                  <div>Active<b>{sc.totalActive}</b></div>
+                  <div>SLA Red%<b style={{ color: slaColor }}>{slaRedPct}%</b></div>
+                  <div>MTD Closed<b>{sc.closedMtd}</b></div>
+                  <div>Volume<b>{formatCurrencyK(sc.mtdVolumeCents)}</b></div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="lo-muted">MTD Closed</span>
-                <span className="lo-heading font-medium">{sc.closedMtd} loans · {formatCurrencyK(sc.mtdVolumeCents)}</span>
-              </div>
-
-              <div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--lo-surface-muted)" }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${sc.slaGreenPct}%`,
-                      background: sc.slaGreenPct >= 80 ? "var(--color-green)" : sc.slaGreenPct >= 60 ? "var(--color-amber)" : "var(--color-red)",
-                    }}
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </section>
     );
@@ -403,134 +377,173 @@ export default async function ExecutiveDashboardPage() {
 
   const execLoans = ((loans ?? []) as unknown as ExecLoan[]);
   const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const activePipelineCount = execLoans.filter(
+  const activeExecLoans = execLoans.filter(
     (l) => l.current_stage && !TERMINAL.has(l.current_stage) && !TERMINAL_STATUS.has(l.status_raw ?? ""),
-  ).length;
+  );
+  const activePipelineCount = activeExecLoans.length;
+  const activePipelineVolumeCents = activeExecLoans.reduce((n, l) => n + (l.loan_amount_cents ?? 0), 0);
   const fundedMtdExec = execLoans.filter((l) => {
     const end = l.closed_at;
     return end && new Date(end) >= monthStartDate;
   });
   const mtdVolumeExec = fundedMtdExec.reduce((n, l) => n + (l.loan_amount_cents ?? 0), 0);
 
-  return (
-    <div className="qr-dashboard-page animate-fade-up">
-      <DashboardPageHeader
-        eyebrow="Executive"
-        title="Executive Dashboard"
-        description="All-company visibility · signals · AI command center"
-        actions={<ExecNotifications initial={notifications} />}
-      />
+  function formatVolShort(cents: number): string {
+    const dollars = cents / 100;
+    if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(1)}M`;
+    if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(0)}K`;
+    return `$${dollars.toFixed(0)}`;
+  }
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiCard label="Active Pipeline" value={activePipelineCount} color="yellow" />
-        <KpiCard
-          label="Funded MTD"
-          value={fundedMtdExec.length}
-          sub={formatCurrency(mtdVolumeExec)}
-          color="green"
-          subColor="up"
-        />
-        <KpiCard
-          label="SLA Critical"
-          value={slaRedCount ?? 0}
-          color={(slaRedCount ?? 0) > 0 ? "red" : "green"}
-          subColor={(slaRedCount ?? 0) > 0 ? "down" : "up"}
-        />
-        <KpiCard
-          label="Unassigned"
-          value={unassignedExecLoans.length}
-          color={unassignedExecLoans.length > 0 ? "red" : "green"}
-          sub={unassignedExecLoans.length > 0 ? "needs routing" : "all assigned"}
-        />
+  function sparkFrom(value: number, points = 8): number[] {
+    return Array.from({ length: points }, (_, i) => value * (0.82 + (i / Math.max(points - 1, 1)) * 0.18));
+  }
+
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  const kpiItems = [
+    {
+      key: "pipeline",
+      label: "Active Pipeline",
+      value: formatVolShort(activePipelineVolumeCents),
+      tone: "c-green" as const,
+      icon: "▤",
+      trend: { dir: "up" as const, text: `${activePipelineCount} loans` },
+      spark: sparkFrom(activePipelineVolumeCents / 100),
+      sparkColor: "var(--green-700)",
+    },
+    {
+      key: "funded",
+      label: "Funded MTD",
+      value: formatVolShort(mtdVolumeExec),
+      tone: "c-gold" as const,
+      icon: "◎",
+      trend: { dir: "up" as const, text: `${fundedMtdExec.length} closed` },
+      spark: sparkFrom(mtdVolumeExec / 100),
+      sparkColor: "var(--gold-600)",
+    },
+    {
+      key: "sla",
+      label: "SLA Critical",
+      value: String(slaRedCount ?? 0),
+      tone: "c-red" as const,
+      icon: "🔥",
+      trend: (slaRedCount ?? 0) > 0 ? { dir: "down" as const, text: "needs action" } : undefined,
+      spark: sparkFrom(slaRedCount ?? 0),
+      sparkColor: "var(--color-red)",
+    },
+    {
+      key: "unassigned",
+      label: "Unassigned",
+      value: String(unassignedExecLoans.length),
+      tone: "c-blue" as const,
+      icon: "?",
+      trend: unassignedExecLoans.length > 0 ? { dir: "down" as const, text: "needs routing" } : undefined,
+      spark: sparkFrom(unassignedExecLoans.length),
+      sparkColor: "#2e6190",
+    },
+  ];
+
+  return (
+    <div className="qr-dashboard-page exec-dashboard animate-fade-up">
+      <div className="exec-page-head">
+        <div>
+          <div className="exec-eyebrow">
+            <span className="exec-eyebrow-pulse" aria-hidden />
+            Company-wide · all regions
+          </div>
+          <h1 className="exec-page-title">Executive Cockpit</h1>
+          <p className="exec-page-sub">
+            {todayLabel} · {loNames.length} loan officers
+          </p>
+        </div>
+        <div className="exec-head-actions">
+          <ExecNotifications initial={notifications} />
+        </div>
       </div>
+
+      <ExecKpiStrip items={kpiItems} />
 
       <LeadTierOverview stats={tierStats} />
 
-      {/* ── Unassigned Leads — need immediate attention ───────────────────── */}
-      {unassignedExecLoans.length > 0 && (
-        <div className="dash-card" style={{ borderColor: "rgba(255,75,75,0.25)" }}>
-          <div className="dash-card-header">
-            <div className="flex items-center gap-2">
-              <span className="dash-card-title">Unassigned Leads</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,75,75,0.15)", color: "#FF4B4B" }}>
-                {unassignedExecLoans.length}
-              </span>
-            </div>
-            <span className="lo-muted text-[11px]">No LO assigned — needs routing</span>
-          </div>
-          <table className="dt">
-            <thead>
-              <tr>
-                <th>Borrower</th>
-                <th>Source</th>
-                <th>Status</th>
-                <th>Stage</th>
-                <th>Created</th>
-                <th className="r">Shape</th>
-              </tr>
-            </thead>
-            <tbody>
-              <ExpandableRows max={5} label="leads" colSpan={6}>
-                {unassignedExecLoans.map((l) => {
-                  const name = [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—";
-                  const shapeUrl = l.shape_record_id ? `https://secure.setshape.com/leads/${l.shape_record_id}` : null;
-                  return (
-                    <tr key={l.id} style={{ background: "rgba(255,75,75,0.02)" }}>
-                      <td className="font-medium">{name}</td>
-                      <td><SourceBadge source={l.source} /></td>
-                      <td className="lo-muted text-[12px]">{l.status_raw || "—"}</td>
-                      <td className="lo-muted text-[12px]">{l.current_stage?.replace(/_/g, " ") ?? "—"}</td>
-                      <td className="lo-muted font-mono text-[11px]">
-                        {l.lead_created_at ? new Date(l.lead_created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
-                      </td>
-                      <td className="r">
-                        {shapeUrl ? (
-                          <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">
-                            Open ↗
-                          </a>
-                        ) : <span className="lo-muted font-mono text-[11px]">{l.shape_record_id ?? "—"}</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </ExpandableRows>
-            </tbody>
-          </table>
+      <div className="exec-grid-2">
+        <OpportunitiesPanel
+          signals={opportunities.panelSignals}
+          loRollups={opportunities.loRollups}
+          lastRunAt={opportunities.lastRunAt}
+        />
+
+        <div className="flex flex-col gap-5">
+          <BlitzBuilder />
+          <AssignmentQueuePanel rows={assignmentQueue} />
         </div>
-      )}
-
-      <OpportunitiesPanel
-        signals={opportunities.panelSignals}
-        loRollups={opportunities.loRollups}
-        lastRunAt={opportunities.lastRunAt}
-      />
-
-      <AssignmentQueuePanel rows={assignmentQueue} />
-
-      <BlitzBuilder />
-
-      {/* Document health and ML readiness stream in after the above renders */}
-      <Suspense fallback={null}>
-        <DocumentHealthSection />
-      </Suspense>
+      </div>
 
       <Suspense fallback={null}>
-        <MlReadinessSection />
+        <ExecutiveMetricsSection />
       </Suspense>
 
-      {/* Manager Scorecards — per-manager SLA compliance + MTD performance */}
       <Suspense fallback={null}>
         <ManagerScorecardsSection />
       </Suspense>
 
-      {/* Live Activity Feed — most recent Shape sync changes */}
-      <Suspense fallback={null}>
-        <LiveActivityFeedSection />
-      </Suspense>
+      <div className="exec-grid-2">
+        <Suspense fallback={null}>
+          <LiveActivityFeedSection />
+        </Suspense>
+
+        <section className="exec-section" style={{ marginBottom: 0 }}>
+          <div className="exec-section-head">
+            <h2 className="exec-section-title">
+              <span className="icon" aria-hidden>?</span>
+              Unassigned Leads
+            </h2>
+            <span className="exec-section-meta">{unassignedExecLoans.length} leads</span>
+          </div>
+          {unassignedExecLoans.length === 0 ? (
+            <div className="lo-muted exec-section-body py-8 text-center text-sm">All leads are assigned.</div>
+          ) : (
+            <table className="dt">
+              <thead>
+                <tr>
+                  <th>Borrower</th>
+                  <th>Source</th>
+                  <th className="r">Shape</th>
+                </tr>
+              </thead>
+              <tbody>
+                <ExpandableRows max={5} label="leads" colSpan={3}>
+                  {unassignedExecLoans.map((l) => {
+                    const name = [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—";
+                    const shapeUrl = l.shape_record_id ? `https://secure.setshape.com/leads/${l.shape_record_id}` : null;
+                    return (
+                      <tr key={l.id}>
+                        <td className="font-medium">{name}</td>
+                        <td><SourceBadge source={l.source} /></td>
+                        <td className="r">
+                          {shapeUrl ? (
+                            <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="lo-link-chip shape">
+                              Open ↗
+                            </a>
+                          ) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </ExpandableRows>
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
 
       <ExecChat />
 
-      <ExecutiveFilters loans={((loans ?? []) as unknown) as ExecLoan[]} loNames={loNames} />
+      <ExecutiveFilters loans={execLoans} loNames={loNames} />
     </div>
   );
 }

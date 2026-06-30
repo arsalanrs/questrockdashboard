@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/cn";
 
 export type TierBreakdownRow = {
   tier: string | null;
@@ -35,13 +34,6 @@ function fmt$(cents: number | null) {
     maximumFractionDigits: 0,
   }).format(cents / 100);
 }
-
-const TONE: Record<string, string> = {
-  RED: "border-rose-500/35 bg-rose-500/5 hover:border-rose-500/60",
-  ORANGE: "border-amber-500/35 bg-amber-500/5 hover:border-amber-500/60",
-  GREEN: "border-emerald-500/35 bg-emerald-500/5 hover:border-emerald-500/60",
-  UNSET: "border-slate-500/35 bg-slate-500/5 hover:border-slate-500/60 border-dashed",
-};
 
 function normalizeCards(stats: TierBreakdownRow[]): { key: TierKey; label: string; row: TierBreakdownRow }[] {
   const byTier = new Map<string | null, TierBreakdownRow>();
@@ -129,55 +121,62 @@ export function LeadTierOverview({ stats }: { stats: TierBreakdownRow[] }) {
 
   return (
     <>
-      <section className="dash-card p-4">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div className="lo-accent-text text-[11px] font-semibold uppercase tracking-[0.14em]">Lead tier</div>
+      <section className="exec-section">
+        <div className="exec-section-head">
+          <h2 className="exec-section-title">
+            <span className="icon" aria-hidden>▤</span>
+            Lead Tier Overview
+          </h2>
+          <span className="exec-section-meta">Click a tier to drill in</span>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 px-5 pt-3">
           <button
             type="button"
             onClick={() => void recomputeSignalsAndTiers()}
             disabled={recomputing}
-            className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            className="exec-blitz-btn text-xs disabled:opacity-60"
           >
-            {recomputing ? "Recomputing…" : "Recompute buckets & signals"}
+            {recomputing ? "Recomputing…" : "Recompute tiers & signals"}
           </button>
         </div>
-        <h2 className="lo-heading text-base font-semibold">RED / ORANGE / GREEN snapshot</h2>
-        <p className="lo-muted mt-1 text-xs">
-          Tiers are rule-based (pipeline stage, status, funded/closed) — same logic as deal-signal detectors and book
-          cadence policy. The page also refreshes tiers on load. Use{" "}
-          <strong>Recompute buckets &amp; signals</strong> after you change rules so RED/ORANGE/GREEN and opportunity
-          signals match the latest config without waiting for cron.
-        </p>
         {recomputeMsg && (
-          <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">{recomputeMsg}</p>
+          <p className="px-5 text-xs" style={{ color: "var(--color-green)" }}>{recomputeMsg}</p>
         )}
         {recomputeErr && (
-          <p className="mt-2 text-xs text-red-600 dark:text-red-400">{recomputeErr}</p>
+          <p className="px-5 text-xs" style={{ color: "var(--color-red)" }}>{recomputeErr}</p>
         )}
-        <p className="lo-muted mt-2 text-xs">
-          Click a box below to see loans in that bucket. <strong>Unset</strong> shows why each row has no tier (inactive /
-          dispositions, or not persisted yet).
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {cards.map(({ key, label, row }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => void openTier(key, label)}
-              className={cn(
-                "rounded-md border px-3 py-3 text-left transition-colors",
-                TONE[key] ?? "border-border",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              )}
-            >
-              <div className="text-xs font-medium text-mutedForeground">{label}</div>
-              <div className="mt-1 text-2xl font-semibold tabular-nums">{row.count}</div>
-              <div className="mt-0.5 text-[11px] text-mutedForeground tabular-nums">
-                {fmt$(row.volumeCents)} volume
-              </div>
-              <div className="mt-2 text-[10px] font-medium text-mutedForeground">View loans →</div>
-            </button>
-          ))}
+        <div className="exec-tier-grid">
+          {cards.map(({ key, label, row }) => {
+            const tierClass = key === "RED" ? "red" : key === "ORANGE" ? "orange" : key === "GREEN" ? "green" : "unset";
+            const maxCount = Math.max(...cards.map((c) => c.row.count), 1);
+            const barColors: Record<string, string> = {
+              RED: "var(--color-red)",
+              ORANGE: "#c2742e",
+              GREEN: "var(--color-green)",
+              UNSET: "var(--ink-400)",
+            };
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => void openTier(key, label)}
+                className={`exec-tier-card ${tierClass}`}
+              >
+                <div className="exec-tier-top">
+                  <span className="exec-tier-dot" />
+                  <span className="exec-tier-name">{label.replace("Unset / null", "Unset")}</span>
+                </div>
+                <p className="exec-tier-count">{row.count}</p>
+                <p className="exec-tier-vol">{fmt$(row.volumeCents)} volume</p>
+                <div className="exec-tier-bar">
+                  <div
+                    className="fill"
+                    style={{ width: `${(row.count / maxCount) * 100}%`, background: barColors[key] }}
+                  />
+                </div>
+              </button>
+            );
+          })}
         </div>
       </section>
 

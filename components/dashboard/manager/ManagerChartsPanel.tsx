@@ -7,26 +7,33 @@ type Props = {
   funnelStages: FunnelStage[];
   slaHealth: BarChartItem[];
   leadSources: BarChartItem[];
+  /** Single “Pipeline Health” section with 3 charts (manager mockup layout). */
+  unified?: boolean;
 };
 
-export function ManagerChartsPanel({ funnelStages, slaHealth, leadSources }: Props) {
-  return (
+export function ManagerChartsPanel({ funnelStages, slaHealth, leadSources, unified = false }: Props) {
+  const showFunnel = funnelStages.some((s) => s.count > 0);
+  const showSla = slaHealth.length > 0;
+  const showSources = leadSources.length > 0;
+
+  if (!showFunnel && !showSla && !showSources) return null;
+
+  const charts = (
     <>
-      {funnelStages.some((s) => s.count > 0) && (
-        <div className="dash-card p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="dash-card-title">Pipeline Funnel</span>
-            <span className="lo-muted text-[11px]">Active loans by stage</span>
+      {showFunnel && (
+        <div className="mgr-chart-card">
+          <div className="mgr-chart-title">
+            Pipeline Funnel
+            <span className="mgr-chart-tag">by stage</span>
           </div>
-          <FunnelBar stages={funnelStages} height={180} />
+          <FunnelBar stages={funnelStages} height={190} />
         </div>
       )}
-
-      {slaHealth.length > 0 && (
-        <div className="dash-card p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="dash-card-title">Stage SLA Health</span>
-            <span className="lo-muted text-[11px]">% on time</span>
+      {showSla && (
+        <div className="mgr-chart-card">
+          <div className="mgr-chart-title">
+            Stage SLA Health
+            <span className="mgr-chart-tag">% on time</span>
           </div>
           <DashboardBarChart
             data={slaHealth.map((s) => ({
@@ -38,19 +45,36 @@ export function ManagerChartsPanel({ funnelStages, slaHealth, leadSources }: Pro
                     ? "var(--color-amber)"
                     : "var(--color-red)",
             }))}
-            height={Math.max(120, slaHealth.length * 36)}
+            height={190}
           />
         </div>
       )}
-
-      {leadSources.length > 0 && (
-        <div className="dash-card p-4">
-          <div className="mb-2">
-            <span className="dash-card-title">Lead Sources</span>
+      {showSources && (
+        <div className="mgr-chart-card">
+          <div className="mgr-chart-title">
+            Lead Sources
+            <span className="mgr-chart-tag">last 90 days</span>
           </div>
-          <DashboardBarChart data={leadSources} height={Math.max(160, leadSources.length * 28)} />
+          <DashboardBarChart
+            data={leadSources.map((s) => ({ ...s, color: "var(--gold-500)" }))}
+            height={190}
+          />
         </div>
       )}
     </>
   );
+
+  if (unified) {
+    return (
+      <section className="mgr-section">
+        <div className="mgr-section-head">
+          <h2 className="mgr-section-title">Pipeline Health</h2>
+          <span className="mgr-section-meta">Funnel · SLA status · lead sources</span>
+        </div>
+        <div className="mgr-charts-grid">{charts}</div>
+      </section>
+    );
+  }
+
+  return <>{charts}</>;
 }
