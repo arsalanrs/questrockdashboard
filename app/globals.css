@@ -2762,6 +2762,26 @@ html[data-theme="light"] .kpi-card:hover {
   margin-top: 14px;
 }
 
+/* Verify Eligibility CTA — green accent */
+.proc-so-verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(31, 122, 77, 0.18);
+  border: 1px solid rgba(31, 122, 77, 0.4);
+  color: var(--color-green);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  margin-top: 14px;
+  letter-spacing: 0.01em;
+  transition: background 0.15s;
+}
+.proc-so-verify:hover {
+  background: rgba(31, 122, 77, 0.28);
+}
+
 .proc-so-body { flex: 1; overflow-y: auto; padding: 20px 22px; }
 
 .proc-so-stat-row {

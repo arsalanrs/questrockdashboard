@@ -14,6 +14,11 @@ export type CloserLoanRow = {
   current_stage: string | null;
   closing_date: string | null;
   assigned_loan_officer_name: string | null;
+  loan_amount_cents: number | null;
+  loan_type: string | null;
+  lock_expiration_date: string | null;
+  lendingpad_loan_number: string | null;
+  openConditions: number;
 };
 
 const STAGE_LABEL: Record<string, string> = {
@@ -36,13 +41,26 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function closingMeta(dateStr: string | null): { className: string; label: string; badge: "red" | "yellow" | "green" } {
-  if (!dateStr) return { className: "ok", label: "—", badge: "green" };
+function closingMeta(dateStr: string | null): { label: string; badge: "red" | "yellow" | "green" } {
+  if (!dateStr) return { label: "—", badge: "green" };
   const days = differenceInCalendarDays(new Date(dateStr), new Date());
   const label = format(new Date(dateStr), "MMM d, yyyy");
-  if (days < 0) return { className: "danger", label: `${label} (${Math.abs(days)}d late)`, badge: "red" };
-  if (days <= 3) return { className: "warn", label: `${label} (${days}d)`, badge: "yellow" };
-  return { className: "ok", label, badge: "green" };
+  if (days < 0) return { label: `${label} (${Math.abs(days)}d late)`, badge: "red" };
+  if (days <= 3) return { label: `${label} (${days}d)`, badge: "yellow" };
+  return { label, badge: "green" };
+}
+
+function lockMeta(dateStr: string | null): { label: string; cls: string } {
+  if (!dateStr) return { label: "—", cls: "ok" };
+  const days = differenceInCalendarDays(new Date(dateStr), new Date());
+  if (days < 0) return { label: `Exp ${Math.abs(days)}d ago`, cls: "danger" };
+  if (days <= 7) return { label: `${days}d left`, cls: "warn" };
+  return { label: `${days}d left`, cls: "ok" };
+}
+
+function fmtAmount(cents: number | null): string {
+  if (cents == null) return "—";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 }
 
 type Props = {
@@ -52,6 +70,8 @@ type Props = {
 
 export function CloserQueue({ rows, closerName }: Props) {
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+
+  const condWarning = useMemo(() => rows.filter((r) => r.openConditions > 0).length, [rows]);
 
   const filtered = useMemo(() => {
     if (!stageFilter) return rows;
@@ -64,7 +84,7 @@ export function CloserQueue({ rows, closerName }: Props) {
         <div>
           <div className="ops-eyebrow">
             <span className="ops-eyebrow-pulse" aria-hidden />
-            {rows.length} files to close
+            {rows.length} files to close{condWarning > 0 ? ` · ${condWarning} with open conditions` : ""}
           </div>
           <h1 className="ops-page-title">Closer Queue</h1>
           <p className="ops-page-sub">{closerName} · sorted by closing date</p>
@@ -112,6 +132,9 @@ export function CloserQueue({ rows, closerName }: Props) {
               <th>Borrower</th>
               <th>Stage</th>
               <th>Closing Date</th>
+              <th className="r">Amount</th>
+              <th>Lock</th>
+              <th>Conds</th>
               <th>Assigned LO</th>
               <th className="r">Shape</th>
             </tr>
@@ -119,7 +142,7 @@ export function CloserQueue({ rows, closerName }: Props) {
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="lo-muted px-6 py-8 text-center text-sm">
+                <td colSpan={8} className="lo-muted px-6 py-8 text-center text-sm">
                   No files in closing queue.
                 </td>
               </tr>
@@ -127,6 +150,7 @@ export function CloserQueue({ rows, closerName }: Props) {
             {filtered.map((row) => {
               const name = borrower(row);
               const closing = closingMeta(row.closing_date);
+              const lock = lockMeta(row.lock_expiration_date);
               const av =
                 closing.badge === "red"
                   ? { bg: "#FCEEEC", color: "#A33B2E" }
@@ -148,7 +172,9 @@ export function CloserQueue({ rows, closerName }: Props) {
                       <div>
                         <div className="ops-name-main">{name}</div>
                         <div className="ops-name-sub font-mono text-[11px]">
-                          #{row.shape_record_id ?? "—"}
+                          {row.lendingpad_loan_number
+                            ? `LP #${row.lendingpad_loan_number}`
+                            : `#${row.shape_record_id ?? "—"}`}
                         </div>
                       </div>
                     </div>
@@ -159,7 +185,20 @@ export function CloserQueue({ rows, closerName }: Props) {
                     </Badge>
                   </td>
                   <td>
-                    <span className={cn("ops-hrs", closing.className)}>{closing.label}</span>
+                    <span className={cn("ops-hrs", closing.badge === "red" ? "danger" : closing.badge === "yellow" ? "warn" : "ok")}>
+                      {closing.label}
+                    </span>
+                  </td>
+                  <td className="r font-mono text-[12px]">{fmtAmount(row.loan_amount_cents)}</td>
+                  <td>
+                    <span className={cn("ops-hrs text-[11px]", lock.cls)}>{lock.label}</span>
+                  </td>
+                  <td>
+                    {row.openConditions > 0 ? (
+                      <span className="ops-cond-count">☑ {row.openConditions} open</span>
+                    ) : (
+                      <span className="lo-muted text-[11px]">All clear</span>
+                    )}
                   </td>
                   <td className="lo-muted text-[12px]">{row.assigned_loan_officer_name ?? "—"}</td>
                   <td className="r">
@@ -173,9 +212,7 @@ export function CloserQueue({ rows, closerName }: Props) {
                       >
                         Open ↗
                       </a>
-                    ) : (
-                      "—"
-                    )}
+                    ) : "—"}
                   </td>
                 </tr>
               );

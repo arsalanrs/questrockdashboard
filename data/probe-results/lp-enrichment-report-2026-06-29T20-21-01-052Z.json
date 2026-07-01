@@ -1,0 +1,19 @@
+{
+  "probedAt": "2026-06-29T20:21:01.052Z",
+  "summary": {
+    "shapeLoansConsidered": 3,
+    "withLpUuid": 0,
+    "withoutLpUuid": 3,
+    "enriched": 0,
+    "detailParsed": 0,
+    "documentsWritten": 0,
+    "conditionsWritten": 0,
+    "endpointSummary": {},
+    "recommendCompanyReport": true,
+    "recommendation": "Insufficient LP JSON from per-loan APIs. Run company report ingest for rich milestone dates and underwriting fields.",
+    "errorCount": 0,
+    "sampleErrors": []
+  },
+  "samples": [],
+  "loans": []
+}

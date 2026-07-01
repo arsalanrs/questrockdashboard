@@ -1,0 +1,25 @@
+{
+  "probedAt": "2026-06-29T20:23:24.636Z",
+  "summary": {
+    "shapeLoansTotal": 5215,
+    "pipelineLoansProcessed": 5,
+    "shapeLpLinks": {
+      "shapeCandidates": 3,
+      "linked": 0,
+      "duplicatesRemoved": 0
+    },
+    "withLpUuid": 0,
+    "withoutLpUuid": 5,
+    "enriched": 0,
+    "detailParsed": 0,
+    "documentsWritten": 0,
+    "conditionsWritten": 0,
+    "endpointSummary": {},
+    "recommendCompanyReport": true,
+    "recommendation": "Insufficient LP JSON from per-loan APIs. Run company report ingest for rich milestone dates and underwriting fields.",
+    "errorCount": 0,
+    "sampleErrors": []
+  },
+  "samples": [],
+  "loans": []
+}

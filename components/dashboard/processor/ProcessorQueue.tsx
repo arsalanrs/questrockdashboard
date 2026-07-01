@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/Badge";
 import { shapeLeadUrl } from "@/lib/shape-link";
@@ -21,6 +22,12 @@ export type ProcessorLoanRow = {
   slaStatus: SlaStatus;
   queue: string;
   openConditions: number;
+  credit_score_mid: number | null;
+  ltv_bps: number | null;
+  dti_bps: number | null;
+  lock_expiration_date: string | null;
+  lendingpad_loan_number: string | null;
+  lendingpad_loan_uuid: string | null;
 };
 
 type SummaryDef = {
@@ -62,7 +69,7 @@ const TILE_DEFS: SummaryDef[] = [
   { id: "restructure", label: "Restructure Hold", stages: [], useRestructure: true, tone: "t6", icon: "⏸" },
 ];
 
-function borrower(l: ProcessorLoanRow) {
+function borrowerName(l: ProcessorLoanRow) {
   return [l.borrower_first_name, l.borrower_last_name].filter(Boolean).join(" ") || "—";
 }
 
@@ -100,11 +107,20 @@ function matchesTile(row: ProcessorLoanRow, tile: SummaryDef): boolean {
   return !row.is_restructure_hold && tile.stages.includes(row.current_stage ?? "");
 }
 
-type ChecklistItem = {
-  id: string;
-  title: string;
-  status: string;
-};
+function fmtBps(bps: number | null, unit = "%"): string {
+  if (bps == null) return "—";
+  return `${(bps / 100).toFixed(1)}${unit}`;
+}
+
+function lockInfo(dateStr: string | null): { label: string; cls: string } {
+  if (!dateStr) return { label: "—", cls: "ok" };
+  const days = differenceInCalendarDays(new Date(dateStr), new Date());
+  if (days < 0) return { label: `Exp ${Math.abs(days)}d ago`, cls: "danger" };
+  if (days <= 7) return { label: `${days}d left`, cls: "warn" };
+  return { label: `${days}d left`, cls: "ok" };
+}
+
+type ChecklistItem = { id: string; title: string; status: string };
 
 function GamePlanChecklist({ loanId }: { loanId: string }) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -133,7 +149,9 @@ function GamePlanChecklist({ loanId }: { loanId: string }) {
             <div className="proc-check-icon">{done ? "✓" : ""}</div>
             <div className="proc-check-label">{item.title}</div>
             {!done && item.status === "pending" && (
-              <div className="text-[11px] font-semibold" style={{ color: "var(--color-red)" }}>Pending</div>
+              <div className="text-[11px] font-semibold" style={{ color: "var(--color-red)" }}>
+                Pending
+              </div>
             )}
           </div>
         );
@@ -141,6 +159,9 @@ function GamePlanChecklist({ loanId }: { loanId: string }) {
     </div>
   );
 }
+
+const VERIFICATIONBOT_URL =
+  process.env.NEXT_PUBLIC_VERIFICATIONBOT_URL ?? "https://verificationbot.vercel.app";
 
 type Props = {
   loans: ProcessorLoanRow[];
@@ -167,7 +188,6 @@ export function ProcessorQueue({ loans, processorName }: Props) {
     setSlideOpen(false);
     setSelected(null);
   }
-
 
   return (
     <>
@@ -208,7 +228,7 @@ export function ProcessorQueue({ loans, processorName }: Props) {
             Sortable Queue
           </h2>
           <span className="ops-section-meta">
-            <span className="ops-sort-note">↓ Worst SLA first</span>
+            <span className="ops-sort-note">↓ Worst SLA first · click row for detail</span>
           </span>
         </div>
         <table className="dt">
@@ -217,26 +237,31 @@ export function ProcessorQueue({ loans, processorName }: Props) {
               <th>Borrower</th>
               <th>LO</th>
               <th>Stage</th>
-              <th>Queue</th>
-              <th className="r">Hrs in stage</th>
-              <th>Conditions</th>
+              <th className="r">Hrs</th>
+              <th className="r">FICO</th>
+              <th className="r">LTV</th>
+              <th>Lock</th>
+              <th>Conds</th>
               <th>SLA</th>
+              <th className="r">Shape</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="lo-muted px-6 py-8 text-center text-sm">
+                <td colSpan={10} className="lo-muted px-6 py-8 text-center text-sm">
                   No files in this queue.
                 </td>
               </tr>
             )}
             {filtered.map((row) => {
-              const name = borrower(row);
+              const name = borrowerName(row);
               const av = avatarFor(row.slaStatus);
               const stageKey = row.current_stage ?? "";
               const badgeVariant = STAGE_BADGE[stageKey] ?? "default";
               const isSelected = selected?.id === row.id;
+              const shapeUrl = shapeLeadUrl(row.shape_record_id);
+              const lock = lockInfo(row.lock_expiration_date);
               return (
                 <tr
                   key={row.id}
@@ -263,9 +288,23 @@ export function ProcessorQueue({ loans, processorName }: Props) {
                       {STAGE_LABEL[stageKey] ?? stageKey.replace(/_/g, " ")}
                     </Badge>
                   </td>
-                  <td className="lo-muted text-[12px]">{row.queue}</td>
                   <td className={cn("r ops-hrs", hrsClass(row.slaStatus))}>
                     {row.hours != null ? `${row.hours}h` : "—"}
+                  </td>
+                  <td className="r font-mono text-[12px]">
+                    {row.credit_score_mid != null ? (
+                      <span style={{
+                        color: row.credit_score_mid >= 700 ? "var(--color-green)"
+                          : row.credit_score_mid >= 620 ? "var(--color-amber)"
+                          : "var(--color-red)"
+                      }}>
+                        {row.credit_score_mid}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td className="r font-mono text-[12px]">{fmtBps(row.ltv_bps)}</td>
+                  <td>
+                    <span className={cn("ops-hrs text-[11px]", lock.cls)}>{lock.label}</span>
                   </td>
                   <td>
                     <span className="ops-cond-count">☑ {row.openConditions} open</span>
@@ -275,6 +314,19 @@ export function ProcessorQueue({ loans, processorName }: Props) {
                       {row.slaStatus === "On Track" ? "On track" : row.slaStatus}
                     </Badge>
                   </td>
+                  <td className="r">
+                    {shapeUrl ? (
+                      <a
+                        href={shapeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="lo-link-chip shape"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Open ↗
+                      </a>
+                    ) : "—"}
+                  </td>
                 </tr>
               );
             })}
@@ -282,6 +334,7 @@ export function ProcessorQueue({ loans, processorName }: Props) {
         </table>
       </section>
 
+      {/* Slide-over overlay */}
       <div className={cn("proc-overlay", slideOpen && "open")} onClick={closeSlide} aria-hidden />
       <div className={cn("proc-slideover", slideOpen && "open")} role="dialog" aria-modal="true">
         {!selected ? (
@@ -292,13 +345,12 @@ export function ProcessorQueue({ loans, processorName }: Props) {
         ) : (
           <>
             <div className="proc-so-head">
-              <button type="button" className="proc-so-close" onClick={closeSlide} aria-label="Close">
-                ✕
-              </button>
+              <button type="button" className="proc-so-close" onClick={closeSlide} aria-label="Close">✕</button>
               {(() => {
                 const av = avatarFor(selected.slaStatus);
-                const name = borrower(selected);
+                const name = borrowerName(selected);
                 const shapeUrl = shapeLeadUrl(selected.shape_record_id);
+                const verifyUrl = `${VERIFICATIONBOT_URL}/?loanId=${selected.id}`;
                 return (
                   <>
                     <div className="proc-so-avatar" style={{ background: av.bg, color: av.color }}>
@@ -307,16 +359,27 @@ export function ProcessorQueue({ loans, processorName }: Props) {
                     <p className="proc-so-name">{name}</p>
                     <p className="proc-so-meta">{fmtLoanSub(selected)}</p>
                     <p className="proc-so-meta">LO: {selected.assigned_loan_officer_name ?? "—"}</p>
-                    {shapeUrl ? (
-                      <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="proc-so-shape">
-                        Open in Shape ↗
+                    {selected.lendingpad_loan_number && (
+                      <p className="proc-so-meta font-mono text-[11px]">
+                        LP #{selected.lendingpad_loan_number}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {shapeUrl && (
+                        <a href={shapeUrl} target="_blank" rel="noopener noreferrer" className="proc-so-shape">
+                          Open in Shape ↗
+                        </a>
+                      )}
+                      <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="proc-so-verify">
+                        Verify Eligibility →
                       </a>
-                    ) : null}
+                    </div>
                   </>
                 );
               })()}
             </div>
             <div className="proc-so-body">
+              {/* Core stats */}
               <div className="proc-so-stat-row">
                 <div className="proc-so-stat">
                   <div className="l">Stage</div>
@@ -330,18 +393,12 @@ export function ProcessorQueue({ loans, processorName }: Props) {
                 </div>
                 <div className="proc-so-stat">
                   <div className="l">SLA</div>
-                  <div
-                    className="v"
-                    style={{
-                      fontSize: 13,
-                      color:
-                        selected.slaStatus === "Exceeded"
-                          ? "var(--red-700)"
-                          : selected.slaStatus === "At Risk"
-                            ? "var(--amber-700)"
-                            : "var(--emerald-600)",
-                    }}
-                  >
+                  <div className="v" style={{
+                    fontSize: 13,
+                    color: selected.slaStatus === "Exceeded" ? "var(--red-700)"
+                      : selected.slaStatus === "At Risk" ? "var(--amber-700)"
+                      : "var(--emerald-600)",
+                  }}>
                     {selected.slaStatus}
                   </div>
                 </div>
@@ -350,6 +407,59 @@ export function ProcessorQueue({ loans, processorName }: Props) {
                   <div className="v">{selected.openConditions}</div>
                 </div>
               </div>
+
+              {/* LP underwriting data */}
+              {(selected.credit_score_mid || selected.ltv_bps || selected.dti_bps || selected.lock_expiration_date) && (
+                <div className="proc-so-stat-row" style={{ marginTop: 8 }}>
+                  {selected.credit_score_mid != null && (
+                    <div className="proc-so-stat">
+                      <div className="l">FICO</div>
+                      <div className="v" style={{
+                        color: selected.credit_score_mid >= 700 ? "var(--color-green)"
+                          : selected.credit_score_mid >= 620 ? "var(--color-amber)"
+                          : "var(--color-red)",
+                      }}>
+                        {selected.credit_score_mid}
+                      </div>
+                    </div>
+                  )}
+                  {selected.ltv_bps != null && (
+                    <div className="proc-so-stat">
+                      <div className="l">LTV</div>
+                      <div className="v">{fmtBps(selected.ltv_bps)}</div>
+                    </div>
+                  )}
+                  {selected.dti_bps != null && (
+                    <div className="proc-so-stat">
+                      <div className="l">DTI</div>
+                      <div className="v" style={{
+                        color: selected.dti_bps <= 4300 ? "var(--color-green)"
+                          : selected.dti_bps <= 4900 ? "var(--color-amber)"
+                          : "var(--color-red)",
+                      }}>
+                        {fmtBps(selected.dti_bps)}
+                      </div>
+                    </div>
+                  )}
+                  {selected.lock_expiration_date && (() => {
+                    const lock = lockInfo(selected.lock_expiration_date);
+                    return (
+                      <div className="proc-so-stat">
+                        <div className="l">Rate lock</div>
+                        <div className="v" style={{
+                          fontSize: 12,
+                          color: lock.cls === "danger" ? "var(--color-red)"
+                            : lock.cls === "warn" ? "var(--color-amber)"
+                            : "var(--color-green)",
+                        }}>
+                          {lock.label}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
               <p className="proc-checklist-title">Game Plan</p>
               <GamePlanChecklist loanId={selected.id} />
             </div>

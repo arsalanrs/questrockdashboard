@@ -34,6 +34,12 @@ type LoanRow = {
   loan_amount_cents: number | null;
   is_restructure_hold: boolean;
   assigned_loan_officer_name: string | null;
+  credit_score_mid: number | null;
+  ltv_bps: number | null;
+  dti_bps: number | null;
+  lock_expiration_date: string | null;
+  lendingpad_loan_number: string | null;
+  lendingpad_loan_uuid: string | null;
   loan_stage_events: Array<{ entered_at: string }> | null;
   conditions: Array<{ status: string }> | null;
 };
@@ -87,7 +93,7 @@ export default async function ProcessorDashboardPage() {
     supabase
       .from("loans")
       .select(
-        "id,shape_record_id,borrower_first_name,borrower_last_name,current_stage,loan_type,loan_amount_cents,is_restructure_hold,assigned_loan_officer_name,loan_stage_events(entered_at),conditions(status)",
+        "id,shape_record_id,borrower_first_name,borrower_last_name,current_stage,loan_type,loan_amount_cents,is_restructure_hold,assigned_loan_officer_name,credit_score_mid,ltv_bps,dti_bps,lock_expiration_date,lendingpad_loan_number,lendingpad_loan_uuid,loan_stage_events(entered_at),conditions(status)",
       )
       .in("current_stage", [...RELEVANT_STAGES])
       .limit(500),
@@ -116,7 +122,19 @@ export default async function ProcessorDashboardPage() {
     const slaStatus = computeSlaStatus(hours, maxHours);
     const queue = resolveQueue(l);
     const openConditions = (l.conditions ?? []).filter((c) => c.status === "open").length;
-    return { ...l, hours, slaStatus, queue, openConditions };
+    return {
+      ...l,
+      hours,
+      slaStatus,
+      queue,
+      openConditions,
+      credit_score_mid: l.credit_score_mid,
+      ltv_bps: l.ltv_bps,
+      dti_bps: l.dti_bps,
+      lock_expiration_date: l.lock_expiration_date,
+      lendingpad_loan_number: l.lendingpad_loan_number,
+      lendingpad_loan_uuid: l.lendingpad_loan_uuid,
+    };
   });
 
   enriched.sort((a, b) => {
